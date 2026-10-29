@@ -125,6 +125,8 @@ def test_every_owned_table_grows_an_account_id(pg):
     social_connections.init(pg)
     posts.init(pg)
     addons.init(pg)
+    from src import voice_clone
+    voice_clone.init(pg)
     with db.connect(pg) as conn:
         for table in db.OWNED_TABLES:
             assert "account_id" in db.columns(conn, table), f"{table} has no owner"
@@ -1085,6 +1087,8 @@ def _init_everything(path):
     plugin_tokens.init(path)
     social_connections.init(path)
     posts.init(path)
+    from src import voice_clone
+    voice_clone.init(path)
 
 
 AUTH_SCHEMA = {"users", "accounts", "account_members"}

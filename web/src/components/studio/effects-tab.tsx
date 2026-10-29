@@ -30,6 +30,8 @@ import { assetId } from "@/lib/continue";
 import {
   begin,
   candidateOf,
+  COSTUME_EFFECT,
+  COSTUME_VIDEO,
   missing,
   optionLabel,
   requestOf,
@@ -43,6 +45,7 @@ import {
 import { acceptsFile, fits, makeItPro, vesperHref } from "@/lib/effects-tab";
 import {
   featured as pickFeatured,
+  halloweenOn,
   openOptions,
   readContent,
   slotLabel,
@@ -69,6 +72,8 @@ import {
 } from "@/lib/studio-api";
 import type { Turn } from "@/lib/assistant";
 import pageFile from "@/content/effects-page.json";
+import { pairOf, sideBySideHref } from "@/lib/before-after";
+import { BeforeAfter } from "@/components/studio/before-after";
 import "@/components/studio/asset-viewer.css";
 import "@/components/studio/effects-tab.css";
 /* eslint-disable @next/next/no-img-element */
@@ -77,11 +82,38 @@ const CONTENT = readContent(pageFile);
 
 /* ── an example, playing: a clip loops muted, a still is drawn ── */
 function Example({ item, alt = "" }: { item: ShowcaseItem; alt?: string }) {
+  // a still with its original: half and half (2026-10-27, before and after)
+  if (item.kind === "still" && item.before && item.after) {
+    return <BeforeAfter before={item.before} after={item.after} alt={alt} still />;
+  }
   const rest = restingFrame(item);
   if (item.kind === "clip") {
     return <video src={item.after} poster={rest ?? undefined} autoPlay muted loop playsInline preload="metadata" aria-label={alt || undefined} />;
   }
   return <img src={rest ?? item.after} alt={alt} loading="lazy" />;
+}
+
+/* ── the Halloween neon sign (2026-10-27, Mike's pick: design 08) ──
+   Drawn over the wall while the season is on (halloweenOn); its one button
+   opens the Halloween tab. Nothing on it runs or spends. */
+function HalloweenSign({ onOpen }: { onOpen: () => void }) {
+  return (
+    <section className="fxw-neon" aria-label="Halloween effects">
+      <span className="fxw-neon-kicker">Now showing</span>
+      <h2 className="fxw-neon-word">
+        Hallow<span className="fxw-neon-buzz">e</span>en
+      </h2>
+      <span className="fxw-neon-fx" aria-hidden>
+        FX
+      </span>
+      <div className="fxw-neon-foot">
+        <span>Transforms, looks and recipes for your clips and photos</span>
+        <button type="button" className="fxw-neon-go" onClick={onOpen}>
+          Step inside
+        </button>
+      </div>
+    </section>
+  );
 }
 
 /* ── one tile on the wall ── */
@@ -118,6 +150,7 @@ export function EffectsTab() {
   const [fxError, setFxError] = useState("");
   const [showcase, setShowcase] = useState<ShowcaseManifest | null>(null);
   const [tab, setTab] = useState<TabId>("all");
+  const bar = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [chosenKey, setChosenKey] = useState<string | null>(null);
   // what the effect works on: one source, and a second for a row that takes two
@@ -157,6 +190,11 @@ export function EffectsTab() {
   const tabs = useMemo(() => tabsShown(tiles), [tiles]);
   const strip = useMemo(() => pickFeatured(tiles, CONTENT), [tiles]);
   const bundle = useMemo(() => makeItPro(fx?.items ?? []), [fx]);
+  // the Halloween Costumes section (2026-10-27, Mike: "can this be a section
+  // of the effects tab"): every costume, shown with or without an example --
+  // the one seasonal exception to "a tile shows once it has an example"
+  const costumes = useMemo(() => tiles.filter((t) => t.effect.id === COSTUME_EFFECT), [tiles]);
+  const costumeVideo = useMemo(() => tiles.find((t) => t.effect.id === COSTUME_VIDEO) ?? null, [tiles]);
   const chosen = useMemo(() => tiles.find((t) => t.key === chosenKey) ?? null, [tiles, chosenKey]);
   const effect = chosen?.effect ?? null;
   const ready = !!fx?.ready;
@@ -298,6 +336,16 @@ export function EffectsTab() {
       setBusy(false);
     }
   }
+  /* a costume still's "Make it a video": the try-on recipe in the panel, on
+     the ORIGINAL photo, with the same costume as its one detail */
+  const costumeVideoOn = (run: { turn: Turn; effect: Effect }) => {
+    const fxState = run.turn.effect;
+    if (!costumeVideo || !fxState) return;
+    const name = fxState.options.costume;
+    choose(costumeVideo);
+    if (fxState.sources[0]) setSource(fxState.sources[0]);
+    setPrompt(name === undefined ? "" : valueLabel("costume", name));
+  };
   const makeProOn = (on: Candidate[]) => {
     if (!bundle) return;
     const tile = tiles.find((t) => t.key === bundle.id);
@@ -402,6 +450,12 @@ export function EffectsTab() {
             </div>
           ) : shown?.turn.made?.clip ? (
             <video src={mediaSrc(shown.turn.made.clip)} controls playsInline autoPlay muted loop />
+          ) : shown?.turn.made?.image && pairOf(shown.turn.effect, shown.turn.made) ? (
+            <BeforeAfter
+              before={mediaSrc(pairOf(shown.turn.effect, shown.turn.made)!.before)}
+              after={mediaSrc(shown.turn.made.image)}
+              alt={`${shown.effect.label} result`}
+            />
           ) : shown?.turn.made?.image ? (
             <img src={mediaSrc(shown.turn.made.image)} alt={`${shown.effect.label} result`} />
           ) : chosen?.media ? (
@@ -424,7 +478,7 @@ export function EffectsTab() {
 
         {chosen && !shown ? <small className="fxp-model">{chosen.effect.recipe ? `Phantra recipe · ${chosen.effect.made_with || chosen.effect.label}` : chosen.effect.label}{chosen.free ? " · free" : ""}</small> : null}
 
-        {shown ? <ResultPane turn={shown.turn} effect={shown.effect} bundle={bundle} onMakeItPro={makeProOn} /> : null}
+        {shown ? <ResultPane turn={shown.turn} effect={shown.effect} bundle={bundle} onMakeItPro={makeProOn} onCostumeVideo={costumeVideo ? () => costumeVideoOn(shown) : undefined} /> : null}
 
         {slot("first")}
         {mismatch ? <p className="fxp-note">{mismatch}</p> : null}
@@ -509,6 +563,33 @@ export function EffectsTab() {
 
       {/* ── the wall ── */}
       <div className="fxw-main">
+        {halloweenOn() && !query ? (
+          <HalloweenSign
+            onOpen={() => {
+              setTab("halloween");
+              bar.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
+        ) : null}
+        {/* the costumes leave with the season, like the sign above */}
+        {halloweenOn() && costumes.length && !query ? (
+          <section className="fxw-season" aria-label="Halloween Costumes">
+            <div className="fxw-season-head">
+              <h3>Halloween Costumes</h3>
+              <p>Pick a costume and add your photo to see yourself in it, face kept. Then make it a video.</p>
+            </div>
+            <ul className="fxw-season-row">
+              {costumes.map((t) => (
+                <li key={t.key}>
+                  <button type="button" className="fxw-costume" data-chosen={t.key === chosenKey ? "1" : undefined} aria-pressed={t.key === chosenKey} onClick={() => choose(t)}>
+                    {t.media ? <Example item={t.media} alt={t.name} /> : null}
+                    <span>{t.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {strip.length && !query ? (
           <div className="fxw-strip" data-n={strip.length}>
             {strip.map((t, i) => (
@@ -521,7 +602,7 @@ export function EffectsTab() {
           </div>
         ) : null}
 
-        <div className="fxw-bar">
+        <div className="fxw-bar" ref={bar}>
           <div className="fxw-tabs" role="group" aria-label="Effect groups">
             {tabs.map((t) => (
               <button key={t.id} type="button" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
@@ -557,7 +638,7 @@ export function EffectsTab() {
               {results.slice(1).map((r) => (
                 <li key={r.turn.made?.id ?? r.turn.effect?.id}>
                   <b>{r.turn.content}</b>
-                  <ResultPane turn={r.turn} effect={r.effect} bundle={bundle} onMakeItPro={makeProOn} compact />
+                  <ResultPane turn={r.turn} effect={r.effect} bundle={bundle} onMakeItPro={makeProOn} onCostumeVideo={costumeVideo ? () => costumeVideoOn(r) : undefined} compact />
                 </li>
               ))}
             </ul>
@@ -574,12 +655,15 @@ function ResultPane({
   effect,
   bundle,
   onMakeItPro,
+  onCostumeVideo,
   compact,
 }: {
   turn: Turn;
   effect: Effect;
   bundle: Effect | null;
   onMakeItPro: (on: Candidate[]) => void;
+  /** a Halloween costume still: put its video in the panel */
+  onCostumeVideo?: () => void;
   compact?: boolean;
 }) {
   const made = turn.made;
@@ -591,14 +675,26 @@ function ResultPane({
   const self = candidateOf({ image: made.image, clip: made.clip, asset: made.asset }, "this result");
   const toVesper = vesperHref(made.asset, effect.label);
   const proWhy = bundle && self ? unavailable(bundle, [self]) : "";
+  const pair = pairOf(turn.effect, made);
+  const pairHref = pair ? sideBySideHref(pair) : null;
   return (
     <div className="fxp-result">
       {compact ? made.clip ? <video src={mediaSrc(made.clip)} controls playsInline /> : made.image ? <img src={mediaSrc(made.image)} alt={`${effect.label} result`} /> : null : null}
       <div className="fxp-result-acts">
+        {effect.id === COSTUME_EFFECT && onCostumeVideo ? (
+          <button type="button" className="fxp-pill primary" title="Puts the costume video in the panel, from your original photo. Nothing runs until you approve." onClick={onCostumeVideo}>
+            <Sparkles strokeWidth={1.8} /> Make it a video
+          </button>
+        ) : null}
         {bundle && bundle.id !== effect.id && self ? (
           <button type="button" className="fxp-pill primary" disabled={!!proWhy} title={proWhy || "Puts Make It Pro in the panel with this result. Nothing runs until you approve."} onClick={() => onMakeItPro([self])}>
             <Sparkles strokeWidth={1.8} /> Make It Pro
           </button>
+        ) : null}
+        {pairHref ? (
+          <a className="fxp-pill" href={pairHref} download title="Your original photo beside the result, as one image. Free.">
+            <Download strokeWidth={1.8} /> Download side-by-side
+          </a>
         ) : null}
         {id !== null ? <ShareControls key={id} id={id} /> : null}
         {id !== null ? (

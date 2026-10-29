@@ -714,7 +714,7 @@ function Generator({ kind }: { kind: Kind }) {
               items={modelItems}
               picked={vPick?.model ?? ""}
               onPick={chooseModel}
-              title={`${items.length} video models · price at each one's opening pick`}
+              title={`${items.length} video models`}
               foot="Switching keeps your prompt. A length or frame the new model does not take moves to its own, and a line says so."
               wide
             />
@@ -805,7 +805,7 @@ function Frame({ aspect }: { aspect: string }) {
   return <span className="dg-frame" style={{ width: ww || big, height: hh || big }} aria-hidden />;
 }
 
-type MenuItem = { id: string; name: string; note: string; right: string; icon?: ReactNode };
+export type MenuItem = { id: string; name: string; note: string; right: string; icon?: ReactNode };
 
 function MenuList({ items, picked, onPick, title, foot, shapes, scroll }: {
   items: MenuItem[];
@@ -847,8 +847,9 @@ function MenuList({ items, picked, onPick, title, foot, shapes, scroll }: {
   );
 }
 
-/** The panel's model button: a dropdown that opens downward. */
-function ModelMenu(props: {
+/** The panel's model button: a dropdown that opens downward. (The Voice
+ *  page's pickers are this button too.) */
+export function ModelMenu(props: {
   open: boolean;
   onOpen: () => void;
   onClose: () => void;

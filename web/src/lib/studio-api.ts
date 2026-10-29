@@ -10,6 +10,8 @@ import type { Skill } from "@/lib/skills";
 import type { StudioPage } from "@/lib/ad-studio";
 import type { Effect, OptionValue } from "@/lib/effects";
 import type { TalkMenu } from "@/lib/talking-photo";
+import type { DubMenu } from "@/lib/dubbing";
+import type { VoiceMenu } from "@/lib/voice-tab";
 import type { RoleOption } from "@/lib/ref-roles";
 import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
@@ -1039,6 +1041,80 @@ export const runTalk = (body: TalkBody & { expect_credits: number }) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+/* ── a dub (src/dubbing.py; lib/dubbing.ts) ── */
+export const getDubMenu = () => apiFetch<DubMenu>("/dubbing");
+export type DubBody = {
+  source: string;
+  target_language: string;
+  source_language?: string;
+  speakers?: number;
+  consent: boolean;
+  project_id?: number;
+};
+export type DubQuote = { credits: number; charged: boolean; language: string; clip_seconds: number; billed_minutes: number };
+/** what dubbing this clip into this language costs; spends nothing */
+export const quoteDub = (body: DubBody) =>
+  apiFetch<DubQuote>("/dubbing/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Render click, at the price the card showed */
+export const runDub = (body: DubBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/dubbing/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/* ── the Voice section (src/voice_studio.py; lib/voice-tab.ts) ── */
+export const getVoiceMenu = () => apiFetch<VoiceMenu>("/voice");
+export type SpeakBody = { script: string; voice: string; language: string; project_id?: number };
+export type SpeakQuote = { voice: string; language: string | null; characters: number; credits: number; charged: boolean };
+/** what reading this script costs; spends nothing */
+export const quoteSpeak = (body: SpeakBody) =>
+  apiFetch<SpeakQuote>("/voice/speak/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Make click, at the price the panel showed. The job's result names
+ *  the read (`audio`, asset:<id>), its `seconds` and where to play it (`output`). */
+export const runSpeak = (body: SpeakBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/speak/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export type LibraryBody = { script: string; voice: string; emotion: string; speed: number; pitch: number; project_id?: number };
+/** a library read's price (MiniMax Speech-02 HD); spends nothing */
+export const quoteLibrary = (body: LibraryBody) =>
+  apiFetch<SpeakQuote>("/voice/library/quote", { method: "POST", body: JSON.stringify(body) });
+export const runLibrary = (body: LibraryBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/library/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export type DialogueBody = { speakers: string[]; lines: { speaker: number; text: string }[]; project_id?: number };
+export type DialogueQuote = { speakers: number; lines: number; characters: number; estimate_seconds: number; credits: number; charged: boolean };
+/** a dialogue's price, an upper bound (VibeVoice 7B); spends nothing */
+export const quoteDialogue = (body: DialogueBody) =>
+  apiFetch<DialogueQuote>("/voice/dialogue/quote", { method: "POST", body: JSON.stringify(body) });
+export const runDialogue = (body: DialogueBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/dialogue/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export type CloneBody = { sample: string; name: string };
+/** what cloning this voice costs; spends nothing (the consent line is heard at the run) */
+export const quoteClone = (body: CloneBody) =>
+  apiFetch<{ name: string; sample_seconds: number; credits: number; charged: boolean }>("/voice/clone/quote", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+/** the Clone click, at the price the panel showed. The job's result names
+ *  the voice (`voice_id`, `name`) and its preview (`audio`, `output`). */
+export const runClone = (body: CloneBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/clone/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+/** take a cloned voice off this account's library */
+export const removeClone = (voiceId: string) =>
+  apiFetch<{ removed: string }>(`/voice/clones/${encodeURIComponent(voiceId)}`, { method: "DELETE" });
 
 /** A free edit the brain proposed (POST /api/quick-edit): a new shape or a
  *  range, made on the studio's server for no credits, as a job. `source`

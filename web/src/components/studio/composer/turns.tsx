@@ -20,6 +20,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Clapperboard,
+  Columns2,
   Download,
   Ellipsis,
   Film,
@@ -61,7 +62,9 @@ import type { Effect, EffectState } from "@/lib/effects";
 import { TalkingPhotoStep } from "@/components/studio/talking-photo-step";
 import { AdStep } from "@/components/studio/ad-step";
 import type { AdState } from "@/lib/ad-card";
+import { DubbingStep } from "@/components/studio/dubbing-step";
 import type { PhotoChoice, TalkMenu, TalkState } from "@/lib/talking-photo";
+import type { ClipChoice, DubMenu, DubState } from "@/lib/dubbing";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
 import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
@@ -69,6 +72,8 @@ import { RenderCard } from "@/components/studio/render-card";
 import { cardFonts } from "@/components/studio/card-fonts";
 import type { Concept } from "@/lib/studio-api";
 import { cutLine, joinable, trimProblem } from "@/lib/final-cut";
+import { pairOf, sideBySideHref } from "@/lib/before-after";
+import { BeforeAfter } from "@/components/studio/before-after";
 // vesper_v2 (docs/tasks/task-vesper-v2.md): a question the person taps,
 // and the next steps offered under a rendered scene
 import { isAskTool, questionOf } from "@/lib/tappable";
@@ -168,6 +173,14 @@ type Handlers = {
    *  a problem to say, and Close (the panel folds to its line) */
   onPostDone: (id: string, text: string) => void;
   onPostError: (why: string) => void;
+  /** a dub's card (lib/dubbing.ts): its menu, the clips it offers, the
+   *  project a clip is filed under, a change applied to the card's current
+   *  state, and the Render click */
+  dubMenu: DubMenu | null;
+  dubChoices: ClipChoice[];
+  dubProject: number | null;
+  onDubPatch: (id: string, fn: (s: DubState) => DubState) => void;
+  onDubApprove: (id: string, credits: number, charged: boolean) => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -242,6 +255,7 @@ const ICON: Record<ContinueKind, LucideIcon> = {
   canvas: Clapperboard,
   render: Play,
   reuse: RotateCcw,
+  pair: Columns2,
 };
 /* a send that did not finish puts its prompt back in the box */
 const RETRY: ContinueAction = { id: "reuse", kind: "reuse", label: "Try again", title: "", primary: true };
@@ -296,6 +310,15 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
       </>
     );
     const done = () => setOpen(false);
+    if (a.kind === "pair") {
+      const pair = pairOf(turn.effect, m);
+      const href = pair ? sideBySideHref(pair) : null;
+      return href ? (
+        <a key={a.id} className={cls} role={role} href={href} download title={a.title} onClick={done}>
+          {inner}
+        </a>
+      ) : null;
+    }
     if (a.kind === "download" && render !== null) {
       return (
         <a key={a.id} className={cls} role={role} href={renderDownloadHref(render)} title={a.title} onClick={done}>
@@ -533,6 +556,16 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
             <video src={mediaSrc(m.clip)} controls muted loop playsInline preload="metadata" />
           </div>
           <span className="zc-label on">Clip 01</span>
+        </motion.div>
+      </div>
+    ) : pairOf(turn.effect, m) ? (
+      // a costume still: compared with the photo it was made from
+      <div className="zc-tiles one">
+        <motion.div className="zc-tilewrap" {...tile(0)} style={{ maxWidth: 420 }}>
+          <div className="zc-tile on pair">
+            <BeforeAfter before={mediaSrc(pairOf(turn.effect, m)!.before)} after={mediaSrc(m.image ?? "")} alt="Your costume" />
+          </div>
+          <span className="zc-label on">Before and after · drag to compare</span>
         </motion.div>
       </div>
     ) : (
@@ -875,6 +908,17 @@ export function ComposerStream({
                       />
                     </div>
                   )
+                ) : null}
+                {t.dub ? (
+                  <DubbingStep
+                    turn={t}
+                    menu={handlers.dubMenu}
+                    choices={handlers.dubChoices}
+                    busy={handlers.busy}
+                    projectId={handlers.dubProject}
+                    onPatch={(fn) => handlers.onDubPatch(t.dub?.id ?? "", fn)}
+                    onApprove={(credits, charged) => handlers.onDubApprove(t.dub?.id ?? "", credits, charged)}
+                  />
                 ) : null}
                 {t.ad ? (
                   <AdStep

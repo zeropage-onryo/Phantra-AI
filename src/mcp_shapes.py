@@ -370,7 +370,7 @@ class PromptCraft(_Open):
 
 
 SPEND_TOOLS = ("generate_image", "generate_video", "apply_effect", "element_sheet",
-               "edit_clip", "voice_preview", "talking_photo")
+               "edit_clip", "voice_preview", "talking_photo", "dub_clip")
 
 SHAPES: dict[str, type[BaseModel]] = {
     "projects": ProjectList,

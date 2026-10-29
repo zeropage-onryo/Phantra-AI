@@ -315,7 +315,7 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
   // effect writes exactly that.
   const finishProject = useCallback((written: ComposerDraft["written"]) => {
     // what was made stays, and so does the plan that made it
-    setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect || !!t.talk));
+    setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect || !!t.talk || !!t.dub));
     setStage("");
     // the brand kit picked for this conversation stays, and so do the box's
     // references and what each is for: a rewrite of the scene is held to

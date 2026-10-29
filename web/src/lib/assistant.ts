@@ -17,6 +17,7 @@ import type { Plan } from "@/lib/make-plan";
 import type { EffectState } from "@/lib/effects";
 import type { TalkState } from "@/lib/talking-photo";
 import type { AdState } from "@/lib/ad-card";
+import type { DubState } from "@/lib/dubbing";
 import type { Made } from "@/lib/composer";
 import { decodeMascot, encodeMascot, nameOf } from "@/lib/mascot";
 import { asRoles } from "@/lib/ref-roles";
@@ -218,6 +219,9 @@ export type Turn = {
   /** a post the brain proposed (lib/composer.ts POST_TOOL): what, the words
    *  and when, drawn as the Post panel; `done` is what Schedule answered */
   post?: { id: string; source: string; kind: "video" | "image"; caption: string; at: string | null; done?: string };
+  /** the composer: a dub on its way to a clip (lib/dubbing.ts) -- the clip,
+   *  the language, the consent. The dubbed clip is this turn's `made`. */
+  dub?: DubState;
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
   /** a still's step: the model the PERSON chose on its card, over the

@@ -110,12 +110,12 @@ def _tell(event: str, credits: int, held: int, charged: bool) -> None:
 
 class Charge:
     __slots__ = ("account_id", "provider", "ref", "estimate_usd", "key_source",
-                 "source", "dsn", "quote", "hold_id", "held", "attempted", "_done")
+                 "source", "dsn", "quote", "model", "hold_id", "held", "attempted", "_done")
 
     def __init__(self, account_id: Optional[int], *, provider: str, ref: str,
                  estimate_usd, key_source: Optional[str] = None,
                  source: Optional[str] = None, dsn: Optional[str] = None,
-                 quote=None):
+                 quote=None, model: Optional[str] = None):
         self.account_id = account_id
         self.provider = provider
         self.ref = str(ref)
@@ -130,6 +130,13 @@ class Charge:
         # the CLI). Duck-typed: this module never imports
         # pricing (pricing -> providers -> the adapters -> here).
         self.quote = quote
+        # The video model this render is on, or None (a still, an effect).
+        # It picks the markup an UNQUOTED hold converts the estimate at
+        # (pricing.markup_for, 2026-10-27): a clip's card prices at its
+        # model's markup, so a hold that fell back to MARKUP would hold more
+        # than the card showed. A quoted hold ignores it -- the Quote's
+        # credits are the price.
+        self.model = model
         self.hold_id: Optional[int] = None
         self.held: int = 0
         # True once submitted() ran -- i.e. the provider was about to be
@@ -167,13 +174,15 @@ class Charge:
                 print(f"[charge] release_due failed for account {self.account_id}: {e}",
                       file=sys.stderr)
         credits = self._quoted()
+        if credits is None and self.model and self.estimate_usd is not None:
+            credits = ledger.charge_credits(self.estimate_usd, model=self.model)
         self.hold_id = ledger.hold_for_render(
             self.account_id, ref=self.ref, provider=self.provider,
             estimate_usd=self.estimate_usd, key_source=self.key_source,
             source=self.source, credits=credits, dsn=self.dsn)
         if self.hold_id is not None:
             self.held = (credits if credits is not None
-                         else ledger.charge_credits(self.estimate_usd))
+                         else ledger.charge_credits(self.estimate_usd, model=self.model))
             _tell("hold", self.held, self.held, True)
         return self.hold_id
 
@@ -230,7 +239,7 @@ class Charge:
             credits = self.held          # the quoted price is the price rendered
         else:
             usd = self.estimate_usd if actual_usd is None else actual_usd
-            credits = ledger.charge_credits(usd)
+            credits = ledger.charge_credits(usd, model=self.model)
         debited = ledger.settle(self.hold_id, credits=credits,
                                 generation_id=generation_id, cap=self.held, dsn=self.dsn)
         _tell("settle", debited, self.held, True)
@@ -242,7 +251,7 @@ class Charge:
         try:
             if self.quote is not None:
                 return int(self.quote.credits)
-            return int(ledger.charge_credits(self.estimate_usd))
+            return int(ledger.charge_credits(self.estimate_usd, model=self.model))
         except Exception:  # noqa: BLE001 -- an unpriceable render costs nothing to say
             return 0
 

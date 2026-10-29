@@ -36,6 +36,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AudioLines,
   AtSign,
   CalendarDays,
   ChevronsUpDown,
@@ -80,10 +81,11 @@ import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
+import { halloweenOn } from "@/lib/effects-wall";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "image" | "video" | "ads" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "calendar" | "settings";
+export type ViewId = "studio" | "image" | "video" | "ads" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "voice" | "renders" | "calendar" | "settings";
 
 type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
 const NAV: NavItem[] = [
@@ -99,6 +101,9 @@ const NAV: NavItem[] = [
   // only while the `effects_tab` capability is on; the page itself 404s
   // without it, so an entry with the flag off would point at nothing
   { id: "effects", label: "Effects", href: "/studio/effects", icon: Sparkles, cap: "effects_tab" },
+  // the Voice section (2026-10-26, docs/tasks/task-voice-tab.md): every voice
+  // model on one page, behind `voice_tab` the same way
+  { id: "voice", label: "Voice", href: "/studio/voice", icon: AudioLines, cap: "voice_tab" },
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
@@ -131,6 +136,7 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/elements", "elements"],
   ["/studio/brand", "brand"],
   ["/studio/effects", "effects"],
+  ["/studio/voice", "voice"],
   ["/studio/image", "image"],
   ["/studio/video", "video"],
   ["/studio/ads", "ads"],
@@ -561,6 +567,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 <>
                   <Icon strokeWidth={1.35} />
                   <span className="rl">{label}</span>
+                  {id === "effects" && halloweenOn() ? (
+                    <span className="rl rneon" aria-label="Halloween effects">
+                      Halloween
+                    </span>
+                  ) : null}
                   {id === "studio" && unseen > 0 ? (
                     <span className="nbadge" aria-label={`${unseen} new`}>
                       {unseen > 9 ? "9+" : unseen}
@@ -574,7 +585,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   {inner}
                 </a>
               ) : (
-                <Link key={id} href={href} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
+                <Link key={id} href={href} data-nav={id} data-neon={id === "effects" && halloweenOn() ? "1" : undefined} aria-current={current ? "page" : undefined} title={label}>
                   {inner}
                 </Link>
               );

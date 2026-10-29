@@ -85,6 +85,7 @@ import {
   getAssets,
   getEffects,
   getTalkMenu,
+  getDubMenu,
   getClipModels,
   getRefRoles,
   getRender,
@@ -103,6 +104,7 @@ import {
   runCreativeGuide,
   runEffect,
   runTalk,
+  runDub,
   runQuickEdit,
   runGuideAction,
   runKitChange,
@@ -168,6 +170,7 @@ import {
   isEffectTool,
   isTalkTool,
   isAdTool,
+  isDubTool,
   isQuickTool,
   isPostTool,
   type QuickTool,
@@ -210,7 +213,19 @@ import {
   type Prices,
 } from "@/lib/make-plan";
 import { failLine, madeStatus } from "@/lib/made-state";
-import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
+import {
+  begin,
+  candidateOf,
+  candidates,
+  COSTUME_EFFECT,
+  COSTUME_VIDEO,
+  requestOf,
+  sourcesFor,
+  valueLabel,
+  type Candidate,
+  type Effect,
+  type EffectState,
+} from "@/lib/effects";
 import { adRequest, beginAd, withPreview, type AdState } from "@/lib/ad-card";
 import {
   applyOp,
@@ -244,6 +259,7 @@ import {
   type TalkMenu,
   type TalkState,
 } from "@/lib/talking-photo";
+import { beginDub, clipChoices, dubRequest, languageName, type DubMenu, type DubState } from "@/lib/dubbing";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
@@ -291,6 +307,8 @@ import {
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
+import { VesperPeek } from "@/components/studio/vesper-peek";
+import { takeTalk } from "@/lib/creature";
 
 /* an upload on its way to the bin: drawn from its object URL until the
    server answers with the URL the draft keeps */
@@ -630,6 +648,8 @@ function Composer() {
   const [fxOpen, setFxOpen] = useState(false);
   // the talking-photo card's menu (GET /api/talking-photo): voices, bounds
   const [talkMenu, setTalkMenu] = useState<TalkMenu | null>(null);
+  // the dub card's menu (GET /api/dubbing): the languages, the length limit
+  const [dubMenu, setDubMenu] = useState<DubMenu | null>(null);
   // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
   const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
@@ -658,6 +678,21 @@ function Composer() {
   // open it; its drop tile hands files to attach(), its picks join `picked`
   const [libOpen, setLibOpen] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  // Vesper's corner was clicked on another page (lib/creature.ts askToTalk):
+  // he is behind this box now, and the cursor goes in it
+  // (read once into a ref: a development double-run must not lose it)
+  const talkAsked = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (talkAsked.current === null) talkAsked.current = takeTalk();
+    if (!talkAsked.current) return;
+    // the box can mount a beat after the page does: try a few times
+    const ts = [80, 400, 1200].map((ms) =>
+      setTimeout(() => {
+        if (document.activeElement !== textarea.current) textarea.current?.focus();
+      }, ms),
+    );
+    return () => ts.forEach(clearTimeout);
+  }, []);
   const stackRef = useRef<HTMLDivElement>(null);
   const dragDepth = useRef(0);
   const still = useReducedMotion();
@@ -687,6 +722,9 @@ function Composer() {
     getTalkMenu()
       .then(setTalkMenu)
       .catch(() => setTalkMenu(null));
+    getDubMenu()
+      .then(setDubMenu)
+      .catch(() => setDubMenu(null));
     getRefRoles()
       .then((r) => setRefRoles(r.roles))
       .catch(() => setRefRoles([]));
@@ -722,7 +760,8 @@ function Composer() {
       .catch(() => setClipModels([]));
     apiFetch<{ items: { id: string; label: string; note: string; credits: number; references?: boolean }[]; default: string }>("/image-models")
       .then((r) => {
-        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: `${m.note} · ${m.credits} credits`, credits: m.credits, references: m.references }));
+        // no price in the picker (2026-10-27): the send button and the card's Approve show it
+        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits, references: m.references }));
         setImageModels(items);
         const kept = loadImageModel();
         setImageModelState(items.some((m) => m.id === kept) ? kept : r.default);
@@ -795,15 +834,29 @@ function Composer() {
   const openParam = params.get("open");
   const appliedOpen = useRef(false);
   useEffect(() => {
-    if (!ready || appliedOpen.current || (openParam !== "talking-photo" && openParam !== "effects")) return;
+    if (!ready || appliedOpen.current || (openParam !== "talking-photo" && openParam !== "effects" && openParam !== "costume")) return;
+    // a card opened from the home would land in a thread the home does not
+    // show ("Continue your chat"): the arrival moves to the chat page first,
+    // and the card opens there (2026-10-27)
+    if (homePage && openParam !== "effects") {
+      router.replace(`/studio/chat?open=${encodeURIComponent(openParam)}`, { scroll: false });
+      return;
+    }
+    // ?open=costume (2026-10-27, the Halloween try-on page): the costume
+    // card itself, which needs the effects listing first
+    if (openParam === "costume" && !fx) return;
     appliedOpen.current = true;
     // ?open=effects (2026-10-26): the phone's Effects tab when the Effects
     // page's flag is off -- the composer's own gallery, opened here
     if (openParam === "effects") openEffects();
-    else startTalk();
+    else if (openParam === "costume") {
+      const item = fx?.items.find((e) => e.id === COSTUME_EFFECT);
+      if (item) startEffect(item);
+      else openEffects();
+    } else startTalk();
     router.replace(pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
-  }, [ready, openParam]);
+  }, [ready, openParam, fx, homePage]);
 
   // Back from the sign-up a signed-out send opened (2026-10-26): the prompt
   // it kept goes back in the box, once, if the box is empty. Never sent.
@@ -882,6 +935,28 @@ function Composer() {
     appliedSeconds.current = secondsParam;
     if (secondsParam >= lengths.min && secondsParam <= lengths.max) setSeconds(secondsParam);
   }, [secondsParam, lengths]);
+
+  // The Library's "Dub" lands here as ?dub=gen:<id>: the dub card opens on
+  // that clip once the thread has loaded, and the address loses the param so
+  // a reload does not open a second one. Nothing is spent by arriving.
+  const dubParam = params.get("dub");
+  const appliedDub = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !dubParam || dubParam === appliedDub.current) return;
+    appliedDub.current = dubParam;
+    const id = assetId(dubParam);
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("dub");
+    router.replace(`${pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+    if (id === null) return;
+    getRender(id)
+      .then((r) => {
+        if (r.kind !== "video") throw new Error("not a clip");
+        startDub({ on: { ref: r.ref, kind: "clip", from: "the clip from your Library" } });
+      })
+      .catch(() => toast("That clip is not on your Library wall", "err"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per arrival
+  }, [ready, dubParam]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -1452,7 +1527,7 @@ function Composer() {
   const conversationOf = (turns: Turn[]) =>
     turns
       .filter((m) => !m.failed)
-      .map(({ role, content, made, plan, effect, talk, ad }) => ({
+      .map(({ role, content, made, plan, effect, talk, ad, dub }) => ({
         role,
         // a result is named by the number the person sees on it (#3)
         content: ad
@@ -1461,6 +1536,8 @@ function Composer() {
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : talk
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}talking photo — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
+          : dub
+          ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}dub — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
           : made
           ? `${content}\n[${made.n ? `${refTag(made.n)}: ` : ""}made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
           : plan
@@ -1977,6 +2054,25 @@ function Composer() {
       ),
     [uploads, picked, thread],
   );
+  /* A card opened before anything was attached (the costume card off the
+     landing page) takes the first photo that is: a waiting card with no
+     source binds to what now fits. Nothing runs; the card still waits. */
+  useEffect(() => {
+    if (!fx || !fxCandidates.length) return;
+    // the raw setter: a re-bind is not a new turn, so it never moves the home to the chat
+    setTurnsRaw((all) => {
+      let changed = false;
+      const next = all.map((t) => {
+        if (!t.effect || t.made || t.effect.sources.length) return t;
+        const item = fx.items.find((e) => e.id === t.effect?.effect);
+        const found = item ? sourcesFor(item, fxCandidates) : [];
+        if (!item || found.length < item.sources.min) return t;
+        changed = true;
+        return { ...t, effect: { ...t.effect, sources: found } };
+      });
+      return changed ? next : all;
+    });
+  }, [fx, fxCandidates, setTurnsRaw]);
   // a pick from the gallery: a card in the thread, and nothing has run
   function startEffect(item: Effect) {
     const state = begin(item, fxCandidates, newMadeId(), { on: fxOn });
@@ -2104,6 +2200,57 @@ function Composer() {
       // voice that is gone): the card goes back to waiting and prices again
       polling.current.delete(madeId);
       setThread((all) => all.map((t) => (t.talk?.id === id && t.talk ? { ...t, made: undefined, talk: { ...t.talk, paid: undefined } } : t)));
+      toast(e instanceof Error ? e.message : "That did not go through.", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* A DUB (lib/dubbing.ts, 2026-10-26)
+     A clip with speech on it, spoken again in another language. The card
+     offers the thread's clips; the person picks the language, ticks the
+     consent box, and its Render is the click that spends. */
+  const dubChoices = useMemo(() => clipChoices(fxCandidates), [fxCandidates]);
+  function startDub(given: { on?: Candidate | null; target?: string } = {}, reply?: GuideReply, looked?: Turn["looked"]) {
+    const state = beginDub(dubChoices, newMadeId(), given, dubMenu);
+    setThread((all) => [...all, { role: "assistant", content: reply?.message ?? "Dub a clip", reply, looked, dub: state }]);
+  }
+  const patchDub = useCallback(
+    (id: string, fn: (s: DubState) => DubState) =>
+      setThread((all) => all.map((t) => (t.dub?.id === id && t.made?.status !== "running" ? { ...t, dub: fn(t.dub) } : t))),
+    [setThread],
+  );
+  /* The card's Render: the click that spends, at the price it showed. */
+  async function approveDub(id: string, credits: number, charged: boolean) {
+    const turn = threadRef.current.find((t) => t.dub?.id === id);
+    const state = turn?.dub;
+    const body = state ? dubRequest(state, project?.id) : null;
+    if (!state || !body || busy || (turn?.made && isRunning(turn))) return;
+    const madeId = newMadeId();
+    const made: Made = {
+      id: madeId,
+      output: "video",
+      refs: [],
+      status: "running",
+      detail: `Dubbing into ${languageName(dubMenu, state.target)}…`,
+      prompt: "",
+      // an effect's job shape: a reload resumes it through finishEffect
+      effect: "dub",
+      model: "elevenlabs-dubbing",
+    };
+    setBusy(true);
+    setThread((all) => all.map((t) => (t.dub?.id === id && t.dub ? { ...t, made, dub: { ...t.dub, paid: { credits, charged } } } : t)));
+    polling.current.add(madeId);
+    try {
+      const started = await runDub({ ...body, expect_credits: credits });
+      patchMade(madeId, { jobId: started.job_id });
+      const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
+      finishEffect(madeId, job);
+    } catch (e) {
+      // refused before anything ran (a price that moved, no consent): the
+      // card goes back to waiting and prices again
+      polling.current.delete(madeId);
+      setThread((all) => all.map((t) => (t.dub?.id === id && t.dub ? { ...t, made: undefined, dub: { ...t.dub, paid: undefined } } : t)));
       toast(e instanceof Error ? e.message : "That did not go through.", "err");
     } finally {
       setBusy(false);
@@ -2539,6 +2686,20 @@ function Composer() {
         } else if (proposal && isPostTool(proposal.tool)) {
           // A POST: the Post panel opens filled in; its Schedule sends it
           openPost(reply, looked, proposal.args as Record<string, unknown>);
+        } else if (proposal && isDubTool(proposal.tool)) {
+          // A DUB: the card opens with the clip the person pointed at and
+          // the language named; nothing is spent here
+          const args = proposal.args as { on?: unknown; target_language?: unknown };
+          const [named] = numbersOf(args.on);
+          const target = named ? findResult(thread, named) : null;
+          startDub(
+            {
+              on: target ? candidateOf(target, refTag(named)) : null,
+              target: typeof args.target_language === "string" ? args.target_language : "",
+            },
+            reply,
+            looked,
+          );
         } else if (proposal && isQuickTool(proposal.tool)) {
           // A FREE EDIT: it spends nothing, so it runs now (runQuick)
           await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
@@ -2639,6 +2800,9 @@ function Composer() {
     } else if (c.id === "talking-photo") {
       startTalk();
       return;
+    } else if (c.id === "dub") {
+      startDub();
+      return;
     } else if (c.id === "ref") {
       fileInput.current?.click();
     } else if (c.id === "element") {
@@ -2719,6 +2883,17 @@ function Composer() {
     if (a.kind === "effect") {
       const item = fx?.items.find((e) => e.id === a.effect);
       if (!item) return;
+      // a costume preview's "Make it a video": the ORIGINAL photo and the
+      // same costume, so the clip is a real reveal, not a spin in place
+      if (a.effect === COSTUME_VIDEO && t.effect?.effect === COSTUME_EFFECT && t.effect.sources.length) {
+        const costume = t.effect.options.costume;
+        const state = begin(item, fxCandidates, newMadeId(), {
+          on: t.effect.sources,
+          prompt: costume === undefined ? "" : valueLabel("costume", costume),
+        });
+        setThread((all) => [...all, { role: "assistant", content: item.label, effect: state }]);
+        return;
+      }
       if (!self) {
         toast(m.conceptId ? "The video is still being finished into your Library. Try again in a moment." : "There is nothing here to apply it to yet.");
         return;
@@ -3438,6 +3613,11 @@ function Composer() {
                   if (text !== "Not posted.") toast(text);
                 },
                 onPostError: (why) => toast(why, "err"),
+                dubMenu,
+                dubChoices,
+                dubProject: project?.id ?? null,
+                onDubPatch: patchDub,
+                onDubApprove: (id, credits, charged) => void approveDub(id, credits, charged),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
                 // vesper_v2: a tap answers, a next step opens a card
@@ -3479,6 +3659,24 @@ function Composer() {
             onDragLeave={onDragLeave}
             onDrop={onDrop}
           >
+            {/* Vesper, small behind the box's top edge (vesper-peek.tsx) */}
+            <VesperPeek
+              busy={busy}
+              making={!!liveRun}
+              typing={!!idea.trim()}
+              failed={!!last?.failed || last?.made?.status === "failed"}
+              kind={output}
+              onFill={(text) => {
+                setIdea(text);
+                setTimeout(() => {
+                  const box = textarea.current;
+                  if (!box) return;
+                  box.focus();
+                  box.setSelectionRange(text.length, text.length);
+                }, 30);
+              }}
+              onWake={() => textarea.current?.focus()}
+            />
             <AnimatePresence>
               {dragging ? (
                 <motion.div

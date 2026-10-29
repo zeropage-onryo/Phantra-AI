@@ -64,8 +64,10 @@ export function stepModel(
 export const optionOf = (menu: ModelOption[], id: string | null | undefined) => menu.find((m) => m.id === id) ?? null;
 
 /** "Ideogram 4.5 · 19 credits" for the card's select. */
+/** A model's line in a card's pulldown: its name only. The price is on
+    the card's Approve (2026-10-27, Mike: "just on the button"). */
 export function optionLabel(m: ModelOption): string {
-  return typeof m.credits === "number" ? `${m.label} · ${m.credits.toLocaleString("en-US")} credits` : m.label;
+  return m.label;
 }
 
 /** What the card says under the model: whose pick it is, and why. */

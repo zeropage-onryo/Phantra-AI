@@ -75,9 +75,10 @@ test('the button always says the credits of the quote on screen', () => {
 });
 
 test('the picker lines', () => {
-  assert.equal(videoModelLine(VEO), '4-8s · 720p-1080p · from 768 credits');
-  assert.equal(imageModelLine({ id: 'x', label: 'X', note: '', references: false, credits: 19, max_refs: 0 }), 'prompt only · 19 credits');
-  assert.equal(imageModelLine({ id: 'x', label: 'X', note: '', references: true, credits: 33, max_refs: 8 }), 'up to 8 references · 33 credits');
+  // no price in a picker line (2026-10-27): only the Generate button says one
+  assert.equal(videoModelLine(VEO), '4-8s · 720p-1080p');
+  assert.equal(imageModelLine({ id: 'x', label: 'X', note: '', references: false, credits: 19, max_refs: 0 }), 'prompt only');
+  assert.equal(imageModelLine({ id: 'x', label: 'X', note: '', references: true, credits: 33, max_refs: 8 }), 'up to 8 references');
 });
 
 test('a remembered pick is read back field by field, and junk is nothing', () => {

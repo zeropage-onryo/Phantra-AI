@@ -11,11 +11,12 @@ const KLING4 = {
 };
 const VEO = { ...KLING4, id: 'veo3.1', label: 'Veo 3.1', credits: 1576, seconds: { kind: 'choices', values: [4, 6, 8], default: 6 }, max_refs: 0 };
 
-test('a menu row says the price, then the longest take and the pictures a clip holds', () => {
-  assert.equal(modelBadges(KLING4), '189 cr · 30s · 10 pics');
-  assert.equal(modelBadges(VEO), '1,576 cr · 8s');
-  assert.equal(modelBadges({ id: 'nano', label: 'Nano Banana', note: '', references: true, credits: 10, max_refs: 12 }), '10 cr · 12 refs');
-  assert.equal(modelBadges({ id: 'flux', label: 'FLUX 1.1 Pro', note: '', references: false, credits: 10, max_refs: 0 }), '10 cr · text only');
+test('a menu row says the longest take and the pictures a clip holds, never a price', () => {
+  assert.equal(modelBadges(KLING4), '30s · 10 pics');
+  assert.equal(modelBadges(VEO), '8s');
+  assert.equal(modelBadges({ id: 'nano', label: 'Nano Banana', note: '', references: true, credits: 10, max_refs: 12 }), '12 refs');
+  assert.equal(modelBadges({ id: 'flux', label: 'FLUX 1.1 Pro', note: '', references: false, credits: 10, max_refs: 0 }), 'text only');
+  for (const m of [KLING4, VEO]) assert.ok(!/cr\b|credit/.test(modelBadges(m)));
 });
 
 test('the reference count says when a text-only model would not send them', () => {

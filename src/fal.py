@@ -1625,7 +1625,7 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
                                        resolution=resolution,
                                        references=len(reference_urls or [])),
             key_source=KEY_SOURCE,
-            dsn=db_path)
+            dsn=db_path, model=model)
     charge.take()          # InsufficientCredit raises HERE: nothing submitted
     tracker = None
     if track is not None or charge.billed:
@@ -1875,7 +1875,7 @@ def generate_candidates(prompt: str, out_dir, n: int = 3, *,
                 account_id, provider="fal", ref=charging.attempt_ref(out_path),
                 estimate_usd=estimate_cost(1, model=model, duration=duration,
                                            resolution=cfg.get("resolution")),
-                key_source=key_source, dsn=db_path)
+                key_source=key_source, dsn=db_path, model=model)
 
             base_params = {"provider": "fal", "model": model,
                            "model_id": model_spec(model)["t2v"],
@@ -2075,7 +2075,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=estimate_cost(1, model=model, duration=duration,
                                        resolution=resolution, references=len(ref_urls)),
-            key_source=key_source, dsn=db_path, quote=quote)
+            key_source=key_source, dsn=db_path, quote=quote, model=model)
         platform = model_spec(model)["platform"]
         base_params = {"provider": "fal", "model": model,
                        "duration": duration,
@@ -2319,7 +2319,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=usd,
             key_source=key_source, source=source, dsn=db_path,
-            quote=quote)
+            quote=quote, model=model)
         platform = model_spec(model)["platform"]
         base_params = {"provider": "fal", "model": model,
                        "duration": seconds, "source": source,

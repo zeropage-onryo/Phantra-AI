@@ -515,13 +515,13 @@ def test_only_the_lane_marker_makes_a_render_unbillable(led):
 # --------------------------------------------------------------------------
 
 def _generation(dsn, account, ref, *, output_path=None, cost_usd=None,
-                reject_reason=None):
+                reject_reason=None, extra=None):
     """A generations row carrying the ledger ref the way an adapter will."""
     shot_id = generative.add_shot(Shot(subject="a bike", action="idles"),
                                  dsn=dsn, account_id=account)
     gen_id = generative.record_generation(
         shot_id, "kling", "a prompt",
-        params={**ledger.ref_params(ref), "key_source": "env"},
+        params={**ledger.ref_params(ref), "key_source": "env", **(extra or {})},
         output_path=output_path, cost_usd=cost_usd, dsn=dsn, account_id=account)
     if reject_reason:
         with db.connect(dsn) as conn:
@@ -907,3 +907,18 @@ def test_init_is_idempotent(led):
     ledger.init(dsn)
     ledger.init(dsn)
     assert ledger.available(account, dsn) == 100
+
+
+# guards: the reaper prices a reaped clip at the markup of the model it
+# rendered on (2026-10-27), not MARKUP -- else it charges more than the card
+def test_reap_settles_a_video_render_at_its_models_markup(led):
+    from src import pricing
+    dsn, account = led
+    ledger.grant(account, 1000, "subscription", dsn=dsn)
+    hold_id = ledger.hold(account, 400, ref="render-v", provider="fal", dsn=dsn)
+    _generation(dsn, account, "render-v", output_path="/tmp/v.mp4", cost_usd=2.50,
+                extra={"model": "seedance2.5"})
+    result = ledger.reap(datetime.now(timezone.utc) + timedelta(minutes=1), dsn=dsn)
+    assert result["settled"] == [hold_id]
+    assert pricing.markup_for("seedance2.5") == "1.5"
+    assert ledger.available(account, dsn) == 1000 - ledger.charge_credits(2.50, model="seedance2.5") == 625

@@ -1161,8 +1161,15 @@ def test_each_effect_tool_stands_for_one_effect_call():
     from src import effects
     made = {"nano-banana-edit", "flux-kontext-pro", "seedream-edit", "remove-background",
             "remove-video-background", "remove-video-background-pro", "kling-effect",
-            "pixverse-effect", "camera-move", "upscale", "add-sound", "reframe", "reframe-hq"}
+            "pixverse-effect", "camera-move", "upscale", "add-sound", "reframe", "reframe-hq",
+            "costume-preview"}
     assert made == {row["id"] for row in effects.catalogue()}
+    # a Halloween costume is edit_image with a costume picked, never words
+    assert call("edit_image", {"sources": ["gen:1"], "costume": "witch"}) == {
+        "effect": "costume-preview", "sources": ["gen:1"], "prompt": "",
+        "options": {"costume": "witch"}}
+    with pytest.raises(ValueError, match="leave `prompt` empty"):
+        call("edit_image", {"sources": ["gen:1"], "costume": "witch", "prompt": "x"})
 
 
 def test_an_effect_the_balance_cannot_cover_is_a_refusal_with_no_link(effect_door,

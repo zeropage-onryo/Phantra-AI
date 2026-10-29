@@ -104,6 +104,7 @@ their afternoon on something else:
 """
 from __future__ import annotations
 
+import json
 import math
 import sys
 import threading
@@ -211,9 +212,12 @@ def credits_for_usd(usd) -> int:
     return int(math.ceil(cents))
 
 
-def charge_credits(usd) -> int:
+def charge_credits(usd, model: Optional[str] = None) -> int:
     """USD of PROVIDER cost -> integer credits of CHARGE: marked up by
-    `pricing.MARKUP`, rounded UP, never under `pricing.CREDIT_FLOOR`.
+    `pricing.markup_for(model)` (MARKUP when no model is named; a video
+    model may carry its own since 2026-10-27), rounded UP, never under
+    `pricing.CREDIT_FLOOR`. A video door passes the model it priced, or
+    its hold and its card would disagree.
 
     THE ONE NUMBER A HOLD AND A QUOTE SHARE (2026-09-18, the day
     `MARKUP` left 1.0). `credits_for_usd` above is the at-cost peg the
@@ -227,7 +231,7 @@ def charge_credits(usd) -> int:
     adapters import this module.
     """
     from . import pricing
-    return pricing.credits_for(pricing.usd_micros(usd))
+    return pricing.credits_for(pricing.usd_micros(usd), model=model)
 
 
 def ref_params(ref: str) -> dict:
@@ -1255,12 +1259,19 @@ def _generation_for(conn, account_id: Optional[int], ref: str) -> Optional[dict]
     if not db.table_exists(conn, "generations"):
         return None
     row = conn.execute(
-        "SELECT id, cost_usd, output_path, reject_reason FROM generations "
+        "SELECT id, cost_usd, output_path, reject_reason, params_json FROM generations "
         "WHERE account_id IS NOT DISTINCT FROM %s AND params_json LIKE %s "
         "ORDER BY id DESC LIMIT 1",
         (account_id, f'%"{GENERATION_REF_KEY}": "{ref}"%'),
     ).fetchone()
-    return dict(row) if row else None
+    if not row:
+        return None
+    found = dict(row)
+    try:
+        found["model"] = (json.loads(found.pop("params_json") or "{}") or {}).get("model")
+    except (TypeError, ValueError, AttributeError):
+        found["model"] = None
+    return found
 
 
 def reap(older_than=DEFAULT_REAP_AGE, *, account_id: Optional[int] = None,
@@ -1327,7 +1338,10 @@ def reap(older_than=DEFAULT_REAP_AGE, *, account_id: Optional[int] = None,
         if usable:
             actual = gen.get("cost_usd")
             actual_usd = float(actual) if actual is not None else int(h["held"]) / 100
-            settle(hold_id, credits=charge_credits(actual_usd),
+            # at the markup of the model it rendered on (2026-10-27): a
+            # video model may carry its own, and re-pricing a reaped clip at
+            # MARKUP would charge more than its card showed
+            settle(hold_id, credits=charge_credits(actual_usd, model=gen.get("model")),
                    generation_id=int(gen["id"]), dsn=dsn)
             settled.append(hold_id)
             continue
