@@ -668,6 +668,22 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
+}
+/* A long link or an unbroken word in a turn wraps where it must (2026-10-27,
+   Mike: "the words dont fit and it moves around"). On a 390px phone one
+   unbroken URL in Vesper's reply made the page 441px wide, so the whole
+   screen panned sideways and dragged the tab bar off its edge. */
+.zc .zc-turn,
+.zc .zc-turn p,
+.zc .zc-turn li,
+.zc .zc-turn a,
+.zc .zc-turn code {
+  overflow-wrap: anywhere;
+}
+.zc .zc-reply,
+.zc .zc-bubble {
+  min-width: 0;
 }
 .zc .zc-ask {
   display: flex;
@@ -1598,6 +1614,74 @@
     width: 48px;
     height: 48px;
     flex: none;
+  }
+}
+
+/* ── THE PHONE'S CHAT HOLDS STILL, 2026-10-27 ──
+   Mike: "when im working in the studio nothing stays static and its hard to
+   navigate", after a side-by-side with Higgsfield's mobile site. Higgsfield
+   pins its prompt box above the tab bar, keeps the box one short line that
+   grows a little and then scrolls inside itself, and never lets the page get
+   wider than the screen. Here the box sat at the END of the conversation
+   (position: relative above), scrolled away with it, and grew to 200px as
+   you typed; a long word pushed the page sideways (the wrap rule above).
+   Under 720px, on the chat: the box docks above the tab bar with the ground
+   behind it, the turns scroll under it, and while you type the tab bar steps
+   aside so the box sits right on the keyboard. */
+@media (max-width: 720px) {
+  .zps {
+    overflow-x: clip;
+  }
+  .view[data-page="chat"] .zc.zc-active {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .view[data-page="chat"] .zc.zc-active .zc-dock:has(.zc-project),
+  .view[data-page="chat"] .zc.zc-active .zc-dock:not(:has(.zc-project)) .zc-box {
+    position: sticky;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 30;
+  }
+  /* the ground under the docked box, so the turns scrolling behind it never
+     show through its edges or the gap above the tab bar */
+  .view[data-page="chat"] .zc.zc-active .zc-dock:not(:has(.zc-project)) .zc-box {
+    box-shadow:
+      0 -16px 16px -4px var(--ground),
+      0 12px 0 4px var(--ground);
+  }
+  .view[data-page="chat"] .zc.zc-active .zc-dock:has(.zc-project) {
+    padding-top: 12px;
+    padding-bottom: 8px;
+    background: linear-gradient(to bottom, transparent, var(--ground) 12px);
+  }
+  .view[data-page="chat"] .zc.zc-active .zc-box {
+    background: var(--zc-plate, var(--panel));
+  }
+  /* one short line to start, room for about five as you type, then it
+     scrolls inside itself instead of pushing the page */
+  .view[data-page="chat"] .zc.zc-active .zc-box textarea {
+    min-height: 52px;
+    max-height: min(140px, 22dvh);
+    padding: 14px 16px 4px;
+    font-size: 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* the hint stays on the one line the empty box has */
+  .view[data-page="chat"] .zc.zc-active .zc-box textarea::placeholder {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .view[data-page="chat"] .zc.zc-active .zc-tools {
+    padding-top: 4px;
+    padding-bottom: 8px;
+  }
+  /* typing: the tab bar steps aside (phone.css, on every page) and the box
+     comes down to the keyboard */
+  .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .view[data-page="chat"] .zc.zc-active .zc-dock:has(.zc-project),
+  .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .view[data-page="chat"] .zc.zc-active .zc-dock:not(:has(.zc-project)) .zc-box {
+    bottom: 8px;
   }
 }
 
