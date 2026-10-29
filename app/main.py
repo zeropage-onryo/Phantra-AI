@@ -39,8 +39,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src import accounts as accounts_mod
 from src import (
-    affiliates,
     addons,
+    affiliates,
     asset_shelf,
     assistant_store,
     autonomy,
