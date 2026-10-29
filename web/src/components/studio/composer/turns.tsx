@@ -20,6 +20,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Clapperboard,
+  Columns2,
   Download,
   Ellipsis,
   Film,
@@ -70,6 +71,8 @@ import { RenderCard } from "@/components/studio/render-card";
 import { cardFonts } from "@/components/studio/card-fonts";
 import type { Concept } from "@/lib/studio-api";
 import { cutLine, joinable, trimProblem } from "@/lib/final-cut";
+import { pairOf, sideBySideHref } from "@/lib/before-after";
+import { BeforeAfter } from "@/components/studio/before-after";
 // vesper_v2 (docs/tasks/task-vesper-v2.md): a question the person taps,
 // and the next steps offered under a rendered scene
 import { isAskTool, questionOf } from "@/lib/tappable";
@@ -247,6 +250,7 @@ const ICON: Record<ContinueKind, LucideIcon> = {
   canvas: Clapperboard,
   render: Play,
   reuse: RotateCcw,
+  pair: Columns2,
 };
 /* a send that did not finish puts its prompt back in the box */
 const RETRY: ContinueAction = { id: "reuse", kind: "reuse", label: "Try again", title: "", primary: true };
@@ -301,6 +305,15 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
       </>
     );
     const done = () => setOpen(false);
+    if (a.kind === "pair") {
+      const pair = pairOf(turn.effect, m);
+      const href = pair ? sideBySideHref(pair) : null;
+      return href ? (
+        <a key={a.id} className={cls} role={role} href={href} download title={a.title} onClick={done}>
+          {inner}
+        </a>
+      ) : null;
+    }
     if (a.kind === "download" && render !== null) {
       return (
         <a key={a.id} className={cls} role={role} href={renderDownloadHref(render)} title={a.title} onClick={done}>
@@ -538,6 +551,16 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
             <video src={mediaSrc(m.clip)} controls muted loop playsInline preload="metadata" />
           </div>
           <span className="zc-label on">Clip 01</span>
+        </motion.div>
+      </div>
+    ) : pairOf(turn.effect, m) ? (
+      // a costume still: compared with the photo it was made from
+      <div className="zc-tiles one">
+        <motion.div className="zc-tilewrap" {...tile(0)} style={{ maxWidth: 420 }}>
+          <div className="zc-tile on pair">
+            <BeforeAfter before={mediaSrc(pairOf(turn.effect, m)!.before)} after={mediaSrc(m.image ?? "")} alt="Your costume" />
+          </div>
+          <span className="zc-label on">Before and after · drag to compare</span>
         </motion.div>
       </div>
     ) : (

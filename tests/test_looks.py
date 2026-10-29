@@ -91,7 +91,8 @@ def _mean_diff(a, b) -> float:
 # ---------- the table ----------
 
 def test_the_looks_are_free_rows_of_the_effects_table_behind_the_flag(monkeypatch):
-    ids = ("film_grade", "noir", "flash_2000s", "crash_zoom", "vertical_ready", "make_it_pro")
+    ids = ("film_grade", "noir", "flash_2000s", "crash_zoom", "vertical_ready",
+           "title_sequence", "the_ward", "haunted_manor", "found_tape", "make_it_pro")
     assert looks.LOOK_NAMES == ids
     probe = {"seconds": 6.0, "width": 1280, "height": 720, "fps": 30.0}
     for name in ids:
@@ -155,7 +156,8 @@ def test_the_assets_are_generated_deterministic_and_say_so(tmp_path):
 # ---------- each look, and its time per second ----------
 
 @pytest.mark.parametrize("look", ("film_grade", "noir", "flash_2000s", "crash_zoom",
-                                  "vertical_ready"))
+                                  "vertical_ready", "title_sequence", "the_ward",
+                                  "haunted_manor", "found_tape"))
 def test_each_look_runs_and_logs_its_time_per_second_of_input(look, clips, tmp_path, capfd):
     out = tmp_path / f"{look}.mp4"
     res = looks.apply(look, clips["moving"], out)
@@ -252,6 +254,59 @@ def test_flash_2000s_pops_and_stamps(clips, tmp_path):
     corner = (1280 - 260, 720 - 90, 1280, 720)
     assert _mean_diff(a.crop(corner), b.crop(corner)) > 2
     assert _mean_diff(a.crop((0, 0, 260, 90)), b.crop((0, 0, 260, 90))) < 1.5
+
+
+# ---------- the Halloween four (2026-10-27) ----------
+
+def test_title_sequence_jitters_strobes_and_scratches(clips, tmp_path):
+    out = tmp_path / "titles.mp4"
+    res = looks.apply("title_sequence", clips["static"], out)
+    assert res["params"]["strobe"] == {"period": looks.STROBE_PERIOD,
+                                       "length": looks.STROBE_LENGTH}
+    assert res["params"]["jitter"] >= 2 and looks.probe(out)["width"] == 1280
+    # a still source moves: the jitter shifts frame to frame
+    assert _mean_diff(looks.frame_image(out, 0.2), looks.frame_image(out, 0.25)) > 1
+    # the strobe frame at t=0 is brighter than the frame after it
+    from PIL import ImageStat
+    lit = ImageStat.Stat(looks.frame_image(out, 0.0).convert("L")).mean[0]
+    calm = ImageStat.Stat(looks.frame_image(out, 0.5).convert("L")).mean[0]
+    assert lit > calm + 20
+    off = looks.plan("title_sequence", looks.probe(clips["static"]), {"strobe": False},
+                     workdir=tmp_path)
+    assert off["params"]["strobe"] is None and "eval=frame" not in off["graph"]
+
+
+def test_the_ward_is_green_and_flickers(clips, tmp_path):
+    out = tmp_path / "ward.mp4"
+    looks.apply("the_ward", clips["static"], out)
+    from PIL import ImageStat
+    r, g, b = ImageStat.Stat(looks.frame_image(out, 0.5)).mean
+    assert g > r and g > b
+    lum = [ImageStat.Stat(looks.frame_image(out, t).convert("L")).mean[0]
+           for t in (0.3, 0.33, 0.37, 0.4)]
+    assert max(lum) - min(lum) > 0.5                       # the light is not steady
+
+
+def test_haunted_manor_trails_a_ghost(clips, tmp_path):
+    planned = looks.plan("haunted_manor", looks.probe(clips["moving"]), {}, workdir=tmp_path)
+    ghost = planned["params"]["ghost"]
+    assert ghost["delay"] == looks.GHOST_DELAY and 0 < ghost["alpha"] < 1
+    assert "tpad=start_duration=" in planned["graph"]
+    out = tmp_path / "manor.mp4"
+    looks.apply("haunted_manor", clips["moving"], out)
+    assert abs(looks.probe(out)["seconds"] - 2.0) < 0.1     # the ghost does not lengthen it
+
+
+def test_found_tape_stamps_play_and_can_go_without(clips, tmp_path):
+    facts = looks.probe(clips["moving"])
+    on = looks.plan("found_tape", facts, {}, workdir=tmp_path)
+    off = looks.plan("found_tape", facts, {"stamp": False}, workdir=tmp_path)
+    assert on["params"]["stamp"] is True and len(on["inputs"]) == 3
+    assert off["params"]["stamp"] is False and len(off["inputs"]) == 2
+    assert "rgbashift" in on["graph"]
+    out = tmp_path / "tape.mp4"
+    looks.apply("found_tape", clips["moving"], out)
+    assert looks.probe(out)["audio"] is True
 
 
 # ---------- the end card ----------

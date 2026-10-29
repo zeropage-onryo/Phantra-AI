@@ -4243,6 +4243,7 @@ IMAGE_EDIT_MODES = {"faithful": "nano-banana-edit", "precise": "flux-kontext-pro
 ImageEditAspect = Literal[tuple(dict.fromkeys(effect_table.NANO_EDIT_ASPECTS
                                               + effect_table.KONTEXT_ASPECTS))]
 AnimateTemplate = Literal[effect_table.KLING_EFFECTS + effect_table.PIXVERSE_EFFECTS]
+CostumeName = Literal[tuple(effect_table.costumes.COSTUMES)]
 CameraMove = Literal[effect_table.CAMERA_MOVES]
 CameraStyle = Literal["anime", "3d_animation", "clay", "comic", "cyberpunk"]
 EffectResolution = Literal[effect_table.PIXVERSE_RES]
@@ -4283,6 +4284,18 @@ def listed_effect_call(tool: str, params: dict, dsn=None,
     def one(key="source"):
         return [p[key]] if key in p else []
 
+    if tool == "edit_image" and "costume" in p:
+        # a Halloween costume picked from the list (2026-10-27, src/costumes.py):
+        # the words are ours, so words of the caller's own are refused
+        if p.get("prompt"):
+            raise ValueError("a costume is picked from the list; leave `prompt` empty")
+        if p.get("mode", "faithful") != "faithful":
+            raise ValueError("a costume runs in mode faithful")
+        opts = {"costume": p["costume"]}
+        if "aspect" in p:
+            opts["aspect_ratio"] = p["aspect"]
+        return {"effect": "costume-preview", "sources": list(p.get("sources") or []),
+                "prompt": "", "options": opts}
     if tool == "edit_image":
         effect = IMAGE_EDIT_MODES.get(p.get("mode", "faithful"))
         if effect is None:
@@ -5601,15 +5614,20 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
             sources: Annotated[list[str], _arg(
                 "One to four of your images by id from `library` (`gen:<id>` or "
                 "`asset:<id>`), never URLs; mode precise takes one.")],
-            prompt: Annotated[str, _arg("The change to make, in words.")],
+            prompt: Annotated[str, _arg(
+                "The change to make, in words. Leave empty when you pick a costume.")] = "",
             mode: Annotated[ImageEditMode, _arg(
                 "faithful (the default), precise or composite.")] = "faithful",
             aspect: Annotated[Optional[ImageEditAspect], _arg(
                 "The new image's shape. Omit to keep the source's.")] = None,
+            costume: Annotated[Optional[CostumeName], _arg(
+                "A Halloween costume from the list instead of words: the person in "
+                "the image shown wearing it, their face kept.")] = None,
             quote_token: _QuoteToken = "",
             project_id: _FileIn = None) -> dict:
-        return _effect("edit_image", f"edit image {mode}", quote_token, project_id,
-                       sources=sources, prompt=prompt, mode=mode, aspect=aspect)
+        return _effect("edit_image", f"edit image {costume or mode}", quote_token, project_id,
+                       sources=sources, prompt=prompt, mode=mode, aspect=aspect,
+                       costume=costume)
 
     @_reg("remove_background")
     def remove_background(

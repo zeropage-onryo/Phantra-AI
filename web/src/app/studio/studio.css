@@ -298,6 +298,32 @@
   color: var(--text);
   background: var(--signal-soft);
 }
+/* the Halloween neon tag on the rail's Effects entry (2026-10-27, design
+   08; lib/effects-wall.ts halloweenOn ends it): the word glows when the rail
+   is open, the icon glows when it is collapsed */
+.rnav [data-neon] svg {
+  color: #ffd2a8;
+  filter: drop-shadow(0 0 3px #ff7a1a) drop-shadow(0 0 8px #ff7a1a);
+}
+.rnav .rneon {
+  margin-left: auto;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff1e0;
+  text-shadow: 0 0 2px #fff, 0 0 6px #ff7a1a, 0 0 14px #ff7a1a;
+  animation: rneon-buzz 4s infinite;
+}
+/* the flicker dims the glow, never opacity: .rail .rl's opacity is what
+   hides the word while the rail is collapsed */
+@keyframes rneon-buzz {
+  0%, 18%, 22%, 25%, 100% { color: #fff1e0; text-shadow: 0 0 2px #fff, 0 0 6px #ff7a1a, 0 0 14px #ff7a1a; }
+  20%, 24% { color: #8a6a55; text-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rnav .rneon { animation: none; }
+}
 .rnav [aria-current]::before {
   content: "";
   position: absolute;

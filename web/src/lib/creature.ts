@@ -140,3 +140,32 @@ export function restsSmall(pathname: string): boolean {
 export function restingPark(park: Park, pathname: string): Park {
   return restsSmall(pathname) ? { ...park, small: true } : park;
 }
+
+/* The corner (2026-10-27, Mike: "move Vesper to the top left corner,
+   miniaturize him, and when you click on him it takes you to the Create chat
+   box with him small behind it ready to help -- that chat box should be the
+   super computer"). Everywhere but Create he sits small in the header's top
+   left corner; a click goes to Create, where the composer is the one place
+   to talk to him, and he peeks over the box's top edge. The click leaves a
+   note for this tab so the box takes focus when Create mounts. */
+const TALK_KEY = "phantra.assistant.talk";
+
+/** the corner was clicked: Create should focus its box when it mounts */
+export function askToTalk(): void {
+  try {
+    sessionStorage.setItem(TALK_KEY, "1");
+  } catch {
+    /* a private window: Create just opens without focusing */
+  }
+}
+
+/** read once by Create: was it opened from the corner? */
+export function takeTalk(): boolean {
+  try {
+    const asked = sessionStorage.getItem(TALK_KEY) === "1";
+    sessionStorage.removeItem(TALK_KEY);
+    return asked;
+  } catch {
+    return false;
+  }
+}

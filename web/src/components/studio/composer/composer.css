@@ -900,6 +900,28 @@
   aspect-ratio: auto;
   display: block;
 }
+/* a costume still beside its original (before-after.tsx): its own shape */
+.zc .zc-tile.pair {
+  aspect-ratio: auto;
+  display: block;
+  cursor: default;
+}
+.zc .zc-tile.pair img.ba-after,
+.zc .zc-tile.pair img.ba-alone {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  max-height: 560px;
+  object-fit: cover;
+}
+.zc .zc-tile.pair img.ba-before {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .zc .zc-tile.clip video {
   display: block;
   width: 100%;
@@ -1660,5 +1682,133 @@
   .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .view[data-page="chat"] .zc.zc-active .zc-dock:has(.zc-project),
   .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .view[data-page="chat"] .zc.zc-active .zc-dock:not(:has(.zc-project)) .zc-box {
     bottom: 8px;
+  }
+}
+
+/* Vesper behind the box (2026-10-27, vesper-peek.tsx): small, peeking over
+   the box's top left edge, the rest of him hidden by it. The wrapper is the
+   visible part and ends at the box's edge (overflow clips him), so he is
+   "behind" the box wherever the box is -- centred on an empty page or docked
+   under a conversation. A slow bob while idle; he rises a little on hover. */
+.zc .zc-vesper {
+  position: absolute;
+  bottom: 100%;
+  left: 26px;
+  width: 64px;
+  height: 48px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.zc .zc-vesper button {
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: top 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: zc-vesper-bob 4.2s ease-in-out infinite;
+}
+.zc .zc-vesper button:hover,
+.zc .zc-vesper button:focus-visible,
+.zc .zc-box:focus-within .zc-vesper button,
+.zc .zc-vesper:not([data-state="idle"]) button {
+  top: 0;
+}
+.zc .zc-vesper button:focus-visible {
+  outline: none;
+}
+.zc .zc-vesper:not([data-state="idle"]) button {
+  animation: none;
+}
+@keyframes zc-vesper-bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zc .zc-vesper button {
+    animation: none;
+    transition: none;
+  }
+}
+@media (max-width: 720px) {
+  .zc .zc-vesper {
+    left: 18px;
+    width: 56px;
+    height: 34px;
+  }
+}
+
+/* Vesper, interactive (2026-10-27, vesper-peek.tsx / vesper-voice.tsx).
+   His gaze: --gx/--gy (-1..1) toward a pointer that comes near, set by
+   useGaze; individual translate/rotate so the avatar's own transform
+   animations are left alone. */
+.vv-look {
+  display: block;
+  translate: calc(var(--gx, 0) * 3px) calc(var(--gy, 0) * 2px);
+  rotate: calc(var(--gx, 0) * 6deg);
+  transition:
+    translate 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    rotate 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+/* he leans toward the box while you type */
+.zc .zc-vesper[data-state="listening"] .vv-look {
+  rotate: calc(var(--gx, 0) * 6deg + 4deg);
+}
+/* reactions: a nod on send, a hop when a make lands, a wince on a failure */
+.zc .zc-vesper[data-flash="nod"] button {
+  animation: vv-nod 520ms ease-out 1;
+}
+.zc .zc-vesper[data-flash="hop"] button {
+  animation: vv-hop 700ms cubic-bezier(0.22, 0.61, 0.36, 1) 1;
+}
+.zc .zc-vesper[data-flash="wince"] button {
+  animation: vv-wince 420ms ease-in-out 1;
+}
+@keyframes vv-nod {
+  0%, 100% { translate: 0 0; }
+  40% { translate: 0 5px; }
+}
+@keyframes vv-hop {
+  0%, 100% { translate: 0 0; }
+  35% { translate: 0 -8px; }
+  60% { translate: 0 0; }
+  78% { translate: 0 -3px; }
+}
+@keyframes vv-wince {
+  0%, 100% { translate: 0 0; }
+  25% { translate: -2px 2px; }
+  50% { translate: 2px 2px; }
+  75% { translate: -1px 1px; }
+}
+/* his speech bubble on Create: above the box, beside him */
+.zc .vv-peek {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 96px;
+  max-width: min(420px, calc(100% - 120px));
+}
+@media (max-width: 720px) {
+  .zc .vv-peek {
+    left: 78px;
+    bottom: calc(100% + 4px);
+    max-width: calc(100% - 92px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vv-look {
+    translate: none;
+    rotate: none;
+    transition: none;
+  }
+  .zc .zc-vesper[data-flash] button {
+    animation: none;
   }
 }

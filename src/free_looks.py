@@ -26,6 +26,21 @@ an effect's has.
                     from the effects table) that runs only after its own
                     Approve -- never here
 
+The Halloween four (2026-10-27, Mike: an anthology-horror set beside the
+Kling / PixVerse Halloween templates; original looks, never a show's name):
+
+    title_sequence  sepia, frame jitter, film scratches and strobe frames --
+                    a scratched horror opening-titles feel
+    the_ward        a cold green fluorescent grade with a buzzing flicker
+    haunted_manor   a dusty sepia-green grade with a ghost trailing 0.4s
+                    behind the subject
+    found_tape      VHS: half-resolution softness, chroma split, scanlines,
+                    a rolling tracking band and a PLAY stamp
+
+Their overlays (scratches, scanlines, the band, the stamp) are drawn with
+Pillow into the run's own workdir at the clip's size, as the date stamp is,
+so src/looks_assets.py is unchanged.
+
 Every free-look export ends on a one-second "Made in Phantra" card
 (`append_end_card`, a function of its own so the free tier's watermark
 (PR #233) can adopt it). Each run logs its processing time per second of
@@ -47,6 +62,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -81,6 +97,12 @@ END_CARD_TEXT = "Made in Phantra"
 SIGNAL_RED = (228, 0, 43)        # the studio's --signal, as src/watermark.py has it
 CARD_BG = (11, 11, 15)
 STAMP_ORANGE = (255, 150, 40)
+SEPIA = ".393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"
+STROBE_PERIOD = 1.7              # title_sequence: a white frame every 1.7s
+STROBE_LENGTH = 0.07
+GHOST_DELAY = 0.4                # haunted_manor: the ghost runs this far behind
+GHOST_ALPHA = 0.33
+TAPE_STAMP_WHITE = (240, 240, 235)
 SOUND_PASS_PROMPT = "natural ambience and sound effects that fit the picture"
 
 LOOKS: dict[str, dict] = {
@@ -108,6 +130,28 @@ LOOKS: dict[str, dict] = {
         "label": "Vertical Ready", "tags": ("Social",),
         "blurb": "A centred 9:16 crop, ready for Reels, TikTok and Shorts. Free.",
         "options": {},
+    },
+    # -- the Halloween four (2026-10-27) --
+    "title_sequence": {
+        "label": "Title Sequence", "tags": ("Cinematic", "Social"),
+        "blurb": ("Scratched film, jittering frames and strobe flashes: a horror "
+                  "opening-titles look. Free."),
+        "options": {"strobe": {"values": (True, False), "default": True}},
+    },
+    "the_ward": {
+        "label": "The Ward", "tags": ("Cinematic",),
+        "blurb": "Cold green fluorescent light that buzzes and flickers, heavy grain. Free.",
+        "options": {},
+    },
+    "haunted_manor": {
+        "label": "Haunted Manor", "tags": ("Cinematic",),
+        "blurb": "A dusty sepia-green grade with a ghost trailing just behind the subject. Free.",
+        "options": {},
+    },
+    "found_tape": {
+        "label": "Found Tape", "tags": ("Social", "Cinematic"),
+        "blurb": "A worn VHS tape: colour bleed, scanlines, a rolling tracking band. Free.",
+        "options": {"stamp": {"values": (True, False), "default": True}},
     },
     "make_it_pro": {
         "label": "Make It Pro", "tags": ("Cinematic", "Social", "Product"),
@@ -274,6 +318,83 @@ def date_stamp_png(width: int, height: int, path: Path, when: Optional[date] = N
     return path
 
 
+def scratches_png(width: int, height: int, path: Path, seed: int = 13) -> Path:
+    """Film scratches: a few thin, broken vertical lines and dust specks on
+    a transparent frame (title_sequence). Seeded, so a run is repeatable."""
+    from PIL import Image, ImageDraw
+    rnd = random.Random(seed)
+    layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    for _ in range(7):
+        x = rnd.randrange(0, max(1, width))
+        y = 0
+        while y < height:
+            run = rnd.randrange(max(4, height // 8), max(5, height // 2))
+            if rnd.random() < 0.75:
+                d.line((x, y, x + rnd.choice((-1, 0, 1)), min(height, y + run)),
+                       fill=(235, 225, 200, rnd.randrange(90, 200)), width=1)
+            y += run + rnd.randrange(2, max(3, height // 12))
+    for _ in range(max(12, (width * height) // 40000)):
+        cx, cy = rnd.randrange(0, max(1, width)), rnd.randrange(0, max(1, height))
+        r = rnd.choice((1, 1, 2))
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(20, 15, 10, rnd.randrange(120, 220)))
+    layer.save(path)
+    return path
+
+
+def scanlines_png(width: int, height: int, path: Path) -> Path:
+    """A dark line every third row (found_tape)."""
+    from PIL import Image, ImageDraw
+    layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    for y in range(0, height, 3):
+        d.line((0, y, width, y), fill=(0, 0, 0, 70))
+    layer.save(path)
+    return path
+
+
+def tracking_band_png(width: int, height: int, path: Path, seed: int = 7) -> Path:
+    """The VHS tracking band: a strip of bright horizontal noise, a tenth of
+    the frame tall, transparent at its edges (found_tape)."""
+    from PIL import Image, ImageDraw
+    rnd = random.Random(seed)
+    band = max(8, height // 10)
+    layer = Image.new("RGBA", (width, band), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    for y in range(band):
+        edge = 1.0 - abs((y / max(1, band - 1)) * 2 - 1)        # 0 at the edges, 1 mid
+        x = 0
+        while x < width:
+            run = rnd.randrange(4, max(5, width // 12))
+            alpha = int(rnd.randrange(30, 150) * edge)
+            v = rnd.randrange(170, 255)
+            d.line((x, y, min(width, x + run), y), fill=(v, v, v, alpha))
+            x += run + rnd.randrange(0, max(1, width // 30))
+    layer.save(path)
+    return path
+
+
+def tape_stamp_png(width: int, height: int, path: Path, when: Optional[date] = None) -> Path:
+    """The camcorder's on-screen text: PLAY top-left, the date bottom-left,
+    white with a hard shadow (found_tape)."""
+    from PIL import Image, ImageDraw
+    when = when or date.today()
+    short = max(1, min(width, height))
+    font = _font(max(14, int(round(short * 0.05))))
+    margin = max(8, int(round(short * 0.05)))
+    layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    stamp = f"{when.strftime('%b').upper()} {when.day:02d} {when.year}"
+    for text, (x, y) in (("PLAY", (margin, margin)), (stamp, (margin, None))):
+        left, top, right, bottom = d.textbbox((0, 0), text, font=font)
+        if y is None:
+            y = height - margin - (bottom - top)
+        d.text((x - left + 2, y - top + 2), text, font=font, fill=(0, 0, 0, 180))
+        d.text((x - left, y - top), text, font=font, fill=(*TAPE_STAMP_WHITE, 235))
+    layer.save(path)
+    return path
+
+
 def end_card_png(width: int, height: int, path: Path, text: str = END_CARD_TEXT) -> Path:
     """The end card: the studio's dark ground, a red dot and the words,
     centred. Drawn with Pillow's bundled font, so it is the same on every
@@ -331,6 +452,9 @@ def plan(look: str, facts: dict, options: Optional[dict] = None, *,
 
     v: list[str] = []
     graph_tail = ""
+    full_graph: Optional[str] = None            # a look that builds its own whole graph
+    where = Path(workdir or tempfile.gettempdir())
+    bound = ["-loop", "1", "-t", f"{float(facts['seconds']):.3f}"]   # a looped PNG must END
     amap: Optional[str] = "0:a" if audio else None
     if look in ("film_grade", "make_it_pro"):
         film(v)
@@ -390,10 +514,68 @@ def plan(look: str, facts: dict, options: Optional[dict] = None, *,
     elif look == "vertical_ready":
         vertical(v)
         v.append("format=yuv420p")
+    elif look == "title_sequence":
+        j = max(2, _even(min(w, h) * 0.008))          # the jitter, px each way
+        params["jitter"] = j
+        v += ["format=rgb24", f"colorchannelmixer={SEPIA}", "eq=contrast=1.25:saturation=0.7",
+              f"crop={w - 2 * j}:{h - 2 * j}:x='{j}+{j}*sin(n*7.31)':y='{j}+{j}*cos(n*5.17)'",
+              f"scale={w}:{h}", "format=yuv420p", "noise=c0s=26:c0f=t+u",
+              "vignette=angle=PI/4"]
+        strobe = bool(opts.get("strobe"))
+        params["strobe"] = ({"period": STROBE_PERIOD, "length": STROBE_LENGTH}
+                            if strobe else None)
+        if strobe:
+            v.append(f"eq=brightness='if(lt(mod(t,{STROBE_PERIOD}),{STROBE_LENGTH}),0.45,0)'"
+                     ":eval=frame")
+        inputs.append([*bound, str(scratches_png(w, h, where / f"scratches-{w}x{h}.png"))])
+        full_graph = ("[0:v]" + ",".join(v) + "[g];[1:v]format=rgba[s];"
+                      f"[g][s]overlay=x='mod(n*97,{max(2, w // 3)})-{w // 6}':y=0"
+                      ":enable='lt(mod(n,3),2)':format=auto:shortest=1,format=yuv420p[v]")
+    elif look == "the_ward":
+        v += ["format=rgb24",
+              "curves=r='0/0 0.5/0.42 1/0.9':g='0/0.04 0.5/0.56 1/1':b='0/0.03 0.5/0.5 1/0.95'",
+              "eq=contrast=1.2:saturation=0.45:gamma=1.08",
+              "colorbalance=rs=-0.2:gs=0.12:bs=0.05:rm=-0.18:gm=0.14:bm=0.04:rh=-0.1:gh=0.08",
+              "eq=brightness='0.035*sin(t*41)+0.02*sin(t*97)"
+              "+if(lt(mod(t,2.9),0.07),-0.28,0)':eval=frame",
+              "format=yuv420p", "noise=c0s=22:c0f=t+u", "vignette=angle=PI/5"]
+        params["flicker"] = {"drop_every": 2.9, "drop_length": 0.07}
+    elif look == "haunted_manor":
+        shift = max(2, _even(w * 0.006))
+        params["ghost"] = {"delay": GHOST_DELAY, "alpha": GHOST_ALPHA, "shift": shift}
+        full_graph = (
+            "[0:v]split=2[m][gh];"
+            f"[gh]tpad=start_duration={GHOST_DELAY}:start_mode=clone,format=rgba,"
+            f"colorchannelmixer=aa={GHOST_ALPHA}[ghd];"
+            f"[m][ghd]overlay=x={shift}:y=0:format=auto:shortest=1,format=rgb24,"
+            "colorchannelmixer=.38:.72:.17:0:.36:.70:.16:0:.27:.52:.13,"
+            "eq=saturation=0.75:contrast=1.08,curves=g='0/0.02 0.5/0.53 1/0.97',"
+            "format=yuv420p,noise=c0s=16:c0f=t+u,vignette=angle=PI/3.6[v]")
+    elif look == "found_tape":
+        sh = max(2, w // 320)
+        params["chroma_shift"] = sh
+        v += [f"scale={_even(w / 2)}:{_even(h / 2)}", f"scale={w}:{h}:flags=bilinear",
+              "format=rgb24", f"rgbashift=rh={sh}:bh=-{sh}",
+              "eq=saturation=1.35:contrast=1.05", "format=yuv420p", "noise=c0s=14:c0f=t+u"]
+        band = max(8, h // 10)
+        inputs.append([*bound, str(scanlines_png(w, h, where / f"scan-{w}x{h}.png"))])
+        inputs.append([*bound, str(tracking_band_png(w, h, where / f"band-{w}x{h}.png"))])
+        full_graph = ("[0:v]" + ",".join(v) + "[g];[1:v]format=rgba[sl];"
+                      "[g][sl]overlay=0:0:format=auto:shortest=1[a1];[2:v]format=rgba[bd];"
+                      f"[a1][bd]overlay=x=0:y='mod(t*{int(h * 0.6)},{h + band})-{band}'"
+                      ":format=auto:shortest=1")
+        stamped = bool(opts.get("stamp"))
+        params["stamp"] = stamped
+        if stamped:
+            inputs.append([*bound, str(tape_stamp_png(w, h, where / f"tape-{w}x{h}.png"))])
+            full_graph += "[a2];[3:v]format=rgba[st];[a2][st]overlay=0:0:format=auto:shortest=1"
+        full_graph += ",format=yuv420p[v]"
     else:                                     # pragma: no cover - every id is above
         raise ValueError(f"no graph for {look!r}")
 
-    if look == "flash_2000s":
+    if full_graph is not None:
+        graph = full_graph
+    elif look == "flash_2000s":
         graph = "[0:v]" + ",".join(v) + "[g]" + graph_tail + ";[v0]format=yuv420p[v]"
     else:
         graph = "[0:v]" + ",".join(v) + "[v]" + graph_tail

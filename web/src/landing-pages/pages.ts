@@ -39,6 +39,7 @@ import { GROK } from "./entries/grok-imagine-video-generator";
 import { REELS } from "./entries/ai-instagram-reels-maker";
 import { TIKTOK } from "./entries/ai-tiktok-video-generator";
 import { SHORTS } from "./entries/ai-youtube-shorts-maker";
+import { HALLOWEEN_TRY_ON } from "./entries/ai-halloween-costume-try-on";
 
 // One tile in the wall under the hero (the InVideo-style wall, 2026-10-01).
 // A tile with no `src` draws as a gradient plate, the way the
@@ -65,7 +66,9 @@ export type MakeTile = {
   /** The showcase wall only: the tile's frame, "w:h" (default "3:4"). */
   aspect?: string;
   /** The still this one was edited from, shown under a draggable divider
-   *  (the GPT Image page's before/after, 2026-10-08). */
+   *  (the GPT Image page's before/after, 2026-10-08); on the bento wall the
+   *  two split the tile and the pointer slides the result over (2026-10-27,
+   *  the costume try-on). */
   from?: string;
   /** The still has a transparent background: draw it on a checkerboard. */
   alpha?: boolean;
@@ -209,7 +212,7 @@ export type MakePage = {
     spark: string;
     /** a card the composer opens instead of a sentence (?open=): the
      *  talking-photo card, whose photo, consent and voice are not words */
-    open?: "talking-photo";
+    open?: "talking-photo" | "costume";
     /** The outline button beside it. Default: "See examples" -> #examples. */
     secondary?: { label: string; href: string };
     /** The small link at the foot of every model and how-to card. Default "Start now". */
@@ -302,6 +305,7 @@ export const MAKE_PAGES: MakePage[] = [
   TEXT_TO_VIDEO,
   IMAGE_TO_VIDEO,
   TALKING_PHOTO,
+  HALLOWEEN_TRY_ON,
   MUSIC_VIDEO,
   AD_GENERATOR,
   UGC_ADS,
