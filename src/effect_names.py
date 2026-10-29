@@ -68,6 +68,31 @@ LOOKS: dict[str, dict] = {
                     "for reels", "for tiktok", "for shorts", "portrait crop", "vertical crop"),
         "note": "a centred 9:16 crop; free",
     },
+    # the Halloween four (2026-10-27)
+    "title_sequence": {
+        "label": "Title Sequence",
+        "aliases": ("title sequence", "opening titles", "opening credits", "horror titles",
+                    "scratched film", "film scratches", "creepy intro", "anthology horror"),
+        "note": "sepia, frame jitter, scratches and strobe frames; free",
+    },
+    "the_ward": {
+        "label": "The Ward",
+        "aliases": ("the ward", "asylum look", "asylum", "hospital ward", "fluorescent flicker",
+                    "flickering lights", "sickly green"),
+        "note": "a cold green fluorescent grade with a flicker; free",
+    },
+    "haunted_manor": {
+        "label": "Haunted Manor",
+        "aliases": ("haunted manor", "haunted house", "haunted look", "ghost trail",
+                    "ghostly", "ghost effect", "spectral"),
+        "note": "a sepia-green grade with a ghost trailing the subject; free",
+    },
+    "found_tape": {
+        "label": "Found Tape",
+        "aliases": ("found tape", "found footage", "vhs", "vhs look", "camcorder",
+                    "old tape", "tracking lines"),
+        "note": "VHS softness, chroma split, scanlines and a tracking band; free",
+    },
     "make_it_pro": {
         "label": "Make It Pro",
         "aliases": ("make it pro", "pro bundle", "make this pro", "the pro pass",

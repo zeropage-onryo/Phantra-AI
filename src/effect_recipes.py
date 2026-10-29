@@ -58,6 +58,26 @@ RECIPES: dict[str, dict] = {
     "overhead_flip": {"label": "Overhead Flip", "tags": ("transform",),
                       "blurb": "The camera flips over their head and lands them somewhere new.",
                       "hint": "Where they land (optional)"},
+    # 2026-10-27, Mike: anthology-horror recipes for Halloween beside the
+    # Kling / PixVerse templates and the four free looks. Original settings,
+    # never a show's name or characters.
+    "coven": {"label": "Coven", "tags": ("transform",),
+              "blurb": "A ring of candles, black lace and a crown of bone; they look up into the light.",
+              "hint": "One more detail (optional): a raven on the shoulder, a spell book"},
+    "sideshow": {"label": "Sideshow", "tags": ("transform",),
+                 "blurb": "A 1950s carnival tent at night: they bow under a hand-painted banner.",
+                 "hint": "What the banner bills them as (optional)"},
+    "seance": {"label": "Séance", "tags": ("transform",),
+               "blurb": "Candlelight, joined hands, a flame that bends; their eyes roll white.",
+               "hint": "One more detail (optional)"},
+    "the_hotel": {"label": "The Hotel", "tags": ("transform",),
+                  "blurb": "The camera glides down a red-gold Art Deco hallway to where they wait.",
+                  "hint": "What they are holding or wearing (optional)"},
+    # 2026-10-27, Mike: "Ai halloween costume try on ... I want this out by
+    # today": the photo spins into a costume the person names, face kept.
+    "costume_try_on": {"label": "Costume Try-On", "tags": ("transform",),
+                       "blurb": "They spin once and come back around in the costume, same face.",
+                       "hint": "The costume (optional): a vampire, a pirate, Frankenstein's bride"},
 }
 
 
@@ -93,6 +113,11 @@ def prompt_for(name: str, note: str = "") -> str:
     detail worked into its slot (or the recipe's default there)."""
     body, detail, default = _sections(name)
     note = " ".join((note or "").split())
+    if name == "costume_try_on" and note:
+        # a costume picked from the list (the preview's "Make it a video")
+        # arrives by name; it is told to the model in full
+        from . import costumes
+        note = costumes.describe(note)
     fill = detail.replace("{note}", note) if note and detail else (default if "{detail}" in body else "")
     return body.replace("{detail}", fill).strip()
 

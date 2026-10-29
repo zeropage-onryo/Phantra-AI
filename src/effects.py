@@ -57,8 +57,8 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import charge as charging
+from . import costumes, fal, generative, ledger, render_names
 from . import effect_recipes as recipes
-from . import fal, generative, ledger, render_names
 from . import free_looks as looks
 
 CHECKED = "2026-10-07"
@@ -455,6 +455,23 @@ EFFECTS: dict[str, dict] = {
         "price": lambda o, p: 0.018,
         "source": "https://fal.ai/models/fal-ai/bria/background/remove",
     },
+    # -- Halloween costumes (2026-10-27, src/costumes.py): a still in, the
+    # same person in a costume out; the costume is an option, so the card
+    # is one tap per costume and the prompt is written, never typed
+    "costume-preview": {
+        "label": "Halloween Costume", "category": "image_edit",
+        "note": "the person in the photo in a Halloween costume picked from a list, face kept (Nano Banana edit)",
+        "endpoint": "fal-ai/nano-banana/edit", "takes": "image",
+        "field": "image_urls", "as_list": True, "sources": (1, 1),
+        "prompt": "none", "output": "image",
+        "options": {"costume": {"values": tuple(costumes.COSTUMES), "required": True},
+                    "aspect_ratio": {"values": NANO_EDIT_ASPECTS, "default": "auto"}},
+        "fixed": {"num_images": 1},
+        "price": lambda o, p: 0.039,
+        "costume": True, "tags": ("social",),
+        "source": "https://fal.ai/models/fal-ai/nano-banana/edit",
+        "checked": costumes.CHECKED,
+    },
     # -- template effects: a still in, a styled clip out ------------------
     "kling-effect": {
         "label": "Kling effects", "category": "video_effect",
@@ -808,7 +825,11 @@ def build_body(effect: str, urls: list[str], prompt: str, options: dict,
     row = spec(effect)
     body: dict = {**row["fixed"], **options}
     body[row["field"]] = list(urls) if row["as_list"] else urls[0]
-    if row.get("recipe"):
+    if row.get("costume"):
+        # the costume is ours to word (src/costumes.py): it is not a field
+        # the model takes, so it leaves the body as the prompt
+        body["prompt"] = costumes.prompt_for(body.pop("costume"))
+    elif row.get("recipe"):
         # a recipe's prompt is written (prompts/effects/); what the person typed
         # is only the one detail worked into its slot
         body["prompt"] = recipes.prompt_for(effect, prompt)

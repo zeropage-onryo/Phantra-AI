@@ -14,7 +14,7 @@ def recipes_on(monkeypatch):
 
 
 def test_every_recipe_is_a_row_with_its_prompt_on_disk():
-    assert len(effect_recipes.RECIPES) == 10
+    assert len(effect_recipes.RECIPES) == 15
     for name in effect_recipes.RECIPES:
         row = effects.EFFECTS[name]
         assert row["recipe"] is True and row["category"] == "video_effect"
@@ -78,3 +78,13 @@ def test_the_gallery_lists_them_with_their_words_and_their_box(recipes_on):
     assert view["blurb"] == effect_recipes.RECIPES["window_grab"]["blurb"]
     assert view["tags"] == ["product"] and view["credits"] == ledger.charge_credits(0.14 * 5)
     assert view["made_with"] == effect_recipes.MODEL_LABEL
+
+
+def test_the_costume_try_on_dresses_them_in_what_they_name(recipes_on):
+    coat = "a pirate captain's coat and hat"
+    _, body = effects.build_body("costume_try_on", ["https://m/p.jpg"], coat, {"duration": "5"})
+    assert "wearing a pirate captain's coat and hat" in body["prompt"]
+    assert "Keep the person's face" in body["prompt"]
+    # nothing typed: the witch stands in the slot
+    _, plain = effects.build_body("costume_try_on", ["https://m/p.jpg"], "", {"duration": "5"})
+    assert "witch costume" in plain["prompt"] and "{" not in plain["prompt"]

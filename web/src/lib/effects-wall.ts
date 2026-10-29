@@ -23,6 +23,8 @@ export const PRESET_OPTION: Record<string, string> = {
   "kling-effect": "effect_scene",
   "pixverse-effect": "effect",
   "camera-move": "camera_movement",
+  // the Halloween costumes (2026-10-27): one tile per costume
+  "costume-preview": "costume",
 };
 
 /** The showcase keys the overnight slate wrote before templates had tiles. */
@@ -30,7 +32,8 @@ const SHOWCASE_ALIASES: Record<string, string> = {
   "kling-effect:bullet_time_360": "effect.bullet_time",
   "camera-move:camera_rotation": "effect.product_orbit",
 };
-const LOOK_IDS = ["film_grade", "noir", "flash_2000s", "crash_zoom", "vertical_ready", "make_it_pro"];
+const LOOK_IDS = ["film_grade", "noir", "flash_2000s", "crash_zoom", "vertical_ready", "make_it_pro",
+  "title_sequence", "the_ward", "haunted_manor", "found_tape"];
 const EFFECT_KEYS: Record<string, string> = {
   upscale: "effect.4k_smooth",
   "add-sound": "effect.sound_pass",
@@ -54,9 +57,10 @@ const ROW_NAMES: Record<string, string> = {
 /** The camera moves' names, where the table's value is not the move a person would say. */
 const MOVE_NAMES: Record<string, string> = { camera_rotation: "Product Orbit" };
 
-export type TabId = "all" | "new" | "free" | "transform" | "product" | "dance" | "camera" | "holiday" | "tools";
+export type TabId = "all" | "halloween" | "new" | "free" | "transform" | "product" | "dance" | "camera" | "holiday" | "tools";
 export const TABS: { id: TabId; label: string }[] = [
   { id: "all", label: "All" },
+  { id: "halloween", label: "Halloween" },
   { id: "new", label: "New" },
   { id: "free", label: "Free" },
   { id: "transform", label: "Transform" },
@@ -66,6 +70,21 @@ export const TABS: { id: TabId; label: string }[] = [
   { id: "holiday", label: "Holiday" },
   { id: "tools", label: "Tools" },
 ];
+
+/* ── the Halloween season (2026-10-27, Mike: the neon sign, design 08) ──
+   One switch for the page's neon sign, the Halloween tab and the rail's
+   neon tag: on until the end of HALLOWEEN_UNTIL's eve, then gone with no
+   deploy. The tab holds the Halloween templates (read off their names) and
+   the rows named below: the four free looks and the recipes. */
+export const HALLOWEEN_UNTIL = "2026-11-03T00:00:00-05:00";
+export const halloweenOn = (now: Date = new Date()) => now.getTime() < Date.parse(HALLOWEEN_UNTIL);
+const HALLOWEEN = /halloween|pumpkin|witch|vampire|zombie|mummy|demon|voodoo|werewolf|skeletal|devil[ _]smile/i;
+export const HALLOWEEN_IDS = new Set([
+  "title_sequence", "the_ward", "haunted_manor", "found_tape",
+  "coven", "sideshow", "seance", "the_hotel", "costume_try_on",
+  // the costume preview's twelve tiles (src/costumes.py)
+  "costume-preview",
+]);
 
 export type Tile = {
   /** the row id, or <row id>:<template value> */
@@ -127,6 +146,7 @@ const PRODUCT = /product|\bad\b|_ad\b| AD\b|billboard|package|supermarket|macaro
 
 function templateTabs(effectId: string, value: string): TabId[] {
   if (effectId === "camera-move") return ["camera"];
+  if (effectId === "costume-preview") return ["holiday"];
   const tabs: TabId[] = [];
   if (DANCE.test(value)) tabs.push("dance");
   if (HOLIDAY.test(value)) tabs.push("holiday");
@@ -152,6 +172,7 @@ export function tilesFrom(effects: Effect[], manifest: ShowcaseManifest | null, 
     const isNew = fresh.has(key);
     const free = !!effect.free;
     const all = [...tabs];
+    if ((HALLOWEEN_IDS.has(effect.id) || (preset && HALLOWEEN.test(preset.value))) && !all.includes("halloween")) all.push("halloween");
     if (isNew && !all.includes("new")) all.push("new");
     if (free && !all.includes("free")) all.push("free");
     out.push({ key, effect, preset, name, tabs: all, free, isNew, media: items[tileShowcaseKey(key)] ?? null });
@@ -176,10 +197,15 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 /** The wall for a tab and a search. Browsing shows only tiles with an
  *  example; a search looks through every tile, and lists the ones with an
- *  example first. */
+ *  example first. The Halloween tab is opened on purpose from the neon
+ *  sign, so it answers like a search: every Halloween tile, examples first. */
 export function wallFor(tiles: Tile[], tab: TabId, query: string): Tile[] {
   const q = norm(query);
   const inTab = (t: Tile) => tab === "all" || t.tabs.includes(tab);
+  if (!q && tab === "halloween") {
+    const hit = tiles.filter(inTab);
+    return [...hit.filter((t) => t.media), ...hit.filter((t) => !t.media)];
+  }
   if (!q) return tiles.filter((t) => t.media && inTab(t));
   const hit = tiles.filter((t) => inTab(t) && (norm(t.name).includes(q) || norm(t.effect.label).includes(q)));
   return [...hit.filter((t) => t.media), ...hit.filter((t) => !t.media)];
@@ -187,9 +213,10 @@ export function wallFor(tiles: Tile[], tab: TabId, query: string): Tile[] {
 
 /** The tabs worth drawing while browsing: All, and every tab with a tile
  *  that has an example. */
-export function tabsShown(tiles: Tile[]): typeof TABS {
+export function tabsShown(tiles: Tile[], now: Date = new Date()): typeof TABS {
   const have = new Set(tiles.filter((t) => t.media).flatMap((t) => t.tabs));
-  return TABS.filter((t) => t.id === "all" || have.has(t.id));
+  const spooky = halloweenOn(now) && tiles.some((t) => t.tabs.includes("halloween"));
+  return TABS.filter((t) => t.id === "all" || (t.id === "halloween" ? spooky : have.has(t.id)));
 }
 
 /** The featured strip: the content file's picks that have an example, in

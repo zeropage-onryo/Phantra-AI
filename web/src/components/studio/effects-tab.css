@@ -605,3 +605,197 @@
     flex: none;
   }
 }
+
+/* the Halloween Costumes section (2026-10-27): a row of costume tiles above
+   the featured strip; a tile with no example yet is a name on a plate */
+.fxw .fxw-season {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--edge-lo);
+  background: var(--panel);
+}
+.fxw .fxw-season-head h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+.fxw .fxw-season-head p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--bone-2);
+}
+.fxw .fxw-season-row {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 128px;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.fxw .fxw-season-row > li {
+  scroll-snap-align: start;
+}
+.fxw .fxw-costume {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border: 1px solid var(--edge-hi);
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+  background: radial-gradient(120% 90% at 30% 10%, color-mix(in srgb, var(--signal) 22%, transparent) 0%, var(--ground) 70%);
+}
+.fxw .fxw-costume > video,
+.fxw .fxw-costume > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.fxw .fxw-costume > span {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.fxw .fxw-costume[data-chosen="1"] {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+
+/* ── the Halloween neon sign (2026-10-27, design 08) ──
+   Its own two seasonal colours, kept here rather than on :root because they
+   leave with the season; the button is the studio's signal. Motion stops
+   under prefers-reduced-motion. */
+.fxw .fxw-neon {
+  --neon: #ff7a1a;
+  --neon-2: #9b7bff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 34px 20px 26px;
+  border-radius: var(--r2, 20px);
+  border: 1px solid var(--edge-lo);
+  background: radial-gradient(60% 75% at 50% 42%, color-mix(in srgb, var(--neon) 14%, #0d0c10), #07070a 75%);
+  text-align: center;
+  overflow: hidden;
+}
+.fxw .fxw-neon-kicker {
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #f2ecff;
+  text-shadow: 0 0 3px #fff, 0 0 9px var(--neon-2), 0 0 20px var(--neon-2), 0 0 42px var(--neon-2);
+  animation: fxw-hum 0.18s infinite;
+}
+.fxw .fxw-neon-word {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(48px, 8vw, 88px);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff1e0;
+  text-shadow: 0 0 4px #fff, 0 0 10px var(--neon), 0 0 22px var(--neon), 0 0 48px var(--neon),
+    0 0 90px color-mix(in srgb, var(--neon) 60%, transparent);
+  animation: fxw-hum 0.18s infinite;
+}
+.fxw .fxw-neon-buzz {
+  animation: fxw-buzz 4s infinite;
+}
+.fxw .fxw-neon-fx {
+  font-family: var(--display);
+  font-size: 30px;
+  letter-spacing: 0.3em;
+  color: #fff1e0;
+  text-shadow: 0 0 4px #fff, 0 0 10px var(--neon), 0 0 24px var(--neon);
+}
+.fxw .fxw-neon-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+.fxw .fxw-neon-go {
+  height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.fxw .fxw-neon-go:hover {
+  background: var(--signal-deep);
+}
+@keyframes fxw-buzz {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.25; }
+}
+@keyframes fxw-hum {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.93; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fxw .fxw-neon-kicker,
+  .fxw .fxw-neon-word,
+  .fxw .fxw-neon-buzz {
+    animation: none;
+  }
+}
+@media (max-width: 720px) {
+  .fxw .fxw-neon { padding: 24px 16px 20px; }
+  .fxw .fxw-neon-fx { font-size: 22px; }
+}
+
+/* before and after (before-after.tsx, 2026-10-27): a tile's pair fills it;
+   the panel's result fills the panel's frame, as a result does */
+.fxw .fxw-tile > .ba-alone,
+.fxw .fxw-feature > .ba-alone,
+.fxw .fxw-costume > .ba-alone,
+.fxw .fxw-tile > .ba,
+.fxw .fxw-feature > .ba,
+.fxw .fxw-costume > .ba {
+  position: absolute;
+  inset: 0;
+}
+.fxw .fxp-cover > .ba-alone,
+.fxw .fxp-cover > .ba {
+  position: absolute;
+  inset: 0;
+}
+.fxw .fxp-cover > .ba .ba-after {
+  height: 100%;
+  object-fit: cover;
+}

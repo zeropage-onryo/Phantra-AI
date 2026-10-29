@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from src import (
@@ -962,6 +962,15 @@ async def creative_guide_reply(request: Request,
         kept = outcomes.taste(account_id=account_id)
         if kept and isinstance(grounding, dict):
             grounding = {"what_you_keep": kept, **grounding}
+        # What they have been working on (2026-10-27, src/recent_work.py,
+        # Mike: Vesper "holds memory on your projects, last few assets
+        # rendered"): newest projects and renders, near the front so the
+        # grounding's cut never drops it. Empty when nothing can be read.
+        from src import recent_work
+        recent = recent_work.for_grounding(account_id)
+        if recent and isinstance(grounding, dict):
+            kept_first = {"what_you_keep": grounding.pop("what_you_keep")} if "what_you_keep" in grounding else {}
+            grounding = {**kept_first, "your_recent_work": recent, **grounding}
 
         # What the assistant's face reads off the job while the turn runs
         # (2026-10-08, docs/ASSISTANT_AVATARS.md): `detail` is the line under
@@ -5757,6 +5766,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
 # page, no dollars (the table's own `note` and `pricing` are the operator's).
 EFFECT_BLURBS = {
     "nano-banana-edit": "Change an image by describing the change. Keeps faces and identity.",
+    "costume-preview": "You in a Halloween costume: pick one and see it on your own photo, face kept.",
     "flux-kontext-pro": "Precise local edits: swap an object, change text, restyle one area.",
     "seedream-edit": "Combine up to four images into one, or restyle one.",
     "remove-background": "Cut the subject out on a transparent background.",
@@ -5926,6 +5936,44 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
             raise ValueError("one of the images could not be read or made fetchable")
         urls.append(url)
     return urls
+
+
+def _picture_bytes(ref: str, account_id: int) -> Optional[bytes]:
+    """One picture the caller holds, as bytes, read the way an effect reads
+    its source (_effect_urls): a render or an asset by id through
+    resolve_references (the caller's own, or refused), anything else
+    through _photo_bytes as that account. None when it cannot be read."""
+    from src import mcp_server
+    kind, _, rest = (ref or "").partition(":")
+    if kind in ("gen", "asset") and rest.isdigit():
+        try:
+            urls = mcp_server.resolve_references([ref], limit=1, who="Side by side",
+                                                 account_id=account_id)
+        except ValueError:
+            return None
+        return _photo_bytes(urls[0], account_id) if urls else None
+    return _photo_bytes(ref.split("?")[0], account_id)
+
+
+@router.get("/side-by-side")
+def side_by_side(before: str, after: str, account_id: int = Depends(auth.current_account_id)):
+    """Before and after as ONE JPEG to download (2026-10-27, src/side_by_side.py):
+    `before` is the photo an effect started from, `after` the render it made,
+    named by its id (`gen:<id>`, the caller's own). Free, nothing stored."""
+    from src import outcomes
+    from src import side_by_side as sbs
+    if not re.fullmatch(r"gen:\d+", after or ""):
+        return _error(400, "bad_after", "after is a render of yours, by its id (gen:<id>)")
+    a, b = _picture_bytes(before, account_id), _picture_bytes(after, account_id)
+    if not a or not b:
+        return _error(404, "not_found", "One of the two pictures could not be read.")
+    jpeg = sbs.compose(a, b)
+    if not jpeg:
+        return _error(422, "unreadable", "One of the two pictures is not an image.")
+    outcomes.record_ref("download", after, account_id=account_id, source="side_by_side")
+    return Response(content=jpeg, media_type="image/jpeg",
+                    headers={"Content-Disposition": 'attachment; filename="before-after.jpg"',
+                             "Cache-Control": "private, no-store"})
 
 
 @router.post("/effects/quote")
