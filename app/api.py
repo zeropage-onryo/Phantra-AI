@@ -5260,6 +5260,65 @@ def concept_refs(concept_id: int, body: ConceptRefsBody, account_id: int = Depen
     return {"ok": True, "refs": shots[0]["refs"]}
 
 
+class SceneHookBody(BaseModel):
+    asset: str                      # gen:<id>, a video render of this account's
+    seconds: float = 2.0
+
+
+def _save_first_shot(concept_id: int, concept: dict, shots: list[dict], account_id: int) -> None:
+    """Write the shot list back exactly as it was but for the first shot,
+    carrying the warnings and duration through (as concept_refs does)."""
+    preprod.update_concept_shots(
+        concept_id, {"shots": shots, "duration": concept.get("duration"),
+                        **({"ai": concept["ai"]} if concept.get("ai") else {})},
+        warnings=concept.get("warnings") or [], account_id=account_id)
+
+
+@router.put("/scenes/{concept_id}/hook")
+def set_scene_hook(concept_id: int, body: SceneHookBody,
+                   account_id: int = Depends(auth.current_account_id)):
+    """The scene's hook (2026-10-29): a short effect clip the Final cut opens
+    on, played for `seconds` and then a hard cut into shot 1. Free: it only
+    names a clip already made (and paid for on its own card). Kept on the
+    first shot, outside its prompt and refs, so no quote goes stale."""
+    from src import render_assets
+    from src.cut import assemble as cut_assemble
+    from src.cut import doc as cut_doc
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept["shots"]:
+        return _error(404, "not_found", "no such scene")
+    parsed = cut_doc.parse_handle(body.asset)
+    if not parsed or parsed[0] != "gen":
+        return _error(400, "bad_media", "a hook is a gen:<id> clip from the Library")
+    row = render_assets.get(parsed[1], account_id=account_id)
+    if row is None or row.get("deleted_at"):
+        return _error(404, "not_found", "that clip is not in your Library")
+    if row.get("media_kind") != "video":
+        return _error(400, "bad_media", "a hook has to be a video clip")
+    if not (cut_assemble.HOOK_MIN_SECONDS <= body.seconds <= cut_assemble.HOOK_MAX_SECONDS):
+        return _error(400, "bad_seconds",
+                      f"a hook plays {cut_assemble.HOOK_MIN_SECONDS:g}-"
+                      f"{cut_assemble.HOOK_MAX_SECONDS:g} seconds")
+    shots = [dict(s) for s in concept["shots"]]
+    shots[0]["hook"] = {"asset": cut_doc.handle("gen", parsed[1]),
+                        "seconds": round(float(body.seconds), 2)}
+    _save_first_shot(concept_id, concept, shots, account_id)
+    return {"ok": True, "hook": shots[0]["hook"]}
+
+
+@router.delete("/scenes/{concept_id}/hook")
+def clear_scene_hook(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Take the hook off; the clip itself stays in the Library."""
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept["shots"]:
+        return _error(404, "not_found", "no such scene")
+    shots = [dict(s) for s in concept["shots"]]
+    had = shots[0].pop("hook", None) is not None
+    if had:
+        _save_first_shot(concept_id, concept, shots, account_id)
+    return {"ok": True, "removed": had}
+
+
 @router.get("/concepts/{concept_id}")
 def concept_detail(concept_id: int, account_id: int = Depends(auth.current_account_id)):
     """The scene board's data: the full shot list, each shot carrying its

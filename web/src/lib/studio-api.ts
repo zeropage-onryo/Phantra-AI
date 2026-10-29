@@ -731,6 +731,16 @@ export const cutAssemble = (concept_id: number, opts: { music?: string; voice?: 
     method: "POST",
     body: JSON.stringify({ concept_id, ...opts }),
   });
+/** PUT /api/scenes/{id}/hook — the clip (gen:<id>, a video in the
+ *  Library) the scene's Final cut opens on, for `seconds`. Free. */
+export const setSceneHook = (concept_id: number, asset: string, seconds = 2) =>
+  apiFetch<{ ok: true; hook: { asset: string; seconds: number } }>(`/scenes/${concept_id}/hook`, {
+    method: "PUT",
+    body: JSON.stringify({ asset, seconds }),
+  });
+/** DELETE /api/scenes/{id}/hook — the cut opens on shot 1 again. Free. */
+export const clearSceneHook = (concept_id: number) =>
+  apiFetch<{ ok: true; removed: boolean }>(`/scenes/${concept_id}/hook`, { method: "DELETE" });
 /** POST /api/cut/media — an uploaded music bed or voiceover -> asset:<id>. */
 export const cutUploadMedia = (file: File) => {
   const form = new FormData();
@@ -782,6 +792,8 @@ export type Job = {
   version?: number | null;
   /** a finished cut job: how long the joined video runs */
   seconds?: number | null;
+  /** a finished cut job: it opens on the scene's hook (2026-10-29) */
+  hook?: boolean;
   /** what a job filed in the Library, `gen:<id>` (an effect, a free edit,
    *  an assembled cut) */
   asset?: string | null;

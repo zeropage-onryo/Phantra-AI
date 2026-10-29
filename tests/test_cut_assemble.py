@@ -637,3 +637,106 @@ def test_the_final_cut_with_a_kit_is_longer_by_its_card(api, monkeypatch):
     assert carded["status"] == "done", carded
     assert "brand end card added (2.5s)" in carded["notes"]
     assert carded["seconds"] == pytest.approx(plain["seconds"] + 2.0, abs=0.1)
+
+
+# --------------------------------------------------------------------------
+# the hook (2026-10-29): a short effect clip the Final cut opens on
+# --------------------------------------------------------------------------
+
+def test_a_hook_plays_its_seconds_then_hard_cuts_and_never_sets_the_frame():
+    media = {**FAKE, "gen:9": {"frames": 150, "video": True, "audio": False,
+                               "width": 1080, "height": 1080}}
+    hook = {"handle": "gen:9", "label": "hook", "seconds": 2.0, "hook": True}
+    doc, _ = assemble.build_doc([hook, *CLIPS], media)
+    v1 = d.track(doc, "V1")["clips"]
+    assert [(c["media"], c["at"], c["src_out"]) for c in v1][:2] == [
+        ("gen:9", 0, 60), ("gen:1", 60, 120)]
+    assert doc["size"] == [720, 1280]               # the scene's first shot, not the hook
+    assert doc["duration"] == 420
+    assert not any(c.get("transition_in") for c in v1)
+    assert v.problems(doc, media) == []
+
+
+def test_a_hook_shorter_than_its_seconds_plays_whole():
+    media = {**FAKE, "gen:9": {"frames": 30, "video": True, "audio": False,
+                               "width": 720, "height": 1280}}
+    doc, _ = assemble.build_doc([{"handle": "gen:9", "seconds": 2.0, "hook": True}, *CLIPS], media)
+    assert d.track(doc, "V1")["clips"][0]["src_out"] == 30
+
+
+def test_hook_of_reads_only_a_gen_handle_on_the_first_shot():
+    assert assemble.hook_of({"shots": []}) is None
+    assert assemble.hook_of({"shots": [{"n": 1}]}) is None
+    assert assemble.hook_of({"shots": [{"hook": {"asset": "asset:3"}}]}) is None
+    assert assemble.hook_of({"shots": [{"hook": {"asset": "gen:7"}}]}) == {
+        "asset": "gen:7", "seconds": assemble.HOOK_SECONDS}
+
+
+def test_the_hook_is_outside_the_quote_hash():
+    from src import pricing
+    shot = {"n": 1, "prompt": "(0-4s) a.", "refs": ["/refs/x.jpg"]}
+    assert pricing.content_hash(shot) == pricing.content_hash(
+        {**shot, "hook": {"asset": "gen:7", "seconds": 2}})
+
+
+def test_plan_opens_on_the_hook_and_skips_a_vanished_one(rendered):
+    r = rendered
+    with db.connect(r["dsn"]) as conn:
+        gh, _ = _bank(conn, 9, Path("/nonexistent/hook.mp4"), r["a"])
+        shots = preprod.get_concept(r["concept"], r["dsn"], account_id=r["a"])["shots"]
+        shots[0]["hook"] = {"asset": f"gen:{gh}", "seconds": 1.5}
+        conn.execute("UPDATE shoot_concepts SET shots_json = %s WHERE id = %s",
+                     (json.dumps(shots), r["concept"]))
+    planned = assemble.plan(r["concept"], account_id=r["a"], dsn=r["dsn"])
+    assert planned["clips"][0] == {**planned["clips"][0], "handle": f"gen:{gh}",
+                                   "hook": True, "seconds": 1.5}
+    assert [c["handle"] for c in planned["clips"][1:]] == [f"gen:{g}" for g in r["gen"]]
+    # another account's id never resolves: the cut goes on, and says so
+    with db.connect(r["dsn"]) as conn:
+        gb, _ = _bank(conn, 10, Path("/nonexistent/theirs.mp4"), r["b"])
+        shots[0]["hook"] = {"asset": f"gen:{gb}", "seconds": 1.5}
+        conn.execute("UPDATE shoot_concepts SET shots_json = %s WHERE id = %s",
+                     (json.dumps(shots), r["concept"]))
+    planned = assemble.plan(r["concept"], account_id=r["a"], dsn=r["dsn"])
+    assert not any(c.get("hook") for c in planned["clips"])
+    assert any("hook" in n for n in planned["notes"])
+
+
+def test_the_hook_routes_check_the_clip_and_keep_the_scene(api):
+    client, r = api
+    url = f"/api/scenes/{r['concept']}/hook"
+    with db.connect(r["dsn"]) as conn:
+        gh, _ = _bank(conn, 11, Path("/nonexistent/hook.mp4"), r["a"])
+        gb, _ = _bank(conn, 12, Path("/nonexistent/theirs.mp4"), r["b"])
+        still = conn.execute(
+            "INSERT INTO generated_assets (created_at, generation_id, tool, model, media_kind, "
+            "prompt, media_url, account_id) VALUES ('t', 100013, 'fal', 'flux', 'image', 'p', "
+            "'/renders/x.png', %s) RETURNING id", (r["a"],)).fetchone()["id"]
+    before = preprod.get_concept(r["concept"], r["dsn"], account_id=r["a"])
+    assert client.put(url, json={"asset": f"gen:{gb}"}).status_code == 404
+    assert client.put(url, json={"asset": f"gen:{still}"}).status_code == 400
+    assert client.put(url, json={"asset": "asset:1"}).status_code == 400
+    assert client.put(url, json={"asset": f"gen:{gh}", "seconds": 9}).status_code == 400
+    res = client.put(url, json={"asset": f"gen:{gh}", "seconds": 1.5})
+    assert res.status_code == 200 and res.json()["hook"] == {"asset": f"gen:{gh}", "seconds": 1.5}
+    after = preprod.get_concept(r["concept"], r["dsn"], account_id=r["a"])
+    assert after["shots"][0]["hook"]["asset"] == f"gen:{gh}"
+    assert after["shots"][0]["timeline"] == before["shots"][0]["timeline"]
+    assert after["shots"][0]["refs"] == before["shots"][0]["refs"]
+    assert client.delete(url).json() == {"ok": True, "removed": True}
+    assert "hook" not in preprod.get_concept(r["concept"], r["dsn"], account_id=r["a"])["shots"][0]
+    assert client.delete("/api/scenes/999999/hook").status_code == 404
+
+
+@needs_ffmpeg
+def test_the_final_cut_opens_on_the_hook(api, clips):
+    client, r = api
+    with db.connect(r["dsn"]) as conn:
+        gh, _ = _bank(conn, 14, clips / "a.mp4", r["a"])
+    assert client.put(f"/api/scenes/{r['concept']}/hook",
+                      json={"asset": f"gen:{gh}", "seconds": 1.5}).status_code == 200
+    job = _wait(client, client.post("/api/cut/assemble",
+                                    json={"concept_id": r["concept"]}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert job["hook"] is True
+    assert job["seconds"] == pytest.approx(13.5, abs=0.05)

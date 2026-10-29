@@ -32,6 +32,8 @@ import {
   Sparkles,
   UserRound,
   Wand2,
+  X,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -100,6 +102,10 @@ type Handlers = {
   onScene: (madeId: string, scene: Concept) => void;
   /** join a rendered scene's shots into one video (lib/final-cut.ts) */
   onJoin: (m: Made) => void;
+  /** open the effects gallery to make this scene's hook (lib/final-cut.ts) */
+  onHook: (m: Made) => void;
+  /** take the hook off; the cut is joined again without it (free) */
+  onUnhook: (m: Made) => void;
   /** trim the final cut into a new clip, free (seconds) */
   onTrim: (m: Made, start: number, end: number) => void;
   onChip: (text: string) => void;
@@ -433,6 +439,21 @@ function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
               title="Keep part of it as a new clip. Free."
             >
               <Scissors strokeWidth={1.6} /> {trimming ? "Trimming…" : "Trim"}
+            </button>
+          ) : null}
+          {m.conceptId ? (
+            <button
+              type="button"
+              className="zc-act"
+              onClick={() => h.onHook(m)}
+              title="Open the cut on a 2-second effect drawn from its first frame. The effect shows its price before it runs; putting it on the cut is free."
+            >
+              <Zap strokeWidth={1.6} /> {cut.hook ? "Change the hook" : "Add a hook"}
+            </button>
+          ) : null}
+          {m.conceptId && cut.hook ? (
+            <button type="button" className="zc-act" onClick={() => h.onUnhook(m)} title="Join the cut again without the hook. Free.">
+              <X strokeWidth={1.6} /> Remove the hook
             </button>
           ) : null}
           {m.conceptId ? (
