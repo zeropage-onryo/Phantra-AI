@@ -72,6 +72,8 @@ import {
 } from "@/lib/studio-api";
 import type { Turn } from "@/lib/assistant";
 import pageFile from "@/content/effects-page.json";
+import { pairOf, sideBySideHref } from "@/lib/before-after";
+import { BeforeAfter } from "@/components/studio/before-after";
 import "@/components/studio/asset-viewer.css";
 import "@/components/studio/effects-tab.css";
 /* eslint-disable @next/next/no-img-element */
@@ -80,6 +82,10 @@ const CONTENT = readContent(pageFile);
 
 /* ── an example, playing: a clip loops muted, a still is drawn ── */
 function Example({ item, alt = "" }: { item: ShowcaseItem; alt?: string }) {
+  // a still with its original: half and half (2026-10-27, before and after)
+  if (item.kind === "still" && item.before && item.after) {
+    return <BeforeAfter before={item.before} after={item.after} alt={alt} still />;
+  }
   const rest = restingFrame(item);
   if (item.kind === "clip") {
     return <video src={item.after} poster={rest ?? undefined} autoPlay muted loop playsInline preload="metadata" aria-label={alt || undefined} />;
@@ -444,6 +450,12 @@ export function EffectsTab() {
             </div>
           ) : shown?.turn.made?.clip ? (
             <video src={mediaSrc(shown.turn.made.clip)} controls playsInline autoPlay muted loop />
+          ) : shown?.turn.made?.image && pairOf(shown.turn.effect, shown.turn.made) ? (
+            <BeforeAfter
+              before={mediaSrc(pairOf(shown.turn.effect, shown.turn.made)!.before)}
+              after={mediaSrc(shown.turn.made.image)}
+              alt={`${shown.effect.label} result`}
+            />
           ) : shown?.turn.made?.image ? (
             <img src={mediaSrc(shown.turn.made.image)} alt={`${shown.effect.label} result`} />
           ) : chosen?.media ? (
@@ -663,6 +675,8 @@ function ResultPane({
   const self = candidateOf({ image: made.image, clip: made.clip, asset: made.asset }, "this result");
   const toVesper = vesperHref(made.asset, effect.label);
   const proWhy = bundle && self ? unavailable(bundle, [self]) : "";
+  const pair = pairOf(turn.effect, made);
+  const pairHref = pair ? sideBySideHref(pair) : null;
   return (
     <div className="fxp-result">
       {compact ? made.clip ? <video src={mediaSrc(made.clip)} controls playsInline /> : made.image ? <img src={mediaSrc(made.image)} alt={`${effect.label} result`} /> : null : null}
@@ -676,6 +690,11 @@ function ResultPane({
           <button type="button" className="fxp-pill primary" disabled={!!proWhy} title={proWhy || "Puts Make It Pro in the panel with this result. Nothing runs until you approve."} onClick={() => onMakeItPro([self])}>
             <Sparkles strokeWidth={1.8} /> Make It Pro
           </button>
+        ) : null}
+        {pairHref ? (
+          <a className="fxp-pill" href={pairHref} download title="Your original photo beside the result, as one image. Free.">
+            <Download strokeWidth={1.8} /> Download side-by-side
+          </a>
         ) : null}
         {id !== null ? <ShareControls key={id} id={id} /> : null}
         {id !== null ? (

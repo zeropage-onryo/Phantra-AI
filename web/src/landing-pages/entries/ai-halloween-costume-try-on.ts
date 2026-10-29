@@ -33,6 +33,9 @@
 // MEDIA: none yet. Nothing is generated without Mike's yes, and the
 // showcase manifest has no Halloween example on 2026-10-27, so every tile
 // is a marigold plate until example clips are approved.
+// BEFORE AND AFTER (2026-10-27): a wall tile given `from` (the person's original
+// photo) and `src` (their costume still) splits down the middle and slides to the
+// costume on hover (ad-wall.tsx). When the examples land, give the stills `from`.
 //
 // Checked 2026-10-27 against the code:
 // - Costume Try-On: src/effect_recipes.py RECIPES["costume_try_on"], the

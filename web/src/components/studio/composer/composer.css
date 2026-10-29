@@ -884,6 +884,28 @@
   aspect-ratio: auto;
   display: block;
 }
+/* a costume still beside its original (before-after.tsx): its own shape */
+.zc .zc-tile.pair {
+  aspect-ratio: auto;
+  display: block;
+  cursor: default;
+}
+.zc .zc-tile.pair img.ba-after,
+.zc .zc-tile.pair img.ba-alone {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  max-height: 560px;
+  object-fit: cover;
+}
+.zc .zc-tile.pair img.ba-before {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .zc .zc-tile.clip video {
   display: block;
   width: 100%;

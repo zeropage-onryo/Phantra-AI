@@ -66,7 +66,9 @@ export type MakeTile = {
   /** The showcase wall only: the tile's frame, "w:h" (default "3:4"). */
   aspect?: string;
   /** The still this one was edited from, shown under a draggable divider
-   *  (the GPT Image page's before/after, 2026-10-08). */
+   *  (the GPT Image page's before/after, 2026-10-08); on the bento wall the
+   *  two split the tile and the pointer slides the result over (2026-10-27,
+   *  the costume try-on). */
   from?: string;
   /** The still has a transparent background: draw it on a checkerboard. */
   alpha?: boolean;

@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from src import (
@@ -5936,6 +5936,44 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
             raise ValueError("one of the images could not be read or made fetchable")
         urls.append(url)
     return urls
+
+
+def _picture_bytes(ref: str, account_id: int) -> Optional[bytes]:
+    """One picture the caller holds, as bytes, read the way an effect reads
+    its source (_effect_urls): a render or an asset by id through
+    resolve_references (the caller's own, or refused), anything else
+    through _photo_bytes as that account. None when it cannot be read."""
+    from src import mcp_server
+    kind, _, rest = (ref or "").partition(":")
+    if kind in ("gen", "asset") and rest.isdigit():
+        try:
+            urls = mcp_server.resolve_references([ref], limit=1, who="Side by side",
+                                                 account_id=account_id)
+        except ValueError:
+            return None
+        return _photo_bytes(urls[0], account_id) if urls else None
+    return _photo_bytes(ref.split("?")[0], account_id)
+
+
+@router.get("/side-by-side")
+def side_by_side(before: str, after: str, account_id: int = Depends(auth.current_account_id)):
+    """Before and after as ONE JPEG to download (2026-10-27, src/side_by_side.py):
+    `before` is the photo an effect started from, `after` the render it made,
+    named by its id (`gen:<id>`, the caller's own). Free, nothing stored."""
+    from src import outcomes
+    from src import side_by_side as sbs
+    if not re.fullmatch(r"gen:\d+", after or ""):
+        return _error(400, "bad_after", "after is a render of yours, by its id (gen:<id>)")
+    a, b = _picture_bytes(before, account_id), _picture_bytes(after, account_id)
+    if not a or not b:
+        return _error(404, "not_found", "One of the two pictures could not be read.")
+    jpeg = sbs.compose(a, b)
+    if not jpeg:
+        return _error(422, "unreadable", "One of the two pictures is not an image.")
+    outcomes.record_ref("download", after, account_id=account_id, source="side_by_side")
+    return Response(content=jpeg, media_type="image/jpeg",
+                    headers={"Content-Disposition": 'attachment; filename="before-after.jpg"',
+                             "Cache-Control": "private, no-store"})
 
 
 @router.post("/effects/quote")
