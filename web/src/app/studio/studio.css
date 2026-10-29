@@ -27,6 +27,11 @@
   --signal-hi: #fee32d;
   /* a yellow fill, pressed */
   --signal-deep: #e5c916;
+  /* a big yellow FILL, dimmed (2026-10-22, Mike: the Generate button was
+     "way too bright"): the signal pulled a quarter of the way to the ground,
+     still black ink on it; hover lifts it back toward the signal */
+  --signal-dim: color-mix(in srgb, var(--signal) 76%, var(--ground));
+  --signal-dim-hi: color-mix(in srgb, var(--signal) 88%, var(--ground));
   /* ink ON a signal fill: yellow takes the owl's black, never white */
   --on-signal: #0a0a0b;
   --signal-soft: color-mix(in srgb, var(--signal) 12%, transparent);
@@ -71,6 +76,16 @@
   /* state */
   --ok: #5fa878;
   --warn: #d9a441;
+
+  /* timeline clips on the plugins page's drawn editor (2026-10-23): muted the
+     way editors tint video and audio tracks, so the signal clip reads as new */
+  --clip-video: #2c4258;
+  --clip-audio: #2d4a3d;
+
+  /* the Create front page's news tags (2026-10-22, components/studio/front):
+     NEW MODEL is the signal, UPDATE the ink; these two are the rest */
+  --tag-effect: #7fb2ff;
+  --tag-trend: #5fd08a;
 }
 
 /* the shape, face and timing tokens: the shell, and the ⌘K palette, which
@@ -282,6 +297,32 @@
 .rnav [aria-current] {
   color: var(--text);
   background: var(--signal-soft);
+}
+/* the Halloween neon tag on the rail's Effects entry (2026-10-27, design
+   08; lib/effects-wall.ts halloweenOn ends it): the word glows when the rail
+   is open, the icon glows when it is collapsed */
+.rnav [data-neon] svg {
+  color: #ffd2a8;
+  filter: drop-shadow(0 0 3px #ff7a1a) drop-shadow(0 0 8px #ff7a1a);
+}
+.rnav .rneon {
+  margin-left: auto;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff1e0;
+  text-shadow: 0 0 2px #fff, 0 0 6px #ff7a1a, 0 0 14px #ff7a1a;
+  animation: rneon-buzz 4s infinite;
+}
+/* the flicker dims the glow, never opacity: .rail .rl's opacity is what
+   hides the word while the rail is collapsed */
+@keyframes rneon-buzz {
+  0%, 18%, 22%, 25%, 100% { color: #fff1e0; text-shadow: 0 0 2px #fff, 0 0 6px #ff7a1a, 0 0 14px #ff7a1a; }
+  20%, 24% { color: #8a6a55; text-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rnav .rneon { animation: none; }
 }
 .rnav [aria-current]::before {
   content: "";
@@ -2390,6 +2431,26 @@ textarea.zin {
   border-color: color-mix(in srgb, var(--signal) 85%, transparent);
   color: var(--text);
 }
+/* the new-element form's door into the Library drawer (2026-10-26) */
+.zlibpick {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--bone-3);
+  font-size: 12px;
+  cursor: pointer;
+}
+.zlibpick svg {
+  width: 13px;
+  height: 13px;
+}
+.zlibpick:hover {
+  color: var(--text);
+}
 .zdrop svg {
   width: 14px;
   height: 14px;
@@ -3409,6 +3470,12 @@ select.zin {
      phone layout, so the bar's Edit and the header's Timeline both go */
   .rnav [data-nav="cut"],
   .htabs .htab-cut {
+    display: none;
+  }
+  /* the Image and Video generators (2026-10-22) are not on the phone's bar:
+     it holds no more icons; the Create home's tool tiles reach both */
+  .rnav [data-nav="image"],
+  .rnav [data-nav="video"] {
     display: none;
   }
   .rnav [aria-current]::before {
@@ -4546,4 +4613,551 @@ p.zkeys {
 .trash-acts .btn {
   padding: 7px 11px;
   font-size: 12px;
+}
+
+
+/* ── /studio/plugins (2026-10-23, components/studio/plugins/plugins-page.tsx) ──
+   One loud thing, the drawn editor (.zed); under it the plain install guide
+   (.zplug-guide). The playhead sweeping in and the Phantra clip landing on V2
+   is the page's one motion. */
+.zplug {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 36px 28px 64px;
+  color: var(--text);
+}
+.zplug h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.zplug-title h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(40px, 5.4vw, 68px);
+  line-height: 0.92;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+}
+.zplug-title p {
+  margin: 16px 0 0;
+  max-width: 54ch;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--bone-2);
+}
+/* the drawn editor */
+.zed {
+  margin: 36px 0 0;
+  border: 1px solid var(--edge);
+  border-radius: 20px;
+  background: var(--void);
+  overflow: hidden;
+  box-shadow: 0 40px 80px -40px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.02) inset;
+}
+.zed-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--edge-lo);
+  background: var(--panel);
+  font-size: 12px;
+  color: var(--bone-3);
+}
+.zed-lights {
+  display: flex;
+  gap: 7px;
+}
+.zed-lights i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--edge-hi);
+}
+.zed-app {
+  color: var(--bone);
+  font-weight: 500;
+}
+.zed-proj {
+  margin-left: auto;
+}
+.zed-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+.zed-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.zed-viewer {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 18px 18px 14px;
+  background: #050506;
+}
+.zed-viewer img {
+  width: min(100%, 560px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.zed-tc {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--signal);
+}
+.zed-timeline {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  padding: 0 14px 16px 0;
+  border-top: 1px solid var(--edge-lo);
+  background: var(--well);
+}
+.zed-labels {
+  display: grid;
+  grid-template-rows: 26px 38px 50px 38px;
+  row-gap: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+.zed-labels span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zed-lanes {
+  position: relative;
+  display: grid;
+  grid-template-rows: 26px 38px 50px 38px;
+  row-gap: 4px;
+}
+.zed-ruler {
+  position: relative;
+  border-bottom: 1px solid var(--edge-lo);
+  background-image: repeating-linear-gradient(90deg, var(--edge) 0 1px, transparent 1px 5%);
+  background-size: 100% 6px;
+  background-repeat: no-repeat;
+  background-position: bottom;
+}
+.zed-ruler span {
+  position: absolute;
+  top: 5px;
+  padding-left: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dimmer);
+}
+.zed-lane {
+  position: relative;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.015);
+}
+.zed-clip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.zed-clip.video {
+  border: 1px solid color-mix(in srgb, var(--clip-video) 60%, #7da2c4);
+  background-color: var(--clip-video);
+  background-size: auto 100%;
+  background-repeat: repeat-x;
+  background-blend-mode: luminosity;
+  opacity: 0.92;
+}
+.zed-clip.audio {
+  border: 1px solid color-mix(in srgb, var(--clip-audio) 55%, #7fbf9e);
+  background: var(--clip-audio);
+}
+.zed-clip.audio svg {
+  width: 100%;
+  height: 100%;
+}
+.zed-clip.audio path {
+  fill: color-mix(in srgb, #7fbf9e 70%, transparent);
+}
+.zed-clip.made {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--signal);
+  background: color-mix(in srgb, var(--signal) 22%, var(--ground));
+  color: var(--signal);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transform-origin: left center;
+  animation: zed-land 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 820ms both;
+}
+.zed-made-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.zed-playhead {
+  position: absolute;
+  top: 0;
+  bottom: -6px;
+  left: var(--ph);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--signal);
+  animation: zed-sweep 900ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+.zed-playhead span {
+  position: absolute;
+  top: 0;
+  left: -6px;
+  width: 14px;
+  height: 12px;
+  background: var(--signal);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
+}
+@keyframes zed-sweep {
+  from {
+    left: 0;
+  }
+}
+@keyframes zed-land {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+
+/* the docked Phantra panel, drawn */
+.zed-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-left: 1px solid var(--edge-lo);
+  background: var(--panel);
+  font-size: 12px;
+  color: var(--bone-2);
+}
+.zp-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.zp-top img {
+  width: 20px;
+  height: 20px;
+}
+.zp-top b {
+  color: var(--text);
+  font-size: 13px;
+}
+.zp-top span {
+  margin-left: auto;
+  color: var(--dim);
+}
+.zp-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--edge-lo);
+}
+.zp-tabs span {
+  flex: 1;
+  padding: 6px 0;
+  text-align: center;
+  color: var(--dim);
+}
+.zp-tabs .on {
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--signal);
+}
+.zp-from {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.zp-from img {
+  width: 44px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 3px;
+}
+.zp-prompt {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--text);
+  line-height: 1.45;
+}
+.zp-opts {
+  display: flex;
+  gap: 6px;
+}
+.zp-opts span {
+  padding: 3px 8px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+}
+.zp-price {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--raise);
+}
+.zp-price b {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+}
+.zp-price small {
+  color: var(--dim);
+  font-size: 11px;
+}
+.zp-approve {
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+.zp-lib {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--edge-lo);
+}
+.zp-lib div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.zp-lib img {
+  width: 38px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 3px;
+}
+.zp-lib em {
+  margin-left: auto;
+  font-style: normal;
+  color: var(--dim);
+}
+
+/* the install guide: app tabs, three steps, the download buttons */
+.zplug-guide {
+  max-width: 640px;
+  margin-top: 48px;
+}
+.zplug-tabs {
+  display: flex;
+  gap: 28px;
+  border-bottom: 1px solid var(--edge);
+}
+.zplug-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -1px;
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--dim);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.zplug-tab:hover {
+  color: var(--bone);
+}
+.zplug-tab[aria-selected="true"] {
+  border-bottom-color: var(--signal);
+  color: var(--text);
+}
+.zplug-tab:focus-visible,
+.zplug-get-btn:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.zplug-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.zplug-steps li {
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
+}
+.zplug-steps li:last-child {
+  border-bottom: 0;
+}
+.zplug-step-n {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dim);
+}
+.zplug-steps h2 {
+  margin: 6px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.zplug-steps p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--bone-2);
+}
+.zplug-steps a,
+.zplug-legal a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.zplug-dls {
+  margin-top: 8px;
+}
+.zplug-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.zplug-get-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.zplug-get-btn:hover {
+  background: var(--signal-deep);
+}
+.zplug-get-btn.off {
+  background: var(--raise);
+  border: 1px solid var(--edge);
+  color: var(--bone-3);
+  font-weight: 500;
+  cursor: default;
+}
+.zplug-os {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+.zplug-legal {
+  margin: 14px 0 0;
+  max-width: 64ch;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dim);
+}
+
+@media (max-width: 980px) {
+  .zed-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zed-panel {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .zplug {
+    padding: 24px 16px 48px;
+  }
+  .zed-proj,
+  .zed-ruler span:nth-child(n + 3) {
+    display: none;
+  }
+  .zplug-guide {
+    margin-top: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zed-playhead,
+  .zed-clip.made {
+    animation: none;
+  }
+}
+
+/* What's new (2026-10-25, docs/tasks/task-whats-new.md): the count of live
+   announcements this person has not seen, on Create in the rail and a dot
+   on the header's Create tab */
+.nbadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--rp);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  color: var(--on-signal);
+  background: var(--signal);
+  pointer-events: none;
+}
+.nbadge.dot {
+  position: relative;
+  top: -6px;
+  right: auto;
+  display: inline-block;
+  min-width: 6px;
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  margin-left: 4px;
+}
+
+/* ── THE PHONE, 2026-10-26 (components/studio/phone/) ── Mike's "Phantra
+   Mobile Studio" canvas, after a side-by-side with Higgsfield's mobile site:
+   under 720px the rail-as-icon-bar and the header (its tabs, credit pill,
+   search, tray, New session and avatar) give way to the phone's own top bar
+   (menu + logo) and five labelled tabs. The rules above that shaped the rail
+   into a bottom bar stay for the record; this block wins at the same size. */
+@media (max-width: 720px) {
+  .zps .rail,
+  .zps .rail:hover,
+  .zps .rail.pinned {
+    display: none;
+  }
+  .zps .bar.hdr {
+    display: none;
+  }
+  .zps .shell {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  /* Assets: the tile-size slider is a mouse's control; a phone keeps the
+     wall at its default size, the search and the chips */
+  .zps .azoom {
+    display: none;
+  }
+  /* toasts sit above the tab bar, not under the top bar */
+  .zps .ztoasts {
+    top: auto;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
 }

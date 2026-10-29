@@ -26,6 +26,11 @@
      effect on that clip, two clicks -- the first only shows the price, the
      second spends at exactly that. It is the one button on this page that
      spends, and it is the effects door (/api/effects/run), not a render.
+   - SHOWCASE (2026-10-25, docs/tasks/task-whats-new.md): the Create
+     wall's waiting announcements, for the house account's owners only
+     (components/studio/showcase). Its Render button is the second door on
+     this page that spends: one render on the house account, priced on the
+     button.
    - The MANUAL IMPORT LANE, for the operator only: a clip rendered
      anywhere, by hand, dropped on its card and filed free
      (/api/queue/manual, gated server-side; the `manual_lane` capability
@@ -63,6 +68,8 @@ import {
 } from "@/lib/studio-api";
 import { RefImg, heroOf, partsOf } from "@/components/studio/concept-card";
 import { useShell } from "@/components/studio/shell";
+import { NeedsYou } from "@/components/studio/calendar/needs-you";
+import { ShowcaseList } from "@/components/studio/showcase/showcase-list";
 import { creditsLabel, resultOf, sceneOf } from "@/lib/job-feed";
 import { forgetJobs, refreshJobs, useJobs } from "@/lib/jobs";
 import { creditsText, liveJobFor, renderedOf } from "@/lib/render-choice";
@@ -333,6 +340,13 @@ export default function RendersPage() {
           {live.length ? `${live.length} running` : "nothing running"} · a scene is rendered from its own Render button
         </span>
       </div>
+
+      {/* posts the platform refused (2026-10-22, the calendar): above the jobs */}
+      <NeedsYou toast={toast} />
+
+      {/* what the Create wall is waiting on (2026-10-25, docs/tasks/task-whats-new.md):
+          the house account's owners only; draws nothing for anyone else */}
+      <ShowcaseList toast={toast} />
 
       <div className="chead">
         <h3>Jobs</h3>

@@ -337,6 +337,44 @@ def render_wan(shot: Shot) -> str:
     )
 
 
+# Grok Imagine Video 1.5 (xAI, on fal since 2026-10-23) -- plain prose:
+# the camera move named first, then who does what where, the light and the
+# look, and a sentence of sound, because the model makes its audio in the
+# same pass as the picture. No labeled sections and no negative list: fal's
+# schema takes a single `prompt`, and xAI's guidance (via fal's model page)
+# is to name the camera move and the subject's action plainly. A general
+# pattern, not a verified dialect, so `verified` stays None.
+GROK_CAMERA = {
+    "static": "the camera holds still",
+    "pan_left": "the camera pans slowly left",
+    "pan_right": "the camera pans slowly right",
+    "tilt_up": "the camera tilts up",
+    "tilt_down": "the camera tilts down",
+    "push_in": "the camera pushes in slowly",
+    "pull_out": "the camera pulls back slowly",
+    "tracking": "the camera tracks alongside",
+    "handheld": "handheld camera",
+    "crane_up": "the camera cranes up",
+    "crane_down": "the camera cranes down",
+    "orbit": "the camera orbits the subject",
+}
+
+
+def render_grok(shot: Shot) -> str:
+    """Grok Imagine: camera, a sized shot of the subject doing the action
+    in the setting, light and look, then the sound."""
+    sentences = [
+        f"{GROK_CAMERA[shot.camera][:1].upper()}{GROK_CAMERA[shot.camera][1:]} on a "
+        f"{_readable_size(shot.size)} shot: {shot.subject} {shot.action}"
+        + (f" in {shot.setting}" if shot.setting.strip() else "") + ".",
+    ]
+    light = _phrase(shot.lighting, shot.look)
+    if light:
+        sentences.append(f"{light[:1].upper()}{light[1:]}.")
+    sentences.append(f"Sound: {shot.audio.strip() or 'ambient sound only, no dialogue'}.")
+    return " ".join(sentences)
+
+
 # OpenArt Director — conversational, not a prompt syntax. Checked
 # 2026-08-20 against OpenArt's own blog and the Director user manual
 # (director-user-manual.vercel.app): Director organizes Story → Scenes →
@@ -424,6 +462,7 @@ PLATFORMS: dict[str, Platform] = {
     "seedance": Platform("seedance", SEEDANCE_CAMERA, render_seedance, verified="2026-08-04"),
     "ltx": Platform("ltx", LTX_CAMERA, render_ltx, verified="2026-08-04"),
     "wan": Platform("wan", WAN_CAMERA, render_wan, verified="2026-08-04"),
+    "grok": Platform("grok", GROK_CAMERA, render_grok, verified=None),
     "openart": Platform("openart", CAMERA_PROSE, render_openart, verified="2026-08-20"),
 }
 

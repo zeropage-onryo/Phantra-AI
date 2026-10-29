@@ -20,9 +20,12 @@
 
    A CONVERSATION IS WORKING MEMORY (2026-10-02, Mike's call): it is saved
    only so the person can pick it up where they left off. Once the scene is
-   CREATED it goes away (`finishProject`: the turns, the brief, the box and
-   its references are cleared, and only the "scene written" card remains
-   until "Write another"); the pill's button clears it the same way
+   CREATED it goes away (`finishProject`: the turns, the brief and the box's
+   words are cleared, and only the "scene written" card remains until "Write
+   another"); the box's REFERENCES stay, so the next take of the same idea
+   is held to the same pictures (2026-10-22, scene 441 -> 442: the rewrite
+   lost all three stills), until the person takes them off or starts a new
+   session; the pill's button clears it the same way
    (`clearProject`). Nothing is ever archived -- the server DELETES the row.
    What the talk produced lives on the concept and, once rendered, on the
    asset with its prompt. Nothing here calls a model or spends.
@@ -312,11 +315,22 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
   // effect writes exactly that.
   const finishProject = useCallback((written: ComposerDraft["written"]) => {
     // what was made stays, and so does the plan that made it
-    setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect || !!t.talk));
+    setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect || !!t.talk || !!t.dub));
     setStage("");
-    // the brand kit picked for this conversation stays: only New session
-    // clears it (2026-10-22)
-    setDraftState((d) => ({ ...EMPTY_DRAFT, written, brand_kit_id: d.brand_kit_id }));
+    // the brand kit picked for this conversation stays, and so do the box's
+    // references and what each is for: a rewrite of the scene is held to
+    // the same pictures unless the person takes one off. Only New session
+    // clears them (2026-10-22)
+    setDraftState((d) => ({
+      ...EMPTY_DRAFT,
+      written,
+      brand_kit_id: d.brand_kit_id,
+      // ...and so does the Ad Studio's brief: the next ad is the same campaign
+      studio: d.studio,
+      picked: d.picked,
+      uploads: d.uploads,
+      roles: d.roles,
+    }));
   }, [setTurns]);
 
   // the header's "New session" (lib/assistant.ts requestNewSession): the

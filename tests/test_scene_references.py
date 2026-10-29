@@ -707,3 +707,30 @@ def test_director_frames_upload_from_disk_into_the_bin(tmp_path, monkeypatch):
     assert body["skipped"] == 1
     assert body["urls"][0].startswith("/refs/")
     assert api._resolve_asset_photo(body["urls"][0]).exists()
+
+
+def test_three_library_stills_and_a_named_prop_all_ride_on_a_timed_rewrite(tmp_db, monkeypatch):
+    """2026-10-22, scene 441 -> 442 (docs/tasks/task-kit-products-and-screens.md
+    A1): the rewrite into timed shots kept only the app prop the writer
+    found by name. When the composer sends the three Library stills (the
+    box now keeps them, and "#3" typed in the text names one), every one is
+    on the shot, the person's picks first, and the timed scene's parts are
+    chosen from all four."""
+    from src import timeline
+    app_prop = {"name": "Gygler App Interface", "category": "prop", "text": "the Gygler app",
+                "photos": ["/props/gygler-app-interface/photo/gygler-app-interface.jpg"]}
+    monkeypatch.setattr(api, "_assets_all", lambda account_id=None: [app_prop])
+    stills = [f"https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-c43{n}-x.jpg"
+              for n in (8, 9)] + ["https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-c440-x.jpg"]
+    prompt = ("(0-3s) Hands garnish the dish. (3-7s) A tablet shows the Gygler App Interface. "
+              "(7-10s) The head chef smiles.")
+    scene_id = preprod.save_concept(
+        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": prompt}]},
+        dsn=tmp_db, account_id=None)
+    refs = api._attach_scene_refs(scene_id, stills, idea="the Gygler App Interface on a tablet")
+    assert refs[:3] == stills
+    assert refs[3] == "/props/gygler-app-interface/photo/gygler-app-interface.jpg"
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    tl = timeline.ensure(scene_id, db_path=tmp_db)
+    assert all(p["refs"] == refs for p in tl["parts"])     # the plain split keeps every ref

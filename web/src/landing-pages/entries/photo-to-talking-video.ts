@@ -271,7 +271,7 @@ export const TALKING_PHOTO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["omnihuman-video-generator", "image-to-video", "consistent-character-video", "ugc-ads"],
+  related: ["omnihuman-video-generator", "image-to-video", "consistent-character-video", "ugc-ads", "ai-halloween-costume-try-on"],
   finalCta: {
     eyebrow: "One photo, one voice",
     title: "Make a photo talk.",

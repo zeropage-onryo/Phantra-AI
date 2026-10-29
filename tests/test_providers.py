@@ -190,4 +190,4 @@ def test_the_default_render_is_the_cheap_720p_or_the_models_floor():
             assert spec["frame"]["default"] == "720p", spec["id"]
     ltx = providers.check_render_choice("fal", "ltx2.3")
     assert (ltx["duration"], ltx["frame"]) == (6, "1080p")
-    assert ltx["estimate_usd"] == pytest.approx(0.36)
+    assert ltx["estimate_usd"] == pytest.approx(0.48)     # $0.08/s x 6s

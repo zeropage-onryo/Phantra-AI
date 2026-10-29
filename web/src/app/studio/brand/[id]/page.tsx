@@ -20,7 +20,7 @@
    contrast lines are worked out here from the palette and stored nowhere. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Copy, ImagePlus, Plus, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, ImagePlus, Plus, Trash2, Upload, X } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import {
   deleteBrandKit,
@@ -55,23 +55,39 @@ import {
   fontStack,
   isFontRole,
   isSvg,
+  LINK_PHOTOS_MAX,
   normaliseHex,
   problems,
   roleColour,
   splitList,
   withDefaults,
+  tabOfProblem,
 } from "@/lib/brand-kit";
+import { cardFonts } from "@/components/studio/card-fonts";
+import "../brand.css";
 import { useShell } from "@/components/studio/shell";
+import { UseKitMenu } from "@/components/studio/use-kit-menu";
 /* eslint-disable @next/next/no-img-element */
 
-const BTN = "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] transition disabled:opacity-40";
-const PRI = `${BTN} bg-white text-black! hover:bg-white/90 disabled:bg-white/15 disabled:text-white/40! disabled:opacity-100`;
-const GHOST = `${BTN} border border-white/15 text-white/80 hover:border-white/40`;
-const FIELD =
-  "w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-white/90 outline-none focus:border-white/30";
-const LABEL = "mb-1 block text-[11px] uppercase tracking-wide text-white/40";
-const HINT = "text-[12px] leading-relaxed text-white/40";
-const CARD = "flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:p-5";
+/* r3 (2026-10-26, Mike's pick "Brand 04"): the kit in tabs, the preview
+   beside them; the shared parts are brand.css (bk-): a white pill saves
+   (nothing on this page spends), outline pills for the rest. */
+const PRI = "bk-ok";
+const GHOST = "bk-pill";
+const FIELD = "bk-input";
+const LABEL = "bk-lab";
+const HINT = "bk-hint";
+const CARD = "bk-sect";
+const TABS = [
+  ["identity", "Identity"],
+  ["visual", "Visual"],
+  ["look", "Look"],
+  ["voice", "Voice"],
+  ["sound", "Sound"],
+  ["products", "Products & characters"],
+] as const;
+type Tab = (typeof TABS)[number][0];
+const isTab = (v: string): v is Tab => TABS.some(([id]) => id === v);
 const ROLES_NO_EXTRA = PALETTE_ROLES.filter((r) => r !== "extra") as Exclude<PaletteRole, "extra">[];
 // the editor's transitions most kits want; the API takes any of the 58
 const TRANSITIONS: [string, string][] = [
@@ -84,8 +100,8 @@ const ASPECTS = ["16:9", "9:16", "1:1"] as const;
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className={CARD}>
-      <header className="flex flex-col gap-1">
-        <h2 className="text-[15px] font-semibold text-white/90">{title}</h2>
+      <header className="bk-sect-head">
+        <h2 className="bk-anton">{title}</h2>
         {hint ? <p className={HINT}>{hint}</p> : null}
       </header>
       {children}
@@ -213,13 +229,17 @@ function FileSlot({ kit, role, label, accept, onUpload, onRemove, busy }: {
   );
 }
 
-function ElementPicker({ title, items, picked, onToggle, claims, onClaims }: {
+function ElementPicker({ title, items, picked, onToggle, claims, onClaims, aliases, onAliases, photos, onPhotos }: {
   title: string;
   items: Asset[];
   picked: number[];
   onToggle: (id: number, name: string) => void;
   claims?: Record<number, string>;
   onClaims?: (id: number, text: string) => void;
+  aliases?: Record<number, string>;
+  onAliases?: (id: number, text: string) => void;
+  photos?: Record<number, number>;
+  onPhotos?: (id: number, n: number) => void;
 }) {
   if (!items.length) return <p className={HINT}>No {title.toLowerCase()} in Elements yet.</p>;
   return (
@@ -241,6 +261,31 @@ function ElementPicker({ title, items, picked, onToggle, claims, onClaims }: {
                 onChange={(e) => onClaims(id, e.target.value)}
               />
             ) : null}
+            {on && onAliases ? (
+              <input
+                className={FIELD}
+                placeholder={`Other names a scene calls it by, comma-separated (e.g. "the app")`}
+                value={aliases?.[id] ?? ""}
+                onChange={(e) => onAliases(id, e.target.value)}
+              />
+            ) : null}
+            {on && onPhotos ? (
+              <label className="flex items-center gap-2 text-[12px] text-white/60">
+                Hold a shot that names it to
+                <select
+                  className="rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-white/85"
+                  value={photos?.[id] ?? 1}
+                  onChange={(e) => onPhotos(id, Number(e.target.value))}
+                >
+                  {Array.from({ length: LINK_PHOTOS_MAX }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n === 1 ? "1 photo" : `${n} photos`}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-white/40">(an app: its real screenshots, added to the element)</span>
+              </label>
+            ) : null}
           </div>
         );
       })}
@@ -261,11 +306,19 @@ export default function BrandKitPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>("16:9");
+  // the tab, kept in the address (#look) so a reload or a shared link opens it
+  const [tab, setTab] = useState<Tab>(() => {
+    const h = typeof window === "undefined" ? "" : window.location.hash.slice(1);
+    return isTab(h) ? h : "identity";
+  });
   const [elements, setElements] = useState<Asset[]>([]);
   // list fields are edited as text and split on save, so a comma typed is never eaten
   const [lists, setLists] = useState({ banned: "", use: "", avoid: "", never: "", selling: "", aesthetics: "" });
   const [why, setWhy] = useState<string | null>(null);
   const [claims, setClaims] = useState<Record<number, string>>({});
+  // per linked element, as typed; split on save like the other lists
+  const [productAliases, setProductAliases] = useState<Record<number, string>>({});
+  const [castAliases, setCastAliases] = useState<Record<number, string>>({});
   const refInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
 
@@ -284,6 +337,8 @@ export default function BrandKitPage() {
       aesthetics: formatAesthetics(s.look.aesthetics),
     });
     setClaims(Object.fromEntries(s.products.map((p) => [p.id, (p.claims ?? []).join(", ")])));
+    setProductAliases(Object.fromEntries(s.products.map((p) => [p.id, (p.aliases ?? []).join(", ")])));
+    setCastAliases(Object.fromEntries(s.characters.map((c) => [c.id, (c.aliases ?? []).join(", ")])));
     setDirty(false);
   };
 
@@ -308,7 +363,8 @@ export default function BrandKitPage() {
     look: { ...spec.look, banned: splitList(lists.banned), aesthetics: parseAesthetics(lists.aesthetics) },
     voice: { ...spec.voice, use: splitList(lists.use), avoid: splitList(lists.avoid) },
     never_claim: splitList(lists.never),
-    products: spec.products.map((p) => ({ ...p, claims: splitList(claims[p.id] ?? "") })),
+    products: spec.products.map((p) => ({ ...p, claims: splitList(claims[p.id] ?? ""), aliases: splitList(productAliases[p.id] ?? "") })),
+    characters: spec.characters.map((c) => ({ ...c, aliases: splitList(castAliases[c.id] ?? "") })),
   });
   const issues = problems(name, composed());
 
@@ -382,62 +438,89 @@ export default function BrandKitPage() {
   }
   if (!kit) return <section className="view"><span className="m" style={{ padding: 24 }}>loading…</span></section>;
 
-  return (
-    <section className="view" style={{ paddingTop: 0 }}>
-      {fontsCss ? <style>{fontsCss}</style> : null}
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 sm:px-8">
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={GHOST} onClick={() => router.push("/studio/brand")}>
-            <ArrowLeft size={13} /> Kits
-          </button>
-          <input
-            className={`${FIELD} max-w-sm text-[15px] font-semibold`}
-            value={name}
-            maxLength={80}
-            aria-label="Kit name"
-            onChange={(e) => {
-              setName(e.target.value);
-              setDirty(true);
-            }}
-          />
-          <span className="flex-1" />
-          <button
-            type="button"
-            className={GHOST}
-            onClick={() =>
-              duplicateBrandKit(id)
-                .then((k) => router.push(`/studio/brand/${k.id}`))
-                .catch((e) => toast(e instanceof Error ? e.message : "Could not duplicate", "err"))
-            }
-          >
-            <Copy size={13} /> Duplicate
-          </button>
-          <button
-            type="button"
-            className={GHOST}
-            onClick={() =>
-              deleteBrandKit(id)
-                .then(() => {
-                  toast(`${kit.name} deleted`, "ok", { action: { label: "Undo", run: () => restoreBrandKit(id) } });
-                  router.push("/studio/brand");
-                })
-                .catch((e) => toast(e instanceof Error ? e.message : "Could not delete", "err"))
-            }
-          >
-            <Trash2 size={13} /> Delete
-          </button>
-          <button type="button" className={PRI} disabled={!dirty || saving || issues.length > 0} onClick={save}>
-            {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-          </button>
-        </div>
-        {issues.length && dirty ? (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[13px] text-amber-100">
-            {issues.map(([f, m]) => `${f}: ${m}`).join(" · ")}
-          </div>
-        ) : null}
+  const flagged = new Set(issues.map(([f]) => tabOfProblem(f)).filter(Boolean));
+  const pickTab = (t: Tab) => {
+    setTab(t);
+    try {
+      window.history.replaceState(null, "", `#${t}`);
+    } catch {
+      /* the address keeps the tab only where it can */
+    }
+  };
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="flex min-w-0 flex-col gap-5">
+  return (
+    <section className={`view bk bk-kit ${cardFonts}`}>
+      {fontsCss ? <style>{fontsCss}</style> : null}
+      <div className="bk-kitbar">
+        <button type="button" className={GHOST} onClick={() => router.push("/studio/brand")}>
+          <ArrowLeft size={14} /> Kits
+        </button>
+        <input
+          className="bk-kitname"
+          value={name}
+          maxLength={80}
+          aria-label="Kit name"
+          onChange={(e) => {
+            setName(e.target.value);
+            setDirty(true);
+          }}
+        />
+        <span className="bk-chip">
+          {kit.projects ? `${kit.projects} project${kit.projects === 1 ? "" : "s"} use it` : "On no project yet"}
+        </span>
+        <span className="bk-grow" />
+        <UseKitMenu kit={{ id: kit.id, name: kit.name }} unsaved={dirty} buttonClassName="bk-pill" label="Use this kit" />
+        <button
+          type="button"
+          className={GHOST}
+          onClick={() =>
+            duplicateBrandKit(id)
+              .then((k) => router.push(`/studio/brand/${k.id}`))
+              .catch((e) => toast(e instanceof Error ? e.message : "Could not duplicate", "err"))
+          }
+        >
+          <Copy size={14} /> Duplicate
+        </button>
+        <button
+          type="button"
+          className={GHOST}
+          onClick={() =>
+            deleteBrandKit(id)
+              .then(() => {
+                toast(`${kit.name} deleted`, "ok", { action: { label: "Undo", run: () => restoreBrandKit(id) } });
+                router.push("/studio/brand");
+              })
+              .catch((e) => toast(e instanceof Error ? e.message : "Could not delete", "err"))
+          }
+        >
+          <Trash2 size={14} /> Delete
+        </button>
+        {dirty ? (
+          <button type="button" className={PRI} disabled={saving || issues.length > 0} onClick={save}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        ) : (
+          <span className="bk-saved">
+            <Check size={14} strokeWidth={2.4} /> Saved
+          </span>
+        )}
+      </div>
+      <div className="bk-tabs" role="tablist" aria-label="Kit sections">
+        {TABS.map(([tid, label]) => (
+          <button key={tid} type="button" role="tab" aria-selected={tab === tid} onClick={() => pickTab(tid)}>
+            {label}
+            {dirty && flagged.has(tid) ? <i className="bk-dot" aria-label="needs a fix" /> : null}
+          </button>
+        ))}
+        <span className="bk-grow" />
+        {dirty ? <span className="bk-hint">Unsaved changes{issues.length ? "; fix the marked tab to save" : ""}</span> : null}
+      </div>
+      {issues.length && dirty ? <div className="bk-issues">{issues.map(([f, m]) => `${f}: ${m}`).join(" · ")}</div> : null}
+
+      <div className="bk-kitbody">
+
+          <div className="bk-kitform" role="tabpanel">
+            {tab === "identity" ? (
             <Section title="Identity" hint="The logo and lines the end card and the writer use.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {FILE_SLOTS.filter((s) => s.role.startsWith("logo_")).map((s) => (
@@ -469,7 +552,9 @@ export default function BrandKitPage() {
                   onChange={(e) => { setLists((l) => ({ ...l, selling: e.target.value })); setDirty(true); }} />
               </Field>
             </Section>
+            ) : null}
 
+            {tab === "visual" ? (
             <Section title="Visual" hint="Colours by role, two fonts, how captions look, and the end card.">
               <div className="flex flex-col gap-2">
                 <span className={LABEL}>Palette</span>
@@ -650,7 +735,9 @@ export default function BrandKitPage() {
                 </label>
               </div>
             </Section>
+            ) : null}
 
+            {tab === "look" ? (
             <Section title="Look" hint="Added to every still, keyframe and clip a project on this kit renders. Up to 8 reference images; a keyframe carries the first three, after the scene's own photos.">
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
                 {references.map((f) => (
@@ -692,7 +779,9 @@ export default function BrandKitPage() {
                   onChange={(e) => { setLists((l) => ({ ...l, aesthetics: e.target.value })); setDirty(true); }} />
               </Field>
             </Section>
+            ) : null}
 
+            {tab === "voice" ? (
             <Section title="Voice" hint="How the writer and the brain speak for this brand.">
               <Field label={`Tone rules · ${spec.voice.tone.length}/${LIMITS.tone}`}>
                 <textarea className={`${FIELD} min-h-20`} maxLength={LIMITS.tone} value={spec.voice.tone}
@@ -713,7 +802,9 @@ export default function BrandKitPage() {
                   onChange={(e) => edit((s) => ({ ...s, voice: { ...s.voice, cta: e.target.value } }))} />
               </Field>
             </Section>
+            ) : null}
 
+            {tab === "sound" ? (
             <Section title="Sound" hint="Stored with the kit now; the audio layer reads it when it lands. Exports stay at -14 LUFS until then.">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Field label="Default voice">
@@ -753,8 +844,10 @@ export default function BrandKitPage() {
                   onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload("music_ref", f, false); }} />
               </div>
             </Section>
+            ) : null}
 
-            <Section title="Products & characters" hint="Linked from Elements -- nothing is re-uploaded. The writer names them, and keeps product claims to the ones allowed here.">
+            {tab === "products" ? (
+            <Section title="Products & characters" hint="Linked from Elements -- nothing is re-uploaded. Each one's photo is attached to any shot that mentions it, by its name or one of its other names. The writer names them, and keeps product claims to the ones allowed here.">
               <span className={LABEL}>Products</span>
               <ElementPicker
                 title="Products"
@@ -762,6 +855,17 @@ export default function BrandKitPage() {
                 picked={spec.products.map((p) => p.id)}
                 claims={claims}
                 onClaims={(pid, text) => { setClaims((c) => ({ ...c, [pid]: text })); setDirty(true); }}
+                aliases={productAliases}
+                onAliases={(pid, text) => { setProductAliases((a) => ({ ...a, [pid]: text })); setDirty(true); }}
+                photos={Object.fromEntries(spec.products.map((p) => [p.id, p.photos ?? 1]))}
+                onPhotos={(pid, n) => edit((s) => {
+                  const link = s.products.find((p) => p.id === pid);
+                  if (link) {
+                    if (n > 1) link.photos = n;
+                    else delete link.photos;
+                  }
+                  return s;
+                })}
                 onToggle={(pid, pname) => edit((s) => {
                   const at = s.products.findIndex((p) => p.id === pid);
                   if (at >= 0) s.products.splice(at, 1);
@@ -778,6 +882,8 @@ export default function BrandKitPage() {
                 title="Characters"
                 items={cast}
                 picked={spec.characters.map((c) => c.id)}
+                aliases={castAliases}
+                onAliases={(cid, text) => { setCastAliases((a) => ({ ...a, [cid]: text })); setDirty(true); }}
                 onToggle={(cid, cname) => edit((s) => {
                   const at = s.characters.findIndex((c) => c.id === cid);
                   if (at >= 0) s.characters.splice(at, 1);
@@ -786,9 +892,10 @@ export default function BrandKitPage() {
                 })}
               />
             </Section>
+            ) : null}
           </div>
 
-          <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
+          <aside className="bk-preview">
             <div className={CARD}>
               <span className={LABEL}>Palette</span>
               <div className="flex h-10 overflow-hidden rounded-md">
@@ -846,7 +953,6 @@ export default function BrandKitPage() {
               </pre>
             </div>
           </aside>
-        </div>
       </div>
     </section>
   );

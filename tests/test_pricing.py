@@ -83,6 +83,7 @@ def test_at_cost_it_charges_what_the_ledger_always_did(fal_keyed, monkeypatch):
     model in the catalogue at its default length and frame. Pins the two
     together so hold_for_render (step 6) has one arithmetic, not two."""
     monkeypatch.setattr(pricing, "MARKUP", "1.0")
+    monkeypatch.setattr(pricing, "MARKUP_BY_MODEL", {})     # every model at the one markup
 def test_the_quote_and_the_hold_share_one_conversion(fal_keyed):
     """MARKUP is 2.4 since 2026-09-18, and the number the card shows must
     be the number the ledger holds: for every model in the catalogue at
@@ -100,12 +101,15 @@ def test_the_quote_and_the_hold_share_one_conversion(fal_keyed):
                                       model=spec["id"])
             choice = providers.check_render_choice(provider, spec["id"])
             assert priced.usd == pytest.approx(choice["estimate_usd"])
-            quoted = pricing.credits_for(priced.provider_usd_micros)
-            assert quoted == ledger.charge_credits(choice["estimate_usd"])
+            # at the model's own markup since 2026-10-27 -- the card and
+            # the hold convert through the SAME function with the SAME model
+            quoted = pricing.credits_for(priced.provider_usd_micros, model=spec["id"])
+            assert quoted == ledger.charge_credits(choice["estimate_usd"], model=spec["id"])
             at_cost = ledger.credits_for_usd(choice["estimate_usd"])
             assert quoted >= max(at_cost, pricing.CREDIT_FLOOR)
-            if at_cost * 2.4 > pricing.CREDIT_FLOOR:
-                assert quoted == pytest.approx(at_cost * 2.4, abs=1)
+            mk = float(pricing.markup_for(spec["id"]))
+            if at_cost * mk > pricing.CREDIT_FLOOR:
+                assert quoted == pytest.approx(at_cost * mk, abs=1)
             seen += 1
     assert seen >= 4
 
@@ -122,8 +126,10 @@ def test_the_shipped_markup_is_exact_on_every_catalogue_price(fal_keyed):
                 continue
             priced = pricing.estimate(account_id=None, shot=scene(), provider=provider,
                                       model=spec["id"])
-            exact = ceil(Fraction(priced.provider_usd_micros, 10_000) * Fraction(pricing.MARKUP))
-            assert pricing.credits_for(priced.provider_usd_micros) == max(exact, pricing.CREDIT_FLOOR)
+            mk = Fraction(pricing.markup_for(spec["id"]))
+            exact = ceil(Fraction(priced.provider_usd_micros, 10_000) * mk)
+            assert pricing.credits_for(priced.provider_usd_micros,
+                                       model=spec["id"]) == max(exact, pricing.CREDIT_FLOOR)
             seen += 1
     assert seen >= 4
 
@@ -168,7 +174,7 @@ def test_a_scene_prices_only_the_shots_still_without_a_clip(fal_keyed):
     assert shown["credits"] == 2 * pricing.credits_for(one.provider_usd_micros)
 
 
-def test_an_unplanned_timed_scene_prices_the_windows_its_prompt_carries(fal_keyed):
+def test_an_unplanned_timed_scene_prices_the_windows_its_prompt_carries(fal_keyed, shot_by_shot):
     shot = scene(TIMED)                     # no timeline yet: planned inside the job
     assert [w["seconds"] for w in pricing.windows_to_render(shot)] == [3, 4, 3]
     assert pricing.windows_to_render(scene()) is None
@@ -288,12 +294,13 @@ def test_the_same_model_quotes_differently_at_720p_and_1080p(fal_keyed):
     assert (at_720.frame, at_1080.frame) == ("720p", "1080p")
     assert at_720.provider_usd_micros == 3_034_000
     assert at_1080.provider_usd_micros == 6_820_000
-    assert at_720.credits == 729                    # ceil(303.4 * 2.4)
-    assert at_1080.credits == 1637                  # ceil(682 * 2.4)
+    # seedance2 carries its own markup since 2026-10-27 (MARKUP_BY_MODEL)
+    assert at_720.credits == 456                    # ceil(303.4 * 1.5)
+    assert at_1080.credits == 1023                  # ceil(682 * 1.5)
     assert providers.band_for("fal", "seedance2", "720p").tier == "creator"
     assert providers.band_for("fal", "seedance2", "1080p").tier == "premium"
     # every plan renders it (2026-10-20): a creator-tier account prices 1080p too
-    assert pricing.quote(frame="1080p", tier="creator", **ask).credits == 1637
+    assert pricing.quote(frame="1080p", tier="creator", **ask).credits == 1023
     # 720p is the default resolution where a model offers it
     assert pricing.quote(**ask).frame == "720p"
 
@@ -314,3 +321,52 @@ def test_account_id_is_keyword_only_with_no_default():
         pricing.quote(shot=scene(), shot_id=1)
     with pytest.raises(TypeError):
         pricing.estimate(None, scene())
+
+
+# --- the markup per video model (2026-10-27) --------------------------------
+
+# guards: a table entry for a model fal does not offer, or a markup under the
+# floor or over MARKUP, ships a price nobody chose
+def test_every_per_model_markup_is_a_real_model_between_the_floor_and_markup():
+    from fractions import Fraction
+
+    assert pricing.MARKUP_BY_MODEL, "the table is the change; an empty one undoes it"
+    for model, mk in pricing.MARKUP_BY_MODEL.items():
+        assert model in fal.VIDEO_MODELS or model in fal.SLOTS, model
+        assert isinstance(mk, str), (model, "a string, through Fraction, like MARKUP")
+        assert Fraction(pricing.MIN_MARKUP) <= Fraction(mk) <= Fraction(pricing.MARKUP), model
+
+
+# guards: credits_for with no model is MARKUP, exactly as before -- stills,
+# effects and every caller that names no model are unchanged
+def test_no_model_is_the_old_markup_and_a_listed_model_is_its_own():
+    assert pricing.markup_for(None) == pricing.markup_for("ltx2.3") == pricing.MARKUP
+    assert pricing.credits_for(1_000_000) == 240
+    assert pricing.credits_for(1_000_000, model="ltx2.3") == 240
+    assert pricing.credits_for(1_000_000, model="seedance2.5") == 150
+    assert pricing.credits_for(2_311_000, model="seedance2.5") == 347      # 5s at 720p
+    assert pricing.credits_for(1_000_000, model="grok1.5-lite") == 173
+    assert ledger.charge_credits(1.00, model="kling4") == 150
+    assert ledger.charge_credits(1.00) == 240
+
+
+# guards: an UNQUOTED hold (the nightly graph, a direct render with no
+# token) holds what the card showed for that model, not MARKUP
+def test_an_unquoted_charge_holds_at_its_models_markup(monkeypatch):
+    from src import charge as charging
+    held = {}
+    monkeypatch.setattr(ledger, "ensure", lambda dsn=None: None)
+
+    def hold_for_render(account_id, **k):
+        held.update(k)
+        return 9
+    monkeypatch.setattr(ledger, "hold_for_render", hold_for_render)
+    import src.billing as billing
+    monkeypatch.setattr(billing, "release_due", lambda *a, **k: None)
+    c = charging.Charge(7, provider="fal", ref="r1", estimate_usd=1.00, model="veo3.1")
+    c.take()
+    assert held["credits"] == c.held == 150
+    plain = charging.Charge(7, provider="fal", ref="r2", estimate_usd=1.00)
+    held.clear()
+    plain.take()
+    assert held["credits"] is None and plain.held == 240     # unchanged: no model, MARKUP

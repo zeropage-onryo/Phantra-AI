@@ -36,9 +36,11 @@ import { STORYBOARD } from "./entries/ai-storyboard-generator";
 import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
 import { TALKING_PHOTO } from "./entries/photo-to-talking-video";
 import { OMNIHUMAN } from "./entries/omnihuman-video-generator";
+import { GROK } from "./entries/grok-imagine-video-generator";
 import { REELS } from "./entries/ai-instagram-reels-maker";
 import { TIKTOK } from "./entries/ai-tiktok-video-generator";
 import { SHORTS } from "./entries/ai-youtube-shorts-maker";
+import { HALLOWEEN_TRY_ON } from "./entries/ai-halloween-costume-try-on";
 
 // One tile in the wall under the hero (the InVideo-style wall, 2026-10-01).
 // A tile with no `src` draws as a gradient plate, the way the
@@ -65,7 +67,9 @@ export type MakeTile = {
   /** The showcase wall only: the tile's frame, "w:h" (default "3:4"). */
   aspect?: string;
   /** The still this one was edited from, shown under a draggable divider
-   *  (the GPT Image page's before/after, 2026-10-08). */
+   *  (the GPT Image page's before/after, 2026-10-08); on the bento wall the
+   *  two split the tile and the pointer slides the result over (2026-10-27,
+   *  the costume try-on). */
   from?: string;
   /** The still has a transparent background: draw it on a checkerboard. */
   alpha?: boolean;
@@ -170,7 +174,7 @@ export type MakeLayout = {
    *  right) or "theater" (a dark panel, the clip large under the copy with
    *  the sound toggle front and centre). A clip in any hero keeps its
    *  sound behind a toggle. */
-  hero?: "center" | "split" | "cover" | "stack" | "fan" | "reel" | "phone" | "theater";
+  hero?: "center" | "split" | "cover" | "stack" | "fan" | "reel" | "phone" | "theater" | "knockout";
   /** The order of the sections after the hero. Absent = DEFAULT_ORDER. A
    *  section left out is not drawn. */
   order?: MakeSectionKey[];
@@ -233,7 +237,7 @@ export type MakePage = {
     spark: string;
     /** a card the composer opens instead of a sentence (?open=): the
      *  talking-photo card, whose photo, consent and voice are not words */
-    open?: "talking-photo";
+    open?: "talking-photo" | "costume";
     /** The outline button beside it. Default: "See examples" -> #examples. */
     secondary?: { label: string; href: string };
     /** The small link at the foot of every model and how-to card. Default "Start now". */
@@ -252,6 +256,13 @@ export type MakePage = {
   /** What a "split", "cover", "stack" or "fan" hero draws: stills or
    *  clips, drawn like wall tiles. */
   heroMedia?: MakeTile[];
+  /** The "knockout" hero's one huge word, with `heroMedia[0]` playing
+   *  inside its letters (2026-10-23, the Grok page). Absent = the H1. */
+  heroWord?: string;
+  /** The "spec-numbers" signature's figures (2026-10-23): one huge figure
+   *  and a short line each; `signatureFrames[i]` is the clip shown beside
+   *  figure i (a plate until it lands). */
+  specs?: { title: string; items: { big: string; small: string }[] };
   /** The still on the page's share card (og.tsx): a path under public/.
    *  Absent = the page's first still (a clip's poster counts). */
   card?: string;
@@ -280,7 +291,7 @@ export type MakePage = {
      *  a column of numbered figures; "posters" is a staggered row of 2:3
      *  posters on a tinted ground; "reels" is a row of vertical clips in
      *  phone frames, each with its sound (clips.tsx). */
-    layout?: "bento" | "showcase" | "filmstrip" | "prompts" | "editorial" | "posters" | "reels";
+    layout?: "bento" | "showcase" | "filmstrip" | "prompts" | "editorial" | "posters" | "reels" | "tape";
   };
   /** The signature's own frames, when they are not the wall's first tiles
    *  (shot-timeline.tsx reads these first). */
@@ -306,8 +317,9 @@ export type MakePage = {
   /** The shot-timeline signature's own scene (shot-timeline.tsx), when
    *  it is not the Seedance page's ceramics scene. */
   timeline?: { eyebrow: string; heading: string; seconds: number; shots: TimelineShot[] };
-  /** The spec-compare signature's spec sheet and comparison table. */
-  specs?: MakeSpecs;
+  /** The spec-compare signature's spec sheet and comparison table (not
+   *  `specs`, which is the spec-numbers signature's figures). */
+  specSheet?: MakeSpecs;
   /** Slugs of other /make pages to link to. Empty hides the section. */
   related: string[];
   finalCta: { eyebrow: string; title: string; body: string };
@@ -321,6 +333,7 @@ export const MAKE_PAGES: MakePage[] = [
   TEXT_TO_VIDEO,
   IMAGE_TO_VIDEO,
   TALKING_PHOTO,
+  HALLOWEEN_TRY_ON,
   MUSIC_VIDEO,
   AD_GENERATOR,
   UGC_ADS,
@@ -340,6 +353,7 @@ export const MAKE_PAGES: MakePage[] = [
   KLING,
   SEEDANCE,
   VEO,
+  GROK,
   OMNIHUMAN,
   NANO_BANANA,
   FLUX,

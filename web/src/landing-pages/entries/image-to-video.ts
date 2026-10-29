@@ -16,7 +16,7 @@
 // - what each photo is for: src/ref_roles.py (subject, product, place, light,
 //   palette, framing, style)
 // - the effects that take an image and give a clip, with their counts:
-//   src/effects.py (Kling 98 templates, PixVerse 154, 20 camera moves)
+//   src/effects.py (Kling 91 templates, PixVerse 154, 20 camera moves)
 // - the finishing effects on the clip: the same table
 import { AMBER } from "../theme";
 import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, model, modelCards } from "../shared";
@@ -190,7 +190,7 @@ export const IMAGE_TO_VIDEO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["text-to-video", "photo-to-talking-video", "consistent-character-video", "ai-video-generator", "ugc-ads", "ai-product-ad-generator"],
+  related: ["text-to-video", "photo-to-talking-video", "ai-halloween-costume-try-on", "consistent-character-video", "ai-video-generator", "ugc-ads", "ai-product-ad-generator"],
   finalCta: {
     eyebrow: "Start from a picture",
     title: "Give it a photo. Say what moves.",

@@ -128,12 +128,13 @@ def test_estimate_cost_matches_the_table():
     """Per-second, times duration, times n. If the table is re-dated with
     new numbers this test is what says the estimate followed."""
     # LTX-2.3 renders 6/8/10s only, so a 5s ask is priced as the 6s it gets
-    assert fal.estimate_cost(1, model="ltx2.3", duration=5) == 0.36
-    assert fal.estimate_cost(1, model="ltx2.3", duration=6) == 0.36
-    assert fal.estimate_cost(2, model="ltx2.3", duration=6) == 0.72
-    assert fal.estimate_cost(1, model="ltx2.3", duration=10) == 0.60
+    # $0.08/s at 1080p since fal's 2026-10 rate (it was $0.06)
+    assert fal.estimate_cost(1, model="ltx2.3", duration=5) == 0.48
+    assert fal.estimate_cost(1, model="ltx2.3", duration=6) == 0.48
+    assert fal.estimate_cost(2, model="ltx2.3", duration=6) == 0.96
+    assert fal.estimate_cost(1, model="ltx2.3", duration=10) == 0.80
     assert fal.estimate_cost(1, model="ltx2.3", duration=6,
-                             resolution="2160p") == 1.44
+                             resolution="2160p") == 1.92
     assert fal.estimate_cost(1, model="kling3-turbo-pro", duration=5) == 0.70
     assert fal.estimate_cost(1, model="wan3", duration=5) == 0.50
     assert fal.estimate_cost(1, model="seedance2-fast", duration=5) == 1.2095
@@ -163,8 +164,12 @@ def test_a_price_can_be_overridden_by_env(monkeypatch):
 
 def test_the_default_model_is_the_cheapest_one_in_the_table():
     """The default render is the cheapest clip there is -- what a card
-    opens on and an empty approve spends."""
-    cheapest = min(fal.MODELS, key=lambda m: fal.estimate_cost(1, model=m))
+    opens on and an empty approve spends. Grok Imagine 1.5 Lite (2026-10-23)
+    is cheaper at 720p, and is left out on purpose: whether it becomes the
+    studio's default render is Mike's call, not a side effect of adding it."""
+    not_default_yet = {"grok1.5-lite"}
+    cheapest = min((m for m in fal.MODELS if m not in not_default_yet),
+                   key=lambda m: fal.estimate_cost(1, model=m))
     assert fal.DEFAULT_MODEL == cheapest
 
 
@@ -669,19 +674,41 @@ def test_a_local_keyframe_without_storage_is_dropped_not_faked(monkeypatch):
     assert fal.as_image_url(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64) is None
 
 
-def test_the_generation_row_records_the_anchor_that_was_actually_sent(
+def test_a_start_frame_that_cannot_be_sent_is_refused_not_rendered_without(
         tmp_db, approved, keys, fake_download, monkeypatch):
-    import json
-
+    # it used to render text-to-video and record prompt_image=False; the
+    # person picked a picture to start on, so a clip without it is not what
+    # they were shown (2026-10-27)
     from src import storage
     monkeypatch.setattr(storage, "configured", lambda: False)
+    http = FakeHttp()
     result = fal.generate_from_prompt(
         "x", reference_image=b"\x89PNG\r\n\x1a\n" + b"\x00" * 64,
-        db_path=tmp_db, http=FakeHttp(), approved=True)
+        db_path=tmp_db, http=http, approved=True)
+    assert result["ok"] is False and "start frame" in result["error"]
+    assert not [c for c in http.calls if c[1] is not None]      # nothing submitted
+
+
+def test_references_reach_the_reference_endpoint_and_the_row(
+        tmp_db, approved, keys, fake_download):
+    import json
+
+    http = FakeHttp()
+    result = fal.generate_from_prompt(
+        "@Image1 holds the phone from @Image2", model="seedance2.5",
+        references=["https://cdn/her.png", "https://cdn/app.png"],
+        db_path=tmp_db, http=http, approved=True)
     assert result["ok"] is True, result
+    url, body = next(c for c in http.calls if c[1] is not None)
+    assert "seedance-2.5/reference-to-video" in url
+    assert body["image_urls"] == ["https://cdn/her.png", "https://cdn/app.png"]
     with generative.connect(tmp_db) as conn:
-        params = conn.execute("SELECT params_json FROM generations").fetchone()[0]
-    assert json.loads(params)["prompt_image"] is False
+        params = json.loads(conn.execute("SELECT params_json FROM generations").fetchone()[0])
+    assert params["references"] == 2 and params["prompt_image"] is False
+    # pictures that cannot be fetched spend nothing
+    none = fal.generate_from_prompt("x", model="seedance2.5", references=["data:image/png;base64,AA"],
+                                    db_path=tmp_db, http=FakeHttp(), approved=True)
+    assert none["ok"] is False and "reference pictures" in none["error"]
 
 
 def test_an_http_error_carries_fals_reason(monkeypatch):
@@ -715,7 +742,7 @@ def test_every_image_model_is_dated_sourced_and_priced():
         assert spec["checked"] and spec["source"].startswith("https://fal.ai/models/"), name
         priced = sum(k in spec for k in ("usd_per_image", "usd_per_megapixel", "usd_by_size"))
         assert priced == 1, name
-        assert spec["size"] in ("wh", "aspect", "enum", "named"), name
+        assert spec["size"] in ("wh", "aspect", "enum", "named", "exact"), name
         assert fal.image_usd(name) > 0
     opts = fal.image_options()
     assert [o["id"] for o in opts] == list(fal.IMAGE_MODELS)
@@ -750,11 +777,26 @@ def test_references_go_to_the_edit_endpoint_only_where_one_exists():
     endpoint, body, used = fal.image_request("flux-pro1.1", "a can", aspect="4:5",
                                              reference_urls=refs)
     assert endpoint == "fal-ai/flux-pro/v1.1" and "image_urls" not in body and used == 0
-    assert (body["width"], body["height"]) == (912, 1136)
+    # FLUX 1.1 Pro's schema has no width/height: the frame is image_size
+    # (2026-10-27; with width/height every still came back landscape_4_3)
+    assert body["image_size"] == {"width": 912, "height": 1136} and "width" not in body
     # the two other frame shapes
     assert fal.image_request("nano-banana-pro", "x", aspect="9:16")[1]["aspect_ratio"] == "9:16"
-    assert fal.image_request("ideogram4.5", "x", aspect="16:9")[1]["image_size"] == "landscape_16_9"
-    assert fal.image_request("ideogram4.5", "x", aspect="7:5")[1]["image_size"] == "square_hd"
+    # Ideogram: an explicit size off its own list, the true shape (its
+    # presets drew 4:5 as 3:4); no 21:9 at all, refused
+    assert fal.image_request("ideogram4.5", "x", aspect="16:9")[1]["image_size"] == {"width": 1280, "height": 720}
+    assert fal.image_request("ideogram4.5", "x", aspect="4:5")[1]["image_size"] == {"width": 896, "height": 1120}
+    assert fal.image_request("ideogram4.5", "x", aspect="7:5")[1]["image_size"] == {"width": 1024, "height": 1024}
+    with pytest.raises(ValueError, match="21:9"):
+        fal.image_request("ideogram4.5", "x", aspect="21:9")
+    assert "21:9" not in fal.image_aspects("ideogram4.5") and "21:9" in fal.image_aspects("gpt-image-2")
+    for name, spec in fal.IMAGE_MODELS.items():
+        for a in fal.image_aspects(name):
+            b = fal.image_request(name, "x", aspect=a)[1]
+            size = b.get("image_size")
+            if isinstance(size, dict):      # every {w,h} frame is the aspect's true shape, within 2%
+                w, h = fal.IMAGE_SIZES[a]
+                assert abs(size["width"] / size["height"] - w / h) / (w / h) < 0.02, (name, a, size)
     assert fal.image_request("ideogram4.5", "x")[1]["quality"] == "medium"   # not high, ~4x the price
     # GPT Image 2.5 (2026-10-08): exact {width, height}, quality sent at high,
     # up to 16 references to the variant's own edit endpoint
@@ -770,14 +812,16 @@ def test_references_go_to_the_edit_endpoint_only_where_one_exists():
     for a in fal.IMAGE_SIZES:
         w, h = fal.image_request("seedream4.5", "x", aspect=a)[1]["image_size"].values()
         assert 2560 * 1440 <= w * h <= 4096 * 4096 and max(w, h) <= 4096
-    # GPT Image 2 (2026-10-04): named sizes by orientation, quality sent
-    # explicitly (fal's default is high at ~4x), up to 16 references, priced
-    # per size at medium
+    # GPT Image 2 (2026-10-04): priced per named size by orientation, quality
+    # sent explicitly (fal's default is high at ~4x), up to 16 references.
+    # Since 2026-10-24 the frame SENT is the aspect's true shape within the
+    # named size's pixels (it was the named size itself: "9:16" drew 2:3)
     endpoint, body, used = fal.image_request("gpt-image-2", "a can", aspect="4:5",
                                              reference_urls=[f"https://r2.example/{i}.jpg" for i in range(20)])
     assert endpoint == "openai/gpt-image-2/edit" and used == 16
-    assert body["image_size"] == {"width": 1024, "height": 1536} and body["quality"] == "medium"
-    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == {"width": 1536, "height": 1024}
+    assert body["image_size"] == {"width": 1120, "height": 1392} and body["quality"] == "medium"
+    assert fal.image_request("gpt-image-2", "x", aspect="9:16")[1]["image_size"] == {"width": 944, "height": 1664}
+    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == {"width": 1664, "height": 944}
     assert fal.image_request("gpt-image-2", "x", aspect="1:1")[1]["image_size"] == {"width": 1024, "height": 1024}
     assert fal.image_usd("gpt-image-2", "1:1") == 0.053
     assert fal.image_usd("gpt-image-2", "9:16") == 0.042
@@ -869,13 +913,28 @@ def test_a_still_filed_under_a_project_says_so_on_its_row_and_the_wall(
     assert "project_id" not in wall[plain["asset_id"]]
 
 
+def test_gpt_image_2_draws_the_shape_it_is_labelled():
+    """The render test (2026-10-24): a "9:16" GPT Image 2 still came back
+    1024x1536 and the clip drawn from it came out 3:4. Every aspect now goes
+    out at its own ratio, inside fal's limits (multiples of 16, 655,360 to
+    8,294,400 pixels, at most 3:1) and never above the pixels it is priced at."""
+    spec = fal.IMAGE_MODELS["gpt-image-2"]
+    for aspect, (w, h) in fal.IMAGE_SIZES.items():
+        sw, sh = fal.image_request("gpt-image-2", "x", aspect=aspect)[1]["image_size"].values()
+        assert sw % 16 == 0 and sh % 16 == 0, aspect
+        assert 655_360 <= sw * sh <= 8_294_400 and max(sw, sh) <= 3 * min(sw, sh), aspect
+        assert abs(sw / sh - w / h) < 0.02, (aspect, sw, sh)
+        nw, nh = (int(n) for n in fal.named_size(spec, aspect).split("x"))
+        assert sw * sh <= nw * nh, aspect
+
+
 def test_every_image_model_sends_an_image_size_fal_accepts():
     """fal 422'd gpt-image-2's "1024x1536" string: image_size is a named enum
     or a {width, height} object, nothing else. Every model, every aspect."""
     named = {"square_hd", "square", "portrait_4_3", "portrait_16_9",
              "landscape_4_3", "landscape_16_9", "auto"}
     for model in fal.IMAGE_MODELS:
-        for aspect in list(fal.IMAGE_SIZES) + [None]:
+        for aspect in list(fal.image_aspects(model)) + [None]:
             body = fal.image_request(model, "x", aspect=aspect)[1]
             if "image_size" in body:
                 v = body["image_size"]

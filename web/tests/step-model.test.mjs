@@ -37,9 +37,10 @@ test('the card says whose pick the model is, and why', () => {
   assert.equal(modelLine({ id: 'ideogram4.5', by: 'proposed', why: '' }, MENU), 'Ideogram 4.5 proposed');
   assert.equal(modelLine({ id: 'nano', by: 'you', why: '' }, MENU), 'Your choice for this still');
   assert.equal(modelLine({ id: 'nano', by: 'picked', why: '' }, MENU), '');
-  assert.equal(optionLabel(MENU[2]), 'Ideogram 4.5 · 19 credits');
+  // the pulldown names the model only; the price is on Approve (2026-10-27)
+  assert.equal(optionLabel(MENU[2]), 'Ideogram 4.5');
   assert.equal(optionLabel(MENU[4]), 'No price yet');
-  assert.equal(optionLabel({ id: 'x', label: 'Big', credits: 1250 }), 'Big · 1,250 credits');
+  assert.equal(optionLabel({ id: 'x', label: 'Big', credits: 1250 }), 'Big');
 });
 
 test('a model that takes no references says so before the click', () => {

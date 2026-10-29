@@ -72,7 +72,11 @@ DB_PATH = PROJECT_ROOT / "data" / "pipeline.db"
 # `DATABASE_URL` in .env overrides it; a deployment sets it to Supabase.
 DEFAULT_DSN = "postgresql://phantra:phantra@localhost:5432/phantra"
 
-PLATFORMS = ("instagram", "tiktok", "youtube")
+# Where a video can be posted (videos.platform). The three the metrics
+# sweep reads back, and -- since 2026-10-22, src/posts.py -- the others a
+# person can connect and post to; a platform with no insights API simply
+# keeps the row with no snapshots.
+PLATFORMS = ("instagram", "tiktok", "youtube", "facebook", "linkedin", "reddit", "discord", "x")
 
 # How far a snapshot may sit from the requested age and still count as a
 # reading "at" that age, as a fraction of at_days. Without this, the
@@ -345,6 +349,12 @@ OWNED_TABLES = (
     # fal's queue receipts (2026-09-26, src/fal_requests.py): which job a
     # hold paid for, and the URLs to reattach to it -- one account's render
     "fal_requests",
+    # what Gemini saw in each landed clip (2026-10-25, src/render_qc.py):
+    # one account's renders, read back onto its Render card
+    "render_qc",
+    # What's new (2026-10-25, src/whats_new.py): what one person has seen,
+    # dismissed or asked to be told about on the Create wall
+    "announcement_seen",
     # the cut (2026-09-26, src/cut/store.py): an account's edit versions,
     # the pointer to the one it is on, and the audio it uploaded for them
     "timelines",
@@ -367,6 +377,9 @@ OWNED_TABLES = (
     # who connected Claude to their studio (2026-10-08, src/mcp_connections.py):
     # one person's connection to one account, and when it was last used
     "mcp_connections",
+    # a connected editing-app panel (2026-10-22, src/plugin_tokens.py): one
+    # person's sign-in from Premiere Pro to one account, as a token's hash
+    "plugin_tokens",
     # which studio quotes the MCP has spent (2026-10-08,
     # src/quote_redemptions.py): one account's approved spend, single use
     "quote_redemptions",
@@ -388,6 +401,21 @@ OWNED_TABLES = (
     # the free trial's marked renders and their clean originals (2026-10-11,
     # src/watermark.py): one account's media
     "watermarked_media",
+    # a person's own social accounts (2026-10-22, src/social_connections.py):
+    # one workspace's Instagram account or Discord channel, with its
+    # encrypted token -- the credential that posts as them
+    "social_connections",
+    # a post going to one of those accounts at one time (2026-10-22,
+    # src/posts.py), and its own log: one workspace's plan, and what the
+    # worker did with it
+    "posts",
+    "post_events",
+    # a workspace's paid add-ons (2026-10-26, src/addons.py): what one
+    # account bought beside its plan (the Ad Studio), and whether it holds
+    "account_addons",
+    # a person's own cloned voices (2026-10-27, src/voice_clone.py): their
+    # voice, the consent line heard in it, and the model's voice id
+    "voice_clones",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is
@@ -438,6 +466,16 @@ SHARED_TABLES = {
     # -- the closed reference set (src/imagesearch.py)
     "image_candidates": "server-found image search results the agent may "
                         "only reference by id; a search cache, not authorship",
+    # -- sign-in in progress (2026-10-22, src/plugin_tokens.py)
+    # -- What's new (2026-10-25, src/whats_new.py)
+    "showcase_items": "the Create wall's announcements, the same for every "
+                      "person: house renders and Phantra's own copy only, "
+                      "never an account's data (what one person saw is the "
+                      "OWNED announcement_seen)",
+    "plugin_pairings": "a panel's sign-in code waiting for a person, ten "
+                       "minutes at most: it has no account until someone "
+                       "approves it, and the approval writes the OWNED "
+                       "plugin_tokens row",
 }
 
 

@@ -52,6 +52,7 @@ import { cardFonts } from "@/components/studio/card-fonts";
 import { RefImg, partsOf, windowLabel } from "@/components/studio/concept-card";
 import { useShell } from "@/components/studio/shell";
 import { rememberJob, useJobs } from "@/lib/jobs";
+import { checkLines } from "@/lib/render-checks";
 import {
   chipText,
   creditsText,
@@ -61,7 +62,12 @@ import {
   keyframeButton,
   keyframeCeilingNote,
   keyframeCount,
+  SCENE_SHAPE,
+  shapeAsked,
+  priceText,
   keyframeNote,
+  oneClipNote,
+  shotsText,
   keyframePrice,
   legalDuration,
   liveJobFor,
@@ -97,9 +103,17 @@ export type RenderCardProps = {
   onScene?: (scene: Concept) => void;
   /** the shots are drawn right above the card (the composer's turn): no strip */
   noStrip?: boolean;
+  /** THE CHAT'S CARD (2026-10-23, Mike: "i just want approve buttons"):
+   *  only the priced Approve buttons -- the keyframes, then the render --
+   *  each carrying its model and price, plus why a scene cannot render yet.
+   *  No model popover, no draft toggle, no one-shot buttons: the model is
+   *  picked on the box's settings line, and the full card still opens from
+   *  the storyboard and the workspace. When the last clip lands the chat
+   *  joins the shots into one video (the Final cut), as before. */
+  approveOnly?: boolean;
 };
 
-export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }: RenderCardProps) {
+export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, approveOnly }: RenderCardProps) {
   const { balance, toast } = useShell();
   const jobs = useJobs();
   const [scene, setScene] = useState<Concept | null>(null);
@@ -160,7 +174,8 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
   const served = (c: Concept, p: Pick): RenderQuote | null => {
     const q = c.quote;
     if (!q || q.error || q.provider !== p.provider || q.model !== p.model || q.frame !== p.frame) return null;
-    if (!q.timed && q.durations[0] !== p.duration) return null;
+    // a timed scene's lengths are its windows' (one clip or one a shot), never the pick's
+    if (!q.timed && !q.one_clip && q.durations[0] !== p.duration) return null;
     return q;
   };
   const quote = scene && pick ? served(scene, pick) ?? quotes[quoteKey(scene, pick)] ?? null : null;
@@ -198,16 +213,17 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
   const exempt = !!balance?.exempt;
   const charged = !!balance && !balance.exempt;
   const parts = partsOf(scene);
+  const checks = checkLines(scene.checks);
   const done = renderedOf(scene.media_url, parts);
   const oneAtATime = shotsToDraw(parts, scene.keyframes?.stills);
   const r = pick ? renderers[pick.provider] : undefined;
   const spec = pick ? specOf(catalogue, pick.provider, pick.model) : null;
   const plan = pick && spec ? planFor(spec, pick, scene.timeline ? parts : null, quote) : null;
   const noKey = r && !r.available ? `${r.label} is not configured` : "";
-  const badLength = !!(pick && spec && plan && !plan.timed && !legalDuration(spec.duration as AxisLike, Number(pick.duration)));
+  const badLength = !!(pick && spec && plan && !plan.timed && !plan.oneClip && !legalDuration(spec.duration as AxisLike, Number(pick.duration)));
   const short = !!plan && plan.credits !== null && charged && plan.credits > balance!.available;
   const working = !!rendering || busy === "render";
-  const disabled = locked || !pick || !!noKey || badLength || short || working || done.state === "done";
+  const disabled = locked || !pick || !!noKey || badLength || short || working || done.state === "done" || !!plan?.refused;
   const label = working
     ? "Rendering…"
     : done.state === "done"
@@ -230,7 +246,9 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
       ? "Every shot has its clip."
       : done.state === "partial"
         ? `${done.clips} of ${done.of} shots rendered · Render makes the other ${done.of - done.clips}`
-        : keyframeNote(parts, scene.reference_image);
+        : plan?.oneClip
+          ? oneClipNote(plan.shots ?? parts.length, quote && !quote.error ? (quote as RenderQuote).references ?? 0 : 0)
+          : keyframeNote(parts, scene.reference_image);
 
   const approve = async () => {
     if (disabled || !pick) return;
@@ -282,6 +300,73 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
     }
   };
 
+  if (approveOnly) {
+    const modelName = pick ? (r?.models || []).find((m) => m.id === pick.model)?.label || pick.model : "";
+    const ready = !disabled && !!plan;
+    const approveLabel = ready ? `Approve · ${modelName} · ${SCENE_SHAPE} · ${shotsText(plan!)} · ${priceText(plan!, exempt)}` : label;
+    const kf = !locked && done.state !== "done" && (scene.keyframes || drawing) ? scene.keyframes : null;
+    // the prompt asking for a shape the scene does not render in is said, never fixed
+    const asked = done.state !== "done" && !locked ? shapeAsked(scene.prompt) : "";
+    return (
+      <div className="flex min-w-0 flex-col gap-2" data-render-card={scene.id} data-approve-only="">
+        {locked ? (
+          <>
+            <p className={`${NOTE} text-noir-danger!`} role="alert">
+              {why}
+            </p>
+            {!onCanvas ? (
+              <Link
+                href={sceneHref(scene.id, 1)}
+                className="inline-flex min-h-11 items-center self-start rounded-[8px] border border-noir-line px-3 font-plex! text-[11px]! tracking-[0.08em] text-noir-red2! hover:border-noir-red2"
+              >
+                ATTACH REFERENCES ON ITS CANVAS →
+              </Link>
+            ) : null}
+          </>
+        ) : null}
+        {kf || drawing ? (
+          <button
+            type="button"
+            disabled={!!drawing || busy === "keyframes" || working || !scene.keyframes}
+            onClick={() => void draw()}
+            className="inline-flex min-h-11 items-center justify-between gap-2 rounded-[8px] border border-noir-line px-3 font-plex! text-[11px]! tracking-[0.08em] text-bone! hover:enabled:border-bone disabled:cursor-wait disabled:text-bone3!"
+          >
+            <span>
+              {drawing || busy === "keyframes"
+                ? `DRAWING KEYFRAMES…${drawing?.detail ? ` ${drawing.detail.toUpperCase()}` : ""}`
+                : `APPROVE ${keyframeCount(scene.keyframes!).toUpperCase()}`}
+            </span>
+            {scene.keyframes ? <span className="shrink-0 whitespace-nowrap">{keyframePrice(scene.keyframes, exempt).toUpperCase()}</span> : null}
+          </button>
+        ) : null}
+        {done.state !== "done" && !locked ? (
+          <button
+            type="button"
+            data-render={scene.id}
+            disabled={disabled}
+            title={approveLabel}
+            onClick={() => void approve()}
+            className="min-h-11 min-w-0 truncate rounded-[8px] bg-noir-red px-3 font-tight! text-[14px]! font-semibold leading-none! text-noir-bg! hover:enabled:bg-noir-red2 focus-visible:rounded-[8px]! disabled:cursor-not-allowed disabled:bg-noir-line2 disabled:text-bone3!"
+          >
+            {approveLabel}
+          </button>
+        ) : null}
+        {asked ? (
+          <p className={NOTE} data-shape-warning="">
+            The prompt asks for {asked}; this scene renders {SCENE_SHAPE}, the vertical frame.
+          </p>
+        ) : null}
+        {rendering ? (
+          <p className={NOTE} role="status">
+            {rendering.detail || "Rendering"} · the shots join into one video when the last one lands.
+          </p>
+        ) : done.state === "partial" && !locked ? (
+          <p className={NOTE}>{why}</p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-3" data-render-card={scene.id}>
       {/* the shots, as frames whose WIDTH is their share of the scene */}
@@ -306,6 +391,30 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
       <p className={`${NOTE} ${locked ? "text-noir-danger!" : ""}`} role={locked ? "alert" : undefined}>
         {why}
       </p>
+      {/* what the shot planner put back and what will not fit (src/timeline.py
+          keep): a reference it had left off every shot, a shot with no photos,
+          a voiceover longer than its window. Facts, not a lock: Render stays. */}
+      {(scene.timeline?.warnings || []).length ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Notes on the shots">
+          {scene.timeline!.warnings!.map((w) => (
+            <li key={w} className={`${NOTE} text-noir-red2`}>
+              {w}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {/* what a look at each landed clip saw (src/render_qc.py): the brand
+          said, words on screen, the product, hands and faces. Advice on a
+          clip already kept, never a lock. */}
+      {checks.length ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="What we saw in the clips">
+          {checks.map((w) => (
+            <li key={w} className={`${NOTE} text-noir-red2`}>
+              {w}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {locked && !onCanvas ? (
         <Link
           href={sceneHref(scene.id, 1)}

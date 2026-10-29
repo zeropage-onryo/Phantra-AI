@@ -240,6 +240,25 @@ export const SIGNAL: MakeAccent = {
   ],
 };
 
+// PHANTRA (2026-10-23, Mike: "do marigold"): the brand's own accent for
+// every NEW page, on the dark tone (the homepage's warm black #0b0a08).
+// Marigold #ffc21f against that ground is 12.6:1; the button's type is the
+// ground's black, never white (white on marigold is 1.6:1). The plates are
+// dark gold rising to marigold, so an empty tile still reads as the brand.
+// Chosen over the studio's lemon #fee32d and the ripple's orange #ff7a1a.
+export const PHANTRA: MakeAccent = {
+  primary: "#ffc21f",
+  primaryForeground: "#0b0a08",
+  cardLine: "#3a3022",
+  lineHover: "#ffc21f",
+  cardLight: "rgba(255,194,31,0.10)",
+  plates: [
+    "radial-gradient(120% 90% at 20% 10%, #3a2a08 0%, #181410 55%, #0e0d0b 100%)",
+    "radial-gradient(120% 90% at 80% 15%, #4a3409 0%, #1a1510 55%, #0e0d0b 100%)",
+  ],
+  panel: "#0b0a08",
+};
+
 /** The inline variables the skin wrapper carries for `accent`. */
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {

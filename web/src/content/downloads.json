@@ -1,0 +1,14 @@
+{
+  "resolve": {
+    "version": "0.1.2",
+    "size": 44181,
+    "sha256": "1c07b580d4039025cb9be0f4ed601c8bd15c81c5829033c2e89f42a8cd1d5052",
+    "live": true
+  },
+  "premiere": {
+    "version": "0.1.0",
+    "size": null,
+    "sha256": null,
+    "live": false
+  }
+}

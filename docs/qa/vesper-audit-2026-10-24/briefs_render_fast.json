@@ -1,0 +1,154 @@
+[
+ {
+  "brief": "ugc",
+  "brain": "fast",
+  "output": "video",
+  "turns": [
+   {
+    "user": "UGC ad: a girl checks her phone, finds a shift for today, grabs her bag and heads out the door",
+    "secs": 6.8,
+    "message": "Gig-work stories hit harder when they feel lived-in and real. To show her face, I will need you to attach a photo of her or @-mention a character you've already made.\n\nShould we keep it focused on her hands and the phone for now, or would you like a draft with a person to be named later?",
+    "choices": [
+     "Focus on the hands and phone",
+     "Write a draft with a person",
+     "I'll attach a photo now"
+    ],
+    "brief": "A 9:16 UGC-style clip of a young woman's day-in-the-life. \n\n(0-3s) Handheld close-up: A phone screen in a cluttered kitchen. A thumb scrolls until a notification pops: 'Shift Confirmed: Today, 10:00 AM'. \n(3-6s) Mid-shot: She grins at the camera, grabs a worn canvas bag from the counter, and heads toward the sunlight of an open front door. \n\nSTYLE: Handheld phone camera, natural window light, messy but warm interior. No studio lighting. \nSOUND: A bright app notification ping, the rustle of a bag, and the sound of a door opening. \n\nNOTE: This is a draft. Attach a photo of the character or mention an Element before rendering.",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ugc"
+      },
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "Focus on the hands and phone",
+    "secs": 11.3,
+    "message": "I have focused the lens on the hands and the phone to keep the story grounded. This is a draft; to keep the hands, the bag, and the room consistent across the shots, I will eventually need a reference photo of each.\n\nShall I go ahead and write this into a scene for you?",
+    "choices": [
+     "Yes, write the scene",
+     "Add a shot of her shoes",
+     "Change the setting to a kitchen"
+    ],
+    "brief": "A UGC-style clip of a gig worker's morning. 9:16 vertical, handheld phone camera movement. \n\n(0-3s) Close-up on hands holding a smartphone over a messy bedspread. A notification appears: \"New Shift Available.\" A thumb taps it immediately. Natural morning window light. \n\n(3-6s) Medium close-up, handheld. A hand reaches out and grabs a canvas tote bag from the back of a wooden chair. \n\n(6-10s) Low angle, following the legs and the swinging bag as the person walks briskly through a bedroom doorway into a sun-drenched hallway. \n\nSOUND: Haptic phone buzz, the rustle of canvas, quick footsteps on floorboards, a door handle click. \n\nAVOID: Studio lighting, clean minimalist rooms, slow motion, cinematic depth of field.",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ugc"
+      },
+      "ok": true
+     },
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "multi-shot"
+      },
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "Yes, write the scene",
+    "secs": 3.4,
+    "message": "A UGC-style scene, handheld and lived-in. (0-3s) Close-up on a girl's hands holding a smartphone; a gig-work app notification pops up, and her thumb taps to accept a shift. (3-6s) Her hand reaches for a canvas tote bag on a messy wooden table. (6-10s) Low angle, following the bag and her feet in sneakers as she walks quickly toward a sunlit doorway and exits. Sound: The haptic click of the phone, the rustle of the bag, and the muffled sound of a door opening and closing. Look: Warm, natural indoor light, slightly shaky phone-camera movement.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_video",
+     "args": {
+      "prompt": "A UGC-style scene, handheld and lived-in. (0-3s) Close-up on a girl's hands holding a smartphone; a gig-work app notification pops up, and her thumb taps to accept a shift. (3-6s) Her hand reaches for a canvas tote bag on a messy wooden table. (6-10s) Low angle, following the bag and her feet in sneakers as she walks quickly toward a sunlit doorway and exits. Sound: The haptic click of the phone, the rustle of the bag, and the muffled sound of a door opening and closing. Look: Warm, natural indoor light, slightly shaky phone-camera movement."
+     },
+     "label": "Write this scene"
+    },
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ugc"
+      },
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "turns_to_make": 3
+ },
+ {
+  "brief": "honey",
+  "brain": "fast",
+  "output": "video",
+  "turns": [
+   {
+    "user": "a jar of honey with a wooden dipper in morning light, then make it move",
+    "secs": 9.5,
+    "message": "I can map out the morning light and the slow pull of the honey. If you have a specific jar or brand in mind, attach a photo of it now so the film stays true to the label; otherwise, I will craft the look from scratch.\n\nShall we start by generating the hero frame to set the light, then move to the animation?",
+    "choices": [
+     "Use a generic honey jar",
+     "I'll attach a photo of my jar",
+     "Just write the scene for now"
+    ],
+    "brief": "Subject: A glass jar of honey with a wooden dipper.\nSetting: A rustic wooden table in a sun-drenched kitchen.\nAction: A hand lifts the dipper, and thick, golden honey drips in a slow, viscous stream back into the jar.\nVisual Style: Warm morning light, macro shots, shallow depth of field, golden hour palette.\nPacing: Slow and meditative.\nSound: Soft ambient kitchen sounds, birds chirping outside.\n\nNote: This is a draft. Attach a product photo or element to hold the look before rendering.",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "Use a generic honey jar",
+    "secs": 7.2,
+    "message": "Hero frame and the honey's slow motion.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_plan",
+     "args": {
+      "summary": "Hero frame and the honey's slow motion.",
+      "steps": [
+       {
+        "n": 1,
+        "do": "image",
+        "why": "To set the morning light and the look of the jar.",
+        "args": {
+         "prompt": "A generic glass honey jar with a wooden dipper resting inside, thick golden honey, warm morning sunlight streaming through a kitchen window, soft dust motes in the light, macro shot with a shallow depth of field, rustic wooden table."
+        },
+        "uses": []
+       },
+       {
+        "n": 2,
+        "do": "scene",
+        "why": "To animate the honey lifting from the jar.",
+        "args": {
+         "prompt": "The wooden dipper is slowly lifted from the jar, pulling a thick, translucent ribbon of golden honey that spirals back into the glass. The morning light catches the bubbles in the honey. Warm, slow-motion, serene atmosphere. Sound of soft morning ambience and the viscous pull of honey."
+        },
+        "uses": [
+         1
+        ]
+       },
+       {
+        "n": 3,
+        "do": "keyframes",
+        "why": "To see the shots of the honey moving.",
+        "args": {},
+        "scene": 2,
+        "uses": []
+       }
+      ]
+     },
+     "label": "Run this plan"
+    },
+    "tool_runs": []
+   }
+  ],
+  "turns_to_make": 2
+ }
+]

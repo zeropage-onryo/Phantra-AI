@@ -24,6 +24,15 @@ import { pageMeta } from "@/lib/page-meta";
 // kept; the Allow page names the app), src/mcp_connections.py (what is
 // recorded, and that a disconnect is never seen), app/mcp_mount.py (the
 // rate limit), refbin.fetch_public_image (a picture added by address).
+//
+// 2026-10-23: social accounts (docs/tasks/task-social-connections.md,
+// task-publish-worker.md, task-calendar.md). Added: a line under "What's
+// collected", the section "Posting to your social accounts", the platforms
+// under "Third-party services", disconnecting under "Retention & control",
+// and the /data-deletion page the Meta and TikTok reviews ask for. Checked
+// against src/social_connections.py (the token is encrypted at rest, wiped
+// on disconnect), src/publish_worker.py (only a scheduled post is sent),
+// src/posts.py (the feed read, cached a day) and src/social/*.py (scopes).
 
 export const metadata: Metadata = pageMeta({
   title: "Privacy Policy",
@@ -100,6 +109,15 @@ const SECTIONS: LegalSection[] = [
           work, and removed when you press Disconnect.
         </li>
         <li>
+          <strong>Connected social accounts</strong> — optionally, the social accounts you connect
+          under Settings → Connections so the Studio can post for you: the platform&apos;s name for
+          the account (its id, display name, handle and picture), the channel or page you picked,
+          the posting times you set, and the access token the platform issued. The token is
+          encrypted at rest and is used only to send the posts you schedule and to read that
+          account&apos;s own recent posts for the calendar. See &ldquo;Posting to your social
+          accounts&rdquo; below.
+        </li>
+        <li>
           <strong>Chat app connections</strong> — if you connect a chat app to the Studio, the name
           that app gave, the site it sent you back to, when you allowed it and when it was last
           used. See &ldquo;Connecting a chat app&rdquo; below.
@@ -149,6 +167,12 @@ const SECTIONS: LegalSection[] = [
             account to write with, and only for the work you send to it; or if you connect their
             chat app to the Studio, in which case they receive what the connector answers (see
             &ldquo;Connecting a chat app&rdquo;).
+          </li>
+          <li>
+            <strong>Meta (Instagram, Facebook), Discord, Reddit, LinkedIn, TikTok, Google
+            (YouTube) and X</strong> — only if you connect one of your own accounts there to post
+            from the Studio. Each receives the posts you schedule and nothing else; see
+            &ldquo;Posting to your social accounts&rdquo;.
           </li>
           <li>
             <strong>Vercel and Fly.io</strong> — application hosting.
@@ -211,6 +235,54 @@ const SECTIONS: LegalSection[] = [
     ),
   },
   {
+    title: "Posting to your social accounts",
+    body: (
+      <>
+        <p>
+          You can connect your own Instagram, Discord, Reddit, LinkedIn, TikTok, YouTube, Facebook
+          or X account under Settings → Connections. Each connection is made on that platform&apos;s
+          own sign-in screen, where it shows you what the Studio is asking for; the Studio never
+          sees the password of those accounts. The platform then issues an access token, which the
+          Studio keeps encrypted, scoped to your workspace, and uses for exactly two things.
+        </p>
+        <ul>
+          <li>
+            <strong>Sending what you schedule.</strong> A post goes out only when you create it in
+            the Studio (from a render&apos;s Post… button or the calendar) and at the time you set,
+            as you, from the account you picked. Nothing is posted on its own, nothing is posted
+            that you did not write, and a post the platform refuses is shown to you with the
+            platform&apos;s reason and is not sent again until you press Post again.
+          </li>
+          <li>
+            <strong>Showing your calendar.</strong> The calendar&apos;s Feed view reads the
+            account&apos;s own recent posts (their ids, thumbnails, links and captions) through your
+            connection, at most once a day, and keeps that list on your connection for a day so
+            the grid can draw what the queue will land on. It reads nothing else: no messages, no
+            followers, no one else&apos;s accounts.
+          </li>
+        </ul>
+        <p>
+          The platform&apos;s own rules apply to what you post there, and each platform&apos;s privacy
+          policy covers what it does with the post once it arrives. Pressing Disconnect wipes the
+          stored token at once; the record that the account was connected is kept so your
+          history of posts still reads correctly, and is removed with your account. Phantra&apos;s
+          use of information received from Google APIs (a connected YouTube channel) adheres to
+          the{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements: that data is used only to upload the videos
+          you schedule and to show your channel on your calendar, and is never sold, used for
+          advertising, or read by a person except to fix a problem you ask us to look at.
+        </p>
+      </>
+    ),
+  },
+  {
     title: "What doesn't happen",
     body: (
       <p className="border-l-2 border-primary bg-card/60 px-5 py-4 text-muted-foreground">
@@ -228,11 +300,13 @@ const SECTIONS: LegalSection[] = [
         Production material and account data are kept for as long as your account is active.
         Deleting a render in the Studio removes it from your library at once; the file itself is
         kept until your account is deleted, so a scene that used it keeps playing. You can
-        disconnect a connected model account at any time from its settings. To disconnect a chat
+        disconnect a connected model account at any time from its settings, and a connected social
+        account under Settings → Connections, which wipes its token at once. To disconnect a chat
         app, remove the connector in that app (in Claude: Customize, then Connectors): the Studio
         is not told when you do, cannot disconnect it for you, and keeps its record that the
         connection was made until you ask for it to be removed. You can ask for your account and
-        all of its data to be deleted — see contact below.
+        all of its data to be deleted — the steps are on the{" "}
+        <Link href="/data-deletion">data deletion page</Link>.
       </p>
     ),
   },
@@ -270,7 +344,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       dek="What Phantra collects, why, and how it is handled — across the studio itself and the third-party services it connects to."
-      effective="16 Oct 2026"
+      effective="23 Oct 2026"
       sections={SECTIONS}
     />
   );

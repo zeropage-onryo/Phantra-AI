@@ -1,0 +1,8 @@
+{
+  "B": {
+    "runway_site":   {"url": "https://dnznrvs05pmza.cloudfront.net/seedance_2/cgt-20261025025603-bv2lw/Raw_UGC_video_shot_on_a_phone_propped_on_a_stationary_surface_in_a_small_apartment_entryway__real_ro.mp4", "model": "Seedance 2", "size": "720x1280", "seconds": 15.07, "note": "URL is signed, expires ~2026-10-25 22:00 UTC"},
+    "runway_on_phantra": {"url": "https://media.phantra.ai/m/1/renders/fal/wf-20261024-190123-b597f7181efe0734cae2fb36c0d108db.mp4", "ref": "gen:230", "model": "seedance2", "size": "834x1112", "seconds": 15.04},
+    "vesper_on_phantra": {"url": "https://media.phantra.ai/m/1/renders/fal/wf-20261024-190255-aaa0f7313b9606ba68dbe247a6e2c9fa.mp4", "model": "seedance2", "size": "720x1280", "seconds": 10}
+  },
+  "C": {}
+}

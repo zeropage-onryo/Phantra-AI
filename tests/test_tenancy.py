@@ -85,9 +85,11 @@ def test_every_owned_table_grows_an_account_id(pg):
     from src import ledger, spend
     spend.init(pg)
     ledger.init(pg)
-    from src import billing, fal_requests
+    from src import billing, fal_requests, render_qc, whats_new
     billing.init(pg)
     fal_requests.init(pg)
+    render_qc.init(pg)
+    whats_new.init(pg)
     from src.cut import moments as cut_moments
     from src.cut import store as cut_store
     cut_store.init(pg)
@@ -118,6 +120,13 @@ def test_every_owned_table_grows_an_account_id(pg):
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
     watermark.init(pg)
+    from src import addons, plugin_tokens, posts, social_connections
+    plugin_tokens.init(pg)
+    social_connections.init(pg)
+    posts.init(pg)
+    addons.init(pg)
+    from src import voice_clone
+    voice_clone.init(pg)
     with db.connect(pg) as conn:
         for table in db.OWNED_TABLES:
             assert "account_id" in db.columns(conn, table), f"{table} has no owner"
@@ -526,6 +535,13 @@ def test_a_generation_cannot_be_logged_against_someone_elses_shot(two_accounts):
 # predicate. Each needs a reason, and the reason has to be about the
 # statement, not about convenience.
 UNSCOPED_ALLOWED = {
+    # src/plugin_tokens.py (2026-10-22): an editing-app panel's bearer secret
+    # looked up by its SHA-256. The secret IS the credential -- no account
+    # can be named before it is verified, and the hash finds only the one
+    # row that secret proves. poll() asks whether it was approved; the
+    # panel's own sign-out revokes it. Every other statement there is scoped.
+    "SELECT 1 FROM plugin_tokens WHERE token_hash = %s AND revoked_at IS NULL",
+    "UPDATE plugin_tokens SET revoked_at = now() WHERE token_hash = %s AND revoked_at IS NULL",
     # src/watermark.py's lookup of a marked render's clean original by its
     # public key (2026-10-11). Its callers are the doors that hand an image
     # to a model -- imagery.fetch_image_bytes has no account at all -- and
@@ -1033,8 +1049,11 @@ def _init_everything(path):
     spend.init(path)
     ledger.init(path)
     billing.init(path)
-    from src import fal_requests
+    from src import addons, fal_requests, render_qc, whats_new
+    addons.init(path)
     fal_requests.init(path)
+    render_qc.init(path)
+    whats_new.init(path)
     cut_store.init(path)
     from src import brand_kits
     brand_kits.init(path)
@@ -1064,6 +1083,12 @@ def _init_everything(path):
     mcp_preferences.init(path)
     mcp_recipes.init(path)
     watermark.init(path)
+    from src import plugin_tokens, posts, social_connections
+    plugin_tokens.init(path)
+    social_connections.init(path)
+    posts.init(path)
+    from src import voice_clone
+    voice_clone.init(path)
 
 
 AUTH_SCHEMA = {"users", "accounts", "account_members"}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { EditorialSkin } from "@/components/editorial-skin";
 import { PLANS } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/site-url";
+import { SOCIALS } from "@/lib/socials";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { HeroSection } from "@/components/landing/hero-section";
@@ -31,6 +32,8 @@ const HOME_JSON_LD = {
       "@id": `${SITE_URL}/#organization`,
       name: "Phantra AI",
       url: SITE_URL,
+      // the accounts in the header's Resources menu (2026-10-23)
+      sameAs: SOCIALS.map((s) => s.href),
     },
     {
       "@type": "WebSite",
@@ -71,12 +74,19 @@ export default function Home() {
       <main className="flex-1">
         <HeroSection />
         <VesperSection />
-        <StartAnywhereSection />
+        {/* on a phone (2026-10-26, the "Phantra Mobile Studio" canvas) the
+            page is the hero, Vesper, one reel and the closing call: the
+            starting points and the model strip are for wider screens */}
+        <div className="hidden md:block">
+          <StartAnywhereSection />
+        </div>
         <ShowcaseSection />
-        <ModelsStripSection />
+        <div className="hidden md:block">
+          <ModelsStripSection />
+        </div>
         <ClosingCtaSection />
       </main>
-      <SiteFooter />
+      <SiteFooter compact />
     </EditorialSkin>
   );
 }

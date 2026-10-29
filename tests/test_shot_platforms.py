@@ -32,11 +32,12 @@ SHOT = Shot(
 
 # ---------- the registry is the single source ----------
 
-def test_registry_carries_the_six_platforms():
+def test_registry_carries_the_seven_platforms():
     """Runway and Higgsfield left on 2026-09-26: fal is the only video
     renderer, and every video platform left is one it renders (OpenArt is
-    the hand-paste Director dialect, never rendered by the API)."""
-    assert set(PLATFORMS) == {"veo", "kling", "seedance", "ltx", "wan", "openart"}
+    the hand-paste Director dialect, never rendered by the API). Grok
+    joined 2026-10-23."""
+    assert set(PLATFORMS) == {"veo", "kling", "seedance", "ltx", "wan", "grok", "openart"}
 
 
 def test_tools_tuple_derives_from_the_registry():

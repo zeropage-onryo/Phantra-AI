@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "_about": "The Effects page's hand-picked lists (lib/effects-wall.ts reads this; docs/tasks/task-effects-page-r2.md). A key is a tile's key: an effect id (\"make_it_pro\", \"add-sound\") or <effect id>:<template value> for one template of a templated effect (\"kling-effect:bullet_time_360\", \"camera-move:camera_rotation\", \"pixverse-effect:Liquid Metal\"). featured: the strip over the wall, in order, the first one big; a key with no example in public/showcase/manifest.json is skipped. new: the tiles that carry NEW and fill the New tab. Picked by hand, like the Create page's news.json.",
+  "featured": ["kling-effect:bullet_time_360", "make_it_pro", "camera-move:camera_rotation", "film_grade"],
+  "new": ["kling-effect:bullet_time_360", "make_it_pro", "film_grade", "noir", "flash_2000s", "crash_zoom", "vertical_ready", "title_sequence", "the_ward", "haunted_manor", "found_tape", "coven", "sideshow", "seance", "the_hotel"]
+}

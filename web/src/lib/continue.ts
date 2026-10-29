@@ -27,7 +27,9 @@ export type ContinueKind =
   | "editor"
   | "canvas"
   | "render"
-  | "reuse";
+  | "reuse"
+  /** the original and the result as one image to download (a link, free) */
+  | "pair";
 
 export type ContinueAction = {
   /** unique in one result's list */
@@ -97,6 +99,15 @@ export function continueActions(r: ResultFacts, has: { effects: string[]; ready:
   }
 
   if (r.output === "image" && r.image) {
+    // a Halloween costume preview carries on to its video: the same costume,
+    // on the original photo (the studio binds both; 2026-10-27)
+    if (r.effect === "costume-preview") {
+      fx("costume_try_on", "Make it a video", "You spin into this costume in a short clip, made from your original photo.", true);
+      // before and after as one picture (lib/before-after.ts): free, a download
+      if (onWall) {
+        out.push({ id: "pair", kind: "pair", label: "Download side-by-side", title: "Your original photo beside the costume, as one image. Free.", primary: true });
+      }
+    }
     // "Edit image", not "Edit": the rail's Edit is the timeline editor
     fx("nano-banana-edit", "Edit image", "Change this still by describing the change.", true);
     // a variation re-draws a PROMPT; what an effect made has none

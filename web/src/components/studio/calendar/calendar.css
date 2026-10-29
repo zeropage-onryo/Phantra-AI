@@ -1,0 +1,1587 @@
+/* The calendar (2026-10-22, docs/tasks/task-calendar.md). Every colour is
+   a studio token (studio.css :root); the only new shapes are the state
+   glyphs and the platform marks. */
+
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cal kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--bone);
+  border: 1px solid var(--edge-hi);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: var(--raise);
+}
+
+/* ── marks ── */
+.cal-pi {
+  display: inline-block;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+.cal-textmark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: var(--slate);
+  color: var(--bone);
+  font-family: var(--mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  flex: 0 0 auto;
+}
+.cal-glyph {
+  display: inline-block;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--dim);
+  background: transparent;
+  position: relative;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+.cal-glyph.published {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.cal-glyph.queued {
+  border-color: var(--bone);
+}
+.cal-glyph.publishing {
+  border-color: var(--signal);
+  background: linear-gradient(90deg, var(--signal) 50%, transparent 50%);
+}
+.cal-glyph.error {
+  border-color: var(--danger);
+}
+.cal-glyph.error::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 1.5px;
+  margin-top: -1px;
+  background: var(--danger);
+}
+.cal-glyph.draft {
+  border-style: dashed;
+}
+.cal-glyph.cancelled {
+  border-color: var(--dimmer);
+}
+
+/* ── the bar ── */
+.cal-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cal-seg {
+  display: flex;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cal-seg button {
+  padding: 6px 12px;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  background: none;
+  border: 0;
+  border-right: 1px solid var(--edge);
+  cursor: pointer;
+}
+.cal-seg button:last-child {
+  border-right: 0;
+}
+.cal-seg button[aria-pressed="true"] {
+  background: var(--raise);
+  color: var(--text);
+}
+.cal-ib {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bone);
+  background: none;
+  cursor: pointer;
+}
+.cal-ib.sm {
+  width: 22px;
+  height: 22px;
+}
+.cal-ib svg {
+  width: 14px;
+  height: 14px;
+}
+.cal-btn {
+  padding: 7px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  color: var(--bone);
+  font: inherit;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  cursor: pointer;
+}
+.cal-btn.sm {
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.cal-btn.danger {
+  border-color: var(--danger);
+  color: var(--danger-hi);
+}
+.cal-btn:disabled,
+.cal-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cal-primary {
+  padding: 7px 12px;
+  border: 1px solid var(--signal);
+  border-radius: 6px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.cal-primary.sm {
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.cal-primary svg {
+  width: 14px;
+  height: 14px;
+}
+.cal-primary kbd {
+  color: var(--on-signal);
+  background: transparent;
+  border-color: rgb(10 10 11 / 0.35);
+}
+.cal-range {
+  font-family: var(--display);
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  margin: 0 4px;
+}
+.cal-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 7px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--bone);
+  background: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+.cal-chip.off {
+  color: var(--dim);
+  opacity: 0.6;
+}
+.cal-chip.add {
+  color: var(--dim);
+  border-style: dashed;
+}
+.cal-needs {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cal-hint {
+  margin: 0;
+  color: var(--dim);
+  font-size: 11px;
+  font-family: var(--body);
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+.cal-hint a {
+  color: var(--bone);
+}
+.cal-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--bone);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── week ── */
+.cal-weekwrap {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  min-width: 0;
+}
+.cal-stripopen {
+  writing-mode: vertical-rl;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--dim);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 10px 6px;
+  cursor: pointer;
+}
+.cal-week {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--well);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.cal-week-head,
+.cal-week-body {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(0, 1fr));
+}
+.cal-week-body {
+  max-height: 660px;
+  overflow-y: auto;
+  position: relative;
+}
+.cal-dh {
+  padding: 10px 8px 8px;
+  border-bottom: 1px solid var(--edge);
+  border-left: 1px solid var(--edge-lo);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.cal-dh small {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+}
+.cal-dh b {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 18px;
+}
+.cal-dh.today b {
+  color: var(--on-signal);
+  background: var(--signal);
+  border-radius: 5px;
+  padding: 0 6px;
+}
+.cal-hours {
+  position: relative;
+  height: calc(24 * 52px);
+  border-right: 1px solid var(--edge-lo);
+}
+.cal-hours span {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-6px);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+}
+.cal-day {
+  position: relative;
+  border-left: 1px solid var(--edge-lo);
+}
+.cal-day.past {
+  background: repeating-linear-gradient(135deg, transparent 0 9px, rgb(255 255 255 / 0.025) 9px 10px);
+}
+.cal-day.today {
+  background: color-mix(in srgb, var(--signal) 3%, transparent);
+}
+.cal-day.over {
+  background: color-mix(in srgb, var(--signal) 7%, transparent);
+}
+.cal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--edge-lo);
+}
+.cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--signal);
+  z-index: 2;
+  pointer-events: none;
+}
+.cal-now i {
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--signal);
+}
+.cal-slot {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 36px;
+  border: 1px dashed var(--edge-hi);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dimmer);
+  background: none;
+  cursor: pointer;
+}
+.cal-slot b {
+  color: var(--dim);
+  font-weight: 500;
+}
+.cal-slot:hover {
+  border-color: var(--signal);
+  color: var(--bone);
+}
+.cal-ghost {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 56px;
+  border: 1px dashed var(--signal);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--signal) 8%, transparent);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+}
+.cal-post {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  min-height: 62px;
+  line-height: 1.25;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  gap: 7px;
+  overflow: hidden;
+  color: var(--text);
+  cursor: pointer;
+  z-index: 1;
+}
+.cal-post:hover,
+.cal-post:focus-visible {
+  border-color: var(--edge-hi);
+  outline: none;
+}
+.cal-post.published {
+  opacity: 0.72;
+}
+.cal-post.error {
+  border-color: var(--danger);
+}
+.cal-post.publishing {
+  border-color: var(--signal);
+}
+.cal-post.draft {
+  border-style: dashed;
+  background: transparent;
+}
+.cal-post.narrow .cal-thumb {
+  display: none;
+}
+.cal-thumb {
+  width: 40px;
+  flex: 0 0 40px;
+  border-radius: 3px;
+  background: var(--raise);
+  border: 1px solid var(--edge-lo);
+  overflow: hidden;
+  align-self: stretch;
+}
+.cal-thumb.sm {
+  width: 44px;
+  flex-basis: 44px;
+  height: 30px;
+  align-self: center;
+}
+.cal-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cal-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.25;
+}
+.cal-meta > * {
+  flex: 0 0 auto;
+}
+.cal-meta b {
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--dim);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.cal-st.error {
+  color: var(--danger-hi);
+}
+.cal-st.publishing {
+  color: var(--signal);
+}
+.cal-st a {
+  color: inherit;
+}
+
+/* the Library strip */
+.cal-lib {
+  width: 176px;
+  flex: 0 0 176px;
+  background: var(--well);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 720px;
+  overflow-y: auto;
+}
+.cal-lib-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.cal-lib .cal-hint {
+  margin: 0;
+}
+.cal-lib-tile {
+  border: 1px solid var(--edge-lo);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: grab;
+}
+.cal-lib-tile:active {
+  cursor: grabbing;
+}
+.cal-lib-po {
+  height: 78px;
+  border-radius: 4px;
+  background: var(--raise);
+  border: 1px solid var(--edge-lo);
+  position: relative;
+  overflow: hidden;
+}
+.cal-lib-po img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cal-lib-po span {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--bone);
+  background: rgb(11 11 11 / 0.7);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.cal-lib-tile b {
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-lib-tile small {
+  font-size: 10px;
+  color: var(--dim);
+}
+.cal-lib-more {
+  font-size: 11px;
+  margin-top: auto;
+}
+
+/* ── month ── */
+.cal-month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--well);
+  overflow: hidden;
+}
+.cal-mdh {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--edge);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+}
+.cal-mc {
+  min-height: 112px;
+  border-top: 1px solid var(--edge-lo);
+  border-left: 1px solid var(--edge-lo);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cal-mc:nth-child(7n + 8) {
+  border-left: 0;
+}
+.cal-mc.past {
+  background: repeating-linear-gradient(135deg, transparent 0 9px, rgb(255 255 255 / 0.025) 9px 10px);
+}
+.cal-mc.today {
+  background: color-mix(in srgb, var(--signal) 3%, transparent);
+}
+.cal-mn {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--bone);
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.cal-mc.out .cal-mn {
+  color: var(--dimmer);
+}
+.cal-mc.today .cal-mn {
+  color: var(--on-signal);
+  background: var(--signal);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.cal-mp {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--edge-lo);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.cal-mp span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-mp.published {
+  opacity: 0.72;
+}
+.cal-mp.error {
+  border-color: var(--danger);
+}
+.cal-mp.draft {
+  border-style: dashed;
+  background: transparent;
+  color: var(--bone);
+}
+.cal-more {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+  background: none;
+  border: 0;
+  text-align: left;
+  padding-left: 5px;
+  cursor: pointer;
+}
+
+/* ── list ── */
+.cal-listwrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cal-list {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--well);
+  overflow: hidden;
+}
+.cal-lg {
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  border-bottom: 1px solid var(--edge-lo);
+  background: var(--panel);
+}
+.cal-lg.today {
+  color: var(--signal);
+}
+.cal-lr {
+  display: grid;
+  grid-template-columns: 72px 44px minmax(0, 1fr) 150px 170px auto;
+  gap: 14px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--edge-lo);
+}
+.cal-lr.published {
+  opacity: 0.72;
+}
+.cal-lr.error {
+  background: var(--danger-soft);
+}
+.cal-tm {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--bone);
+}
+.cal-nm {
+  min-width: 0;
+}
+.cal-nm b {
+  font-weight: 500;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-nm small {
+  color: var(--dim);
+  font-size: 11px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-to {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--bone);
+  white-space: nowrap;
+}
+.cal-acts {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+@media (max-width: 900px) {
+  .cal-lr {
+    grid-template-columns: 60px minmax(0, 1fr) auto;
+  }
+  .cal-lr .cal-thumb,
+  .cal-lr .cal-to,
+  .cal-lr .cal-st {
+    display: none;
+  }
+  .cal-weekwrap .cal-lib {
+    display: none;
+  }
+}
+
+.cal-needsyou .cal-lr {
+  grid-template-columns: 150px 110px minmax(0, 1fr) 110px auto;
+}
+.cal-needsyou .cal-tm {
+  white-space: nowrap;
+}
+
+/* ── feed ── */
+.cal-feed {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.cal-acc {
+  display: flex;
+  gap: 8px;
+}
+.cal-acc button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--edge);
+  background: var(--well);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  cursor: pointer;
+}
+.cal-acc button[aria-pressed="true"] {
+  opacity: 1;
+  border: 2px solid var(--signal);
+}
+.cal-phone {
+  width: 420px;
+  max-width: 100%;
+  flex: 0 0 auto;
+  background: var(--well);
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cal-ph {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--edge-lo);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cal-ph b {
+  font-weight: 600;
+  font-size: 13px;
+  display: block;
+}
+.cal-ph small {
+  display: block;
+  color: var(--dim);
+  font-size: 11px;
+}
+.cal-pav {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--raise);
+  border: 1px solid var(--edge-hi);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.cal-pav img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+}
+.cal-tile {
+  aspect-ratio: 4 / 5;
+  background: var(--raise);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px;
+  border: 1px solid transparent;
+  overflow: hidden;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.cal-tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cal-tile .cal-td,
+.cal-tile .cal-tn {
+  position: relative;
+  font-size: 10px;
+  color: var(--text);
+  background: rgb(11 11 11 / 0.7);
+  padding: 2px 5px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-tile .cal-td {
+  font-family: var(--mono);
+  font-size: 9px;
+}
+.cal-tile.pub {
+  opacity: 0.6;
+}
+.cal-tile.queued,
+.cal-tile.publishing {
+  border-color: var(--edge-hi);
+}
+.cal-tile.error {
+  border-color: var(--danger);
+}
+.cal-tile.draft {
+  border: 1px dashed var(--dim);
+  background: transparent;
+}
+.cal-tile.drag {
+  opacity: 0.5;
+}
+.cal-tile.over {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 8%, var(--raise));
+}
+.cal-q {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cal-q h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.cal-qr {
+  display: grid;
+  grid-template-columns: 24px 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--edge-lo);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cal-qr.published {
+  opacity: 0.6;
+}
+.cal-qr.error {
+  border-color: var(--danger);
+}
+.cal-qi {
+  font-family: var(--display);
+  font-size: 15px;
+  color: var(--bone);
+  text-align: center;
+}
+
+/* ── legend and keys ── */
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--dim);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.cal-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  color: var(--dim);
+  cursor: pointer;
+}
+.cal-keys svg {
+  width: 14px;
+  height: 14px;
+}
+.cal-keysheet {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 300px;
+  background: var(--raise);
+  border: 1px solid var(--edge-hi);
+  border-radius: 8px;
+  padding: 12px 14px;
+  z-index: 121;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.6);
+}
+.cal-keysheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-keysheet dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 12px;
+  align-items: center;
+}
+.cal-keysheet dd {
+  margin: 0;
+  color: var(--bone);
+}
+.cal-keysheet .m {
+  margin: 8px 0 0;
+}
+
+/* ── the drawer ── */
+.cal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+  /* over the assistant creature (110) and under the toasts */
+  z-index: 120;
+  display: flex;
+  justify-content: flex-end;
+}
+.cal-drawer {
+  width: 460px;
+  max-width: 100%;
+  height: 100%;
+  background: var(--panel);
+  border-left: 1px solid var(--edge);
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+}
+.cal-dr-top {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--edge-lo);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.cal-dr-top h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cal-dr-top p {
+  margin: 3px 0 0;
+  color: var(--dim);
+  font-size: 12px;
+}
+.cal-dr-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  flex: 1;
+}
+
+.cal-dr-foot {
+  padding: 12px 18px;
+  border-top: 1px solid var(--edge-lo);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cal-fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-fld > span {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.cal-in {
+  background: var(--well);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+}
+textarea.cal-in {
+  min-height: 84px;
+  resize: vertical;
+}
+.cal-cnt {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+  text-align: right;
+}
+.cal-when {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cal-when button {
+  padding: 7px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  background: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-when button[aria-pressed="true"] {
+  background: var(--raise);
+  color: var(--text);
+  border-color: var(--edge-hi);
+}
+.cal-alert {
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--bone);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+}
+.cal-alert b {
+  color: var(--danger-hi);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.cal-alert.warm {
+  border-color: var(--signal);
+}
+.cal-alert.warm b {
+  color: var(--signal);
+}
+.cal-alert.ok {
+  border-color: var(--ok);
+}
+.cal-alert.ok b {
+  color: var(--ok);
+}
+.cal-prev {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.cal-prev dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  font-size: 12px;
+  min-width: 0;
+}
+.cal-prev dt {
+  color: var(--dim);
+}
+.cal-prev dd {
+  margin: 0;
+  color: var(--bone);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cal-pickgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.cal-pickgrid button {
+  aspect-ratio: 1;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--raise);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  color: var(--dim);
+  font: inherit;
+  font-size: 10px;
+}
+.cal-pickgrid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cal-picks {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cal-pick {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--edge);
+  background: var(--well);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  opacity: 0.55;
+  text-decoration: none;
+  color: var(--dim);
+  cursor: pointer;
+  padding: 0;
+}
+.cal-pick.on {
+  opacity: 1;
+  border: 2px solid var(--signal);
+}
+.cal-pick .cal-glyph {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  border-width: 2px;
+  border-color: var(--panel);
+}
+.cal-pick .cal-glyph.published {
+  background: var(--ok);
+}
+.cal-pick .cal-glyph.error {
+  background: var(--danger);
+}
+.cal-pick .cal-glyph.error::after {
+  display: none;
+}
+.cal-pick.add {
+  opacity: 1;
+  border-style: dashed;
+  font-size: 18px;
+}
+.cal-ptabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--edge-lo);
+  flex-wrap: wrap;
+}
+.cal-ptabs button {
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  cursor: pointer;
+}
+.cal-ptabs button[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--signal);
+}
+.cal-sibs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cal-sib {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  color: var(--bone);
+}
+.cal-sib.error {
+  border-color: var(--danger);
+}
+.cal-log {
+  border: 1px solid var(--edge-lo);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cal-log > div {
+  display: grid;
+  grid-template-columns: 112px 12px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--edge-lo);
+  font-size: 11px;
+  color: var(--bone);
+}
+.cal-log .cal-tm {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.cal-log > div:last-child {
+  border-bottom: 0;
+}
+.cal-split {
+  position: relative;
+  display: flex;
+}
+.cal-split .cal-primary:first-of-type {
+  border-radius: 6px 0 0 6px;
+}
+.cal-split .caret {
+  border-radius: 0 6px 6px 0;
+  padding: 7px 6px;
+  border-left: 1px solid rgb(10 10 11 / 0.25);
+}
+.cal-split .cal-primary:only-of-type {
+  border-radius: 6px;
+}
+.cal-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: 260px;
+  background: var(--raise);
+  border: 1px solid var(--edge-hi);
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.6);
+  z-index: 2;
+}
+.cal-menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.cal-menu button:hover {
+  background: var(--slate);
+}
+.cal-menu b {
+  font-weight: 500;
+  font-size: 12px;
+}
+.cal-menu small {
+  font-size: 10px;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+
+/* the previews */
+.cal-pv {
+  flex: 0 0 auto;
+}
+.cal-pv-av {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--slate);
+  border: 1px solid var(--edge-hi);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.cal-pv.tall {
+  width: 132px;
+  height: 234px;
+  border-radius: 10px;
+  background: var(--raise);
+  border: 1px solid var(--edge-hi);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+}
+.cal-pv.tall img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cal-pv-bars {
+  position: relative;
+  display: flex;
+  gap: 3px;
+}
+.cal-pv-bars i {
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: rgb(244 243 242 / 0.35);
+}
+.cal-pv-bars i:first-child {
+  background: var(--text);
+}
+.cal-pv-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 9px;
+}
+.cal-pv-head .cal-pv-av {
+  width: 16px;
+  height: 16px;
+}
+.cal-pv-head b {
+  font-weight: 600;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+}
+.cal-pv-cap {
+  position: relative;
+  margin-top: auto;
+  font-size: 9px;
+  line-height: 1.3;
+  color: var(--text);
+  background: rgb(11 11 11 / 0.7);
+  padding: 4px 6px;
+  border-radius: 4px;
+  max-height: 60px;
+  overflow: hidden;
+}
+.cal-pv-cap:empty {
+  display: none;
+}
+.cal-pv.discord {
+  width: 200px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: var(--raise);
+  border: 1px solid var(--edge-hi);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 10px;
+}
+.cal-pv.discord .cal-pv-av {
+  width: 24px;
+  height: 24px;
+}
+.cal-pv.discord b {
+  font-weight: 600;
+}
+.cal-pv.discord small {
+  color: var(--dim);
+  font-size: 9px;
+}
+.cal-pv.discord p {
+  margin: 3px 0 5px;
+  color: var(--bone);
+  overflow-wrap: anywhere;
+}
+.cal-pv-att {
+  width: 150px;
+  height: 84px;
+  border-radius: 4px;
+  background: var(--slate);
+  border: 1px solid var(--edge-hi);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+.cal-pv-att img,
+.cal-pv-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cal-pv.x {
+  width: 200px;
+  background: var(--raise);
+  border: 1px solid var(--edge-hi);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 10px;
+}
+.cal-pv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-pv.x b {
+  font-weight: 600;
+}
+.cal-pv.x small {
+  color: var(--dim);
+}
+.cal-pv.x p {
+  margin: 4px 0 6px;
+  color: var(--bone);
+  overflow-wrap: anywhere;
+}
+.cal-pv-media {
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: var(--slate);
+  border: 1px solid var(--edge-hi);
+  overflow: hidden;
+}
+
+/* ── a platform's own per-post form (2026-10-22) ── */
+.cal-pf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cal-pf.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-end;
+}
+.cal-pf-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  flex: 1 1 140px;
+}
+.cal-pf-row > span {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.cal-pf-row small {
+  font-size: 10px;
+  color: var(--dim);
+}
+.cal-pf-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--bone);
+  padding-bottom: 8px;
+}
+.cal-pf-block {
+  border: 1px solid var(--edge-lo);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-pf-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--bone);
+}

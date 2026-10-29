@@ -7,7 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { SectionTitle } from "./section-title";
 import { ShowcaseWall } from "./showcase-wall";
-import { EditorialWall, FilmstripWall, PostersWall, PromptsWall } from "./walls";
+import { EditorialWall, FilmstripWall, PostersWall, PromptsWall, TapeWall } from "./walls";
 import { ReelsWall } from "./clips";
 import { Button } from "@/components/ui/button";
 import { SPRINGS, reveal } from "@/lib/motion";
@@ -48,6 +48,8 @@ export function AdWall({ page }: { page: MakePage }) {
       return <PostersWall page={page} />;
     case "reels":
       return <ReelsWall page={page} />;
+    case "tape":
+      return <TapeWall page={page} />;
     default:
       return <BentoWall page={page} />;
   }
@@ -194,6 +196,24 @@ export function Tile({
             preload="none"
             aria-label={tile.title}
           />
+        ) : tile.from ? (
+          // before and after (2026-10-27, the costume try-on): the original
+          // under, the result over it from the divider; the pointer slides
+          // the divider left so the result takes the tile
+          <>
+            <Image src={tile.from} alt={tile.title ? `${tile.title}: before` : ""} fill sizes="(min-width: 1024px) 30vw, 50vw" quality={70} className="object-cover" priority={index < 4} />
+            <div
+              className="absolute inset-0 transition-[clip-path] duration-700 ease-out"
+              style={{ clipPath: `inset(0 0 0 ${hover && !still ? 6 : 50}%)` }}
+            >
+              <Image src={tile.src} alt={tile.title ? `${tile.title}: after` : ""} fill sizes="(min-width: 1024px) 30vw, 50vw" quality={70} className="object-cover" priority={index < 4} />
+            </div>
+            <div
+              aria-hidden
+              className="absolute inset-y-0 w-0.5 bg-white/90 transition-[left] duration-700 ease-out"
+              style={{ left: `${hover && !still ? 6 : 50}%` }}
+            />
+          </>
         ) : (
           <Image
             src={tile.src}

@@ -11,10 +11,11 @@
    element" with a render's URL already in the strip (2026-09-18) --
    `photo_urls` rides the same form and the server fetches the bytes. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Image as ImageIcon, LayoutGrid, X } from "lucide-react";
-import { API_URL } from "@/lib/api";
+import { FolderOpen, Image as ImageIcon, LayoutGrid, X } from "lucide-react";
 import { announceBalanceWhenDone, createAsset, getCapabilities } from "@/lib/studio-api";
 import { useShell } from "@/components/studio/shell";
+import { LibraryDrawer } from "@/components/studio/library-drawer";
+import { mediaSrc } from "@/lib/composer";
 import { creditsText } from "@/lib/render-choice";
 import { CREATE_ROUTE, ELEMENT_KINDS, PRODUCT_KIND, type ElementKind } from "@/lib/elements";
 
@@ -59,6 +60,9 @@ export function AddElement({
   const [notes, setNotes] = useState(initialNotes);
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState<string[]>(initialPhotoUrls);
+  // renders picked in the Library drawer ride `photo_urls` with any a
+  // "Make element" opened the form with (2026-10-26)
+  const [libOpen, setLibOpen] = useState(false);
   const [sheet, setSheet] = useState(true);
   // the sheet is one still, charged like any other (2026-09-29: every
   // spend of credits says its price before the click that spends it)
@@ -173,10 +177,24 @@ export function AddElement({
               <ImageIcon strokeWidth={1.6} />
               {photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"} attached` : "Pick photos, or drop them here"}
             </label>
+            <button type="button" className="zlibpick" aria-haspopup="dialog" onClick={() => setLibOpen(true)}>
+              <FolderOpen strokeWidth={1.6} aria-hidden="true" /> Or pick renders from your Library
+            </button>
+            {/* inside the dialog, whose click stops here, so a click in the
+                drawer never reaches the scrim that closes this form */}
+            <LibraryDrawer
+              open={libOpen}
+              onClose={() => setLibOpen(false)}
+              accept="image"
+              max={12}
+              noun="photo"
+              onPick={(items) => setUrls((was) => [...new Set([...was, ...items.map((m) => m.url)])])}
+              onFiles={(picked) => setFiles((was) => [...was, ...picked.filter((f) => f.type.startsWith("image/"))])}
+            />
             {previews.length || urls.length ? (
               <div className="zpreviews">
                 {urls.map((u) => (
-                  <span key={u} className="relative" style={{ backgroundImage: `url(${API_URL}${u})` }} title="from the Assets wall">
+                  <span key={u} className="relative" style={{ backgroundImage: `url(${mediaSrc(u)})` }} title="from your Library">
                     <button
                       type="button"
                       className="zdx absolute -top-1.5 -right-1.5 h-5 w-5 min-h-0 rounded-full bg-black/80"

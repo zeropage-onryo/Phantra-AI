@@ -45,6 +45,8 @@ const nextConfig: NextConfig = {
       "/models/:slug",
       "/make/:slug",
       "/faq",
+      "/whats-new",
+      "/whats-new/rss.xml",
       "/mcp",
       "/mcp/claude",
       "/terms",

@@ -57,7 +57,8 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import charge as charging
-from . import fal, generative, ledger, render_names
+from . import costumes, fal, generative, ledger, render_names
+from . import effect_recipes as recipes
 from . import free_looks as looks
 
 CHECKED = "2026-10-07"
@@ -69,16 +70,17 @@ CATEGORIES = ("image_edit", "video_effect", "camera", "finish", "look")
 
 
 # --- the enums, copied off the schemas on CHECKED --------------------------
+# KLING_EFFECTS re-read 2026-10-27: seven names fal no longer takes were dropped
+# (day_to_night, skateskate, guardian_spirit, pet_moto_rider, 3d_cartoon_2,
+# pet_dance, surfsurf).
 # Long lists, kept verbatim: an effect name is a wire value, and a name
 # this table does not carry is refused before anything is held.
 KLING_EFFECTS = (
     "heart_gesture",
     "bullet_time_360",
-    "day_to_night",
     "swish_swish",
     "running_man",
     "swing_swing",
-    "skateskate",
     "building_sweater",
     "pure_white_wings",
     "black_wings",
@@ -89,7 +91,6 @@ KLING_EFFECTS = (
     "birthday_star",
     "tiger_hug_pro",
     "pet_lion_pro",
-    "guardian_spirit",
     "drunk_dance",
     "drunk_dance_pet",
     "daoma_dance",
@@ -163,13 +164,9 @@ KLING_EFFECTS = (
     "cute_pumpkin_transform",
     "halloween_escape",
     "korean_baseball",
-    "pet_moto_rider",
-    "3d_cartoon_2",
     "girlfriend",
     "boyfriend",
-    "pet_dance",
     "splashsplash",
-    "surfsurf",
 )
 PIXVERSE_EFFECTS = (
     "Kiss Me AI",
@@ -443,7 +440,9 @@ EFFECTS: dict[str, dict] = {
         "endpoint": "fal-ai/bytedance/seedream/v4/edit", "takes": "image",
         "field": "image_urls", "as_list": True, "sources": (1, 4),
         "prompt": "required", "output": "image",
-        "options": {}, "fixed": {"num_images": 1},
+        # auto_2K: the output takes the first picture's shape (2026-10-27;
+        # without it every edit came back square)
+        "options": {}, "fixed": {"num_images": 1, "image_size": "auto_2K"},
         "price": lambda o, p: 0.03,
         "source": "https://fal.ai/models/fal-ai/bytedance/seedream/v4/edit",
     },
@@ -456,10 +455,27 @@ EFFECTS: dict[str, dict] = {
         "price": lambda o, p: 0.018,
         "source": "https://fal.ai/models/fal-ai/bria/background/remove",
     },
+    # -- Halloween costumes (2026-10-27, src/costumes.py): a still in, the
+    # same person in a costume out; the costume is an option, so the card
+    # is one tap per costume and the prompt is written, never typed
+    "costume-preview": {
+        "label": "Halloween Costume", "category": "image_edit",
+        "note": "the person in the photo in a Halloween costume picked from a list, face kept (Nano Banana edit)",
+        "endpoint": "fal-ai/nano-banana/edit", "takes": "image",
+        "field": "image_urls", "as_list": True, "sources": (1, 1),
+        "prompt": "none", "output": "image",
+        "options": {"costume": {"values": tuple(costumes.COSTUMES), "required": True},
+                    "aspect_ratio": {"values": NANO_EDIT_ASPECTS, "default": "auto"}},
+        "fixed": {"num_images": 1},
+        "price": lambda o, p: 0.039,
+        "costume": True, "tags": ("social",),
+        "source": "https://fal.ai/models/fal-ai/nano-banana/edit",
+        "checked": costumes.CHECKED,
+    },
     # -- template effects: a still in, a styled clip out ------------------
     "kling-effect": {
         "label": "Kling effects", "category": "video_effect",
-        "note": "98 one-click templates on a still (heart_gesture takes 2 images)",
+        "note": "91 one-click templates on a still (heart_gesture takes 2 images)",
         "endpoint": "fal-ai/kling-video/v1.6/standard/effects", "takes": "image",
         "field": "input_image_urls", "as_list": True, "sources": (1, 2),
         "prompt": "none", "output": "video",
@@ -609,6 +625,10 @@ def _look_row(name: str, look: dict) -> dict:
 
 
 EFFECTS.update({name: _look_row(name, look) for name, look in looks.LOOKS.items()})
+# the recipe effects (2026-10-26, src/effect_recipes.py): a written prompt in
+# prompts/effects/ on one video model, listed only with PHANTRA_EFFECT_RECIPES=1
+RECIPE_MAX_NOTE = 200      # the one detail a person may add to a recipe
+EFFECTS.update({name: recipes.row(name) for name in recipes.RECIPES})
 EFFECT_NAMES = tuple(EFFECTS)
 SAMPLE = 12       # enum values shown per option in the summary listing
 
@@ -622,7 +642,8 @@ def listed_names() -> tuple[str, ...]:
     """EFFECT_NAMES minus the free looks while they are switched off: what
     the gallery and the connector list. The table itself never changes."""
     return tuple(n for n, r in EFFECTS.items()
-                 if r.get("provider") != "local" or looks.enabled())
+                 if (r.get("provider") != "local" or looks.enabled())
+                 and (not r.get("recipe") or recipes.enabled()))
 
 
 def spec(effect: str) -> dict:
@@ -630,6 +651,7 @@ def spec(effect: str) -> dict:
     if row is None:
         raise ValueError(f"effect must be one of {list(EFFECT_NAMES)}, got {effect!r}")
     looks.require_enabled(effect)       # a free look on a server that has them off
+    recipes.require_enabled(effect)     # a recipe on a server that has them off
     return row
 
 
@@ -686,6 +708,8 @@ def _pricing_note(name: str) -> str:
     }
     if name in notes:
         return notes[name]
+    if EFFECTS[name].get("recipe"):
+        return f"${EFFECTS[name]['rate']} per second ({EFFECTS[name]['model']})"
     if EFFECTS[name].get("free"):
         return "free -- made on the studio's own server, no credits"
     return f"${EFFECTS[name]['price']({}, {})} per image"
@@ -740,6 +764,9 @@ def check_prompt(effect: str, prompt: str) -> str:
         raise ValueError(f"{row['label']} needs a prompt")
     if row["prompt"] == "none" and prompt:
         raise ValueError(f"{row['label']} takes no prompt -- leave it empty")
+    if row.get("recipe") and len(prompt) > RECIPE_MAX_NOTE:
+        raise ValueError(f"{row['label']} takes a short detail, up to {RECIPE_MAX_NOTE} "
+                         f"characters -- the rest of its prompt is written")
     return prompt
 
 
@@ -798,7 +825,15 @@ def build_body(effect: str, urls: list[str], prompt: str, options: dict,
     row = spec(effect)
     body: dict = {**row["fixed"], **options}
     body[row["field"]] = list(urls) if row["as_list"] else urls[0]
-    if prompt:
+    if row.get("costume"):
+        # the costume is ours to word (src/costumes.py): it is not a field
+        # the model takes, so it leaves the body as the prompt
+        body["prompt"] = costumes.prompt_for(body.pop("costume"))
+    elif row.get("recipe"):
+        # a recipe's prompt is written (prompts/effects/); what the person typed
+        # is only the one detail worked into its slot
+        body["prompt"] = recipes.prompt_for(effect, prompt)
+    elif prompt:
         body["prompt"] = prompt
     if effect == "add-sound":
         body["duration"] = _sound_seconds(probe or {"seconds": 8})
@@ -946,14 +981,25 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
         if kind == "audio":
             # a voice (src/talking_photo.py): no Assets tile -- the caller
             # files it in the editor's media bin as an asset:<id>
+            # `result` is the model's answer as it came: a voice clone's
+            # custom_voice_id rides there (src/voice_clone.py)
             return {"ok": True, "media_url": None, "generation_id": generation_id,
                     "asset_id": None, "path": str(out_path), "media_kind": kind,
-                    "error": None}
+                    "result": result, "error": None}
         # by the file's own container: a transparent .webm or a ProRes .mov
         # (step 2b) published as video/mp4 would not play
         ctype = (VIDEO_MIMES.get(out_path.suffix.lower(), "video/mp4") if kind == "video"
                  else "image/png" if out_path.suffix == ".png" else "image/jpeg")
-        media_url = (publish or fal._publish)(out_path, ctype, account_id)
+        try:
+            media_url = (publish or fal._publish)(out_path, ctype, account_id)
+        except Exception as e:
+            # past the settle: the effect WAS made and paid for, so the
+            # outer "Nothing was charged" would be false
+            return {"ok": False, "charged": True, "generation_id": generation_id,
+                    "path": str(out_path), "media_kind": kind,
+                    "error": (f"{row['label']} was made and was charged, but it could not "
+                              f"be filed in your Library ({fal._safe_error(e, account_id)}). "
+                              "It is kept; ask us and we will file it.")}
         asset = {"id": None}
         if bank:
             asset = render_assets.record_best_effort(

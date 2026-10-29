@@ -8,11 +8,11 @@ import type { MakePage, MakeTile } from "../pages";
 // prompt rendered on two models side by side. A frame with no `video` is a
 // gradient plate off the accent, the template's no-media state, captioned
 // by the entry's `meta` until the clip lands. Every value comes from the
-// entry (`specs`), which reads the catalog and src/fal.py; nothing is typed
+// entry (`specSheet`), which reads the catalog and src/fal.py; nothing is typed
 // here. The table scrolls inside its own box on a phone, never the page,
 // with the row labels pinned to its left edge.
 export function SpecCompare({ page }: { page: MakePage }) {
-  const s = page.specs;
+  const s = page.specSheet;
   if (!s) return null;
   const pair = (page.signatureFrames ?? []).slice(0, 2);
   return (

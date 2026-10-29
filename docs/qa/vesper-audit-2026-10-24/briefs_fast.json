@@ -1,0 +1,304 @@
+[
+ {
+  "brief": "bare",
+  "brain": "fast",
+  "output": "image",
+  "turns": [
+   {
+    "user": "a coffee cup on a rainy window",
+    "secs": 18.8,
+    "message": "A close-up of a steaming ceramic coffee cup on a wooden windowsill. The window pane is streaked with raindrops and light condensation. Through the glass, a blurry, moody street is visible. Soft, natural daylight from an overcast sky. Macro lens, sharp focus on the water droplets and the rim of the cup.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_image",
+     "args": {
+      "prompt": "A close-up of a steaming ceramic coffee cup on a wooden windowsill. The window pane is streaked with raindrops and light condensation. Through the glass, a blurry, moody street is visible. Soft, natural daylight from an overcast sky. Macro lens, sharp focus on the water droplets and the rim of the cup.",
+      "model": "nano",
+      "model_why": "a sharp first look at the textures"
+     },
+     "label": "Generate this image"
+    },
+    "tool_runs": [
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "turns_to_make": 1
+ },
+ {
+  "brief": "vague",
+  "brain": "fast",
+  "output": "video",
+  "turns": [
+   {
+    "user": "help me make an ad",
+    "secs": 4.6,
+    "message": "Every ad needs a clear destination. To build this, I need to know the one thing the viewer should remember and which product or person we are carrying across the water. \n\nDrop in a photo of what you are selling or name an element you have already made. What is the one benefit we're highlighting?",
+    "choices": [
+     "A 10-second high-energy social clip",
+     "A cinematic 15-second teaser",
+     "A simple product benefit demonstration"
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ad"
+      },
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "A 10-second high-energy social clip",
+    "secs": 6.3,
+    "message": "Ten seconds of high energy is a strong start for a social hook. To give this ad a shape, I need to know what we are putting in the spotlight. Drop in a photo of your product or person so I can see what we're working with. \n\nWhat are we selling, and what's the one thing it does better than anything else?",
+    "choices": [
+     "It's a high-performance energy drink.",
+     "It's a sleek new pair of running shoes.",
+     "It's a minimalist skincare line."
+    ],
+    "brief": "A 10-second high-energy social ad. \n\nSubject: [TBD - waiting for photo/description]\nSetting: [TBD]\nAction: Fast-paced cuts, high-energy movement.\nVisual Style: Social-first, dynamic camera work.\nPacing: Fast cuts, 10 seconds total.\nSound: [TBD]",
+    "proposal": null,
+    "tool_runs": []
+   },
+   {
+    "user": "It's a high-performance energy drink.",
+    "secs": 11.0,
+    "message": "Energy drinks thrive on speed and hard light. To catch the glare on the can, I need to see what we are working with. \n\nDrop in a photo of the drink, or should we hunt for a reference look to start?",
+    "choices": [
+     "I have a photo",
+     "Search for a look",
+     "Draft the action first"
+    ],
+    "brief": "A 10-second high-energy social ad for a high-performance energy drink. The sequence needs a fast pace and hard lighting to emphasize performance. Subject reference needed to proceed to render.",
+    "proposal": null,
+    "tool_runs": []
+   },
+   {
+    "user": "I have a photo",
+    "secs": 5.2,
+    "message": "High-energy drinks move with speed and hard light. To see the glare on the can and the way it should catch the eye, I need a photo of the product. Once you drop it in, I can hold the scene to its real look.",
+    "choices": [
+     "I'll attach the photo",
+     "Hunt for look references",
+     "Draft the script first"
+    ],
+    "brief": "A 10-second high-energy social ad for a high-performance energy drink. Fast pacing, hard window light, and sharp cuts to showcase the product's intensity. No product photo attached yet.",
+    "proposal": null,
+    "tool_runs": []
+   }
+  ],
+  "turns_to_make": null
+ },
+ {
+  "brief": "photo",
+  "brain": "fast",
+  "output": "image",
+  "turns": [
+   {
+    "user": "make an ad with this",
+    "secs": 14.8,
+    "message": "That UI has a very clean, professional warmth. Since we are in image mode, I can draw a hero still for an ad\u2014putting that Talent Pool screen into the hands of the person who needs it most.\n\nWhich setting fits your vision for this ad?",
+    "choices": [
+     "A hotel manager at a bright front desk, using it on a tablet",
+     "A chef in a modern kitchen, checking the line cooks on a phone",
+     "A sleek laptop in a sunny corporate office"
+    ],
+    "brief": "A hero still for an ad. SUBJECT: The 'Talent Pool' UI from the attached graphic, displayed on a digital device screen. STYLE: Professional hospitality setting, clean and modern. LIGHT: Soft, natural daylight. The UI should be the clear focus, holding the exact orange and beige tones from the reference.",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ad"
+      },
+      "ok": true
+     },
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "product-still"
+      },
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "A hotel manager at a bright front desk, using it on a tablet",
+    "secs": 10.0,
+    "message": "The exact Talent Pool interface from the reference photo\u2014same layout, orange and cream palette, and typography\u2014displayed on a slim tablet held by a professional hotel manager. They are standing at a bright, minimalist marble front desk of a modern hotel. Soft morning window light from the side, creating a clean and airy atmosphere. Medium shot, 50mm lens, shallow depth of field with the elegant hotel lobby softly blurred in the background. High-end lifestyle photography.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_image",
+     "args": {
+      "prompt": "The exact Talent Pool interface from the reference photo\u2014same layout, orange and cream palette, and typography\u2014displayed on a slim tablet held by a professional hotel manager. They are standing at a bright, minimalist marble front desk of a modern hotel. Soft morning window light from the side, creating a clean and airy atmosphere. Medium shot, 50mm lens, shallow depth of field with the elegant hotel lobby softly blurred in the background. High-end lifestyle photography.",
+      "model": "nano",
+      "model_why": "handles the reference image and UI text accurately"
+     },
+     "label": "Generate this image"
+    },
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "product-still"
+      },
+      "ok": true
+     },
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "turns_to_make": 2
+ },
+ {
+  "brief": "named-look",
+  "brain": "fast",
+  "output": "video",
+  "turns": [
+   {
+    "user": "a 10 second clip of a man walking home at night, in the style of Wong Kar-wai",
+    "secs": 14.0,
+    "message": "Wong Kar-wai\u2019s style is built on step-printed motion blur, emerald greens, and the glow of neon in the rain. Before I carry this idea across, do you have a photo of the man or the street I should use? \n\nIf not, I can draft the scene now, but it will need a reference photo before the studio can render it.",
+    "choices": [
+     "Draft it now",
+     "I'll attach a photo",
+     "Research neon city looks"
+    ],
+    "brief": "SUBJECT: A man walking home.\nSETTING: A narrow, urban street at night, slick with rain and lit by flickering neon.\nACTION: He walks with a heavy, rhythmic pace, lost in thought.\nSTYLE: Wong Kar-wai. Saturated jewel tones (emerald, amber), heavy motion blur, and wide-angle lenses close to the subject.\nPACING: Lingering and rhythmic, using slow motion to stretch the walk.\nSOUND: Distant city hum, muffled footsteps on wet pavement, a melancholic cello theme.\nLENGTH: 10 seconds.",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "research_look",
+      "args": {
+       "subject": "Wong Kar-wai"
+      },
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "Draft it now",
+    "secs": 15.3,
+    "message": "A 10-second scene of a solitary man walking home at night, in the style of Wong Kar-wai. PALETTE: Emerald greens, warm ambers, and bruised reds. LIGHT: Low-key, neon practicals, fluorescent glow, high contrast. LENS: Wide-angle, heavy film grain, soft hazy finish. MOVEMENT: Step-printed motion blur, handheld rhythmic follow. SETTING: Rain-slicked alleyway, cramped urban textures. (0-4s) Medium follow shot from behind. A man in a dark trench coat walks through a narrow alley. Emerald neon light catches the rain. (4-7s) Low angle close-up on polished shoes splashing through golden-lit puddles. (7-10s) Wide profile shot. The man passes under a flickering red neon sign, his face obscured by shadow as he turns a corner. SOUND: Muffled city rain, the hum of neon, distant rhythmic footsteps on wet pavement.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_video",
+     "args": {
+      "prompt": "A 10-second scene of a solitary man walking home at night, in the style of Wong Kar-wai. PALETTE: Emerald greens, warm ambers, and bruised reds. LIGHT: Low-key, neon practicals, fluorescent glow, high contrast. LENS: Wide-angle, heavy film grain, soft hazy finish. MOVEMENT: Step-printed motion blur, handheld rhythmic follow. SETTING: Rain-slicked alleyway, cramped urban textures. (0-4s) Medium follow shot from behind. A man in a dark trench coat walks through a narrow alley. Emerald neon light catches the rain. (4-7s) Low angle close-up on polished shoes splashing through golden-lit puddles. (7-10s) Wide profile shot. The man passes under a flickering red neon sign, his face obscured by shadow as he turns a corner. SOUND: Muffled city rain, the hum of neon, distant rhythmic footsteps on wet pavement.",
+      "seconds": 10,
+      "shots": 3
+     },
+     "label": "Write this scene"
+    },
+    "tool_runs": [
+     {
+      "tool": "research_look",
+      "args": {
+       "subject": "Wong Kar-wai"
+      },
+      "ok": true
+     },
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "multi-shot"
+      },
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "turns_to_make": 2
+ },
+ {
+  "brief": "question",
+  "brain": "fast",
+  "output": "video",
+  "turns": [
+   {
+    "user": "which model is best for a talking head?",
+    "secs": 14.2,
+    "message": "For a talking head, the path depends on whether you have a script for them to speak. The `talking_photo` tool is the specialist for matching a face to a voice, while our video models can generate a scene of someone speaking from a description alone.\n\nDo you have a photo of the speaker ready, or should we create a character first?",
+    "choices": [
+     "I have a photo to upload.",
+     "Let's generate a character first.",
+     "Tell me about the talking photo tool."
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "I have a photo to upload.",
+    "secs": 7.2,
+    "message": "Once you drop that photo in, we have two ways to go. If you want them to speak a specific script with a clean lip-sync, the **talking-photo** card is the specialist. If you want a filmed scene of them talking with camera movement and atmosphere, we'll use a **clip model**.\n\nGo ahead and attach the photo\u2014does this person have a script ready to speak?",
+    "choices": [
+     "I have a script ready",
+     "No script, just a scene",
+     "Show me the talking-photo tool"
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "I have a script ready",
+    "secs": 7.5,
+    "message": "I am ready when the photo is. Once you attach it and paste the script here, I can open the card to sync them.",
+    "choices": [
+     "I'll paste the script now",
+     "Just waiting on the upload"
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "I'll paste the script now",
+    "secs": 5.7,
+    "message": "I am listening. Please drop the photo in when you paste the script, and I will set up the talking-photo card.",
+    "choices": [
+     "Ready for the script.",
+     "The photo is coming too."
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": []
+   }
+  ],
+  "turns_to_make": null
+ }
+]

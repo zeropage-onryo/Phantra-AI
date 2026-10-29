@@ -109,7 +109,7 @@ export const KLING_4: MakePage = {
     slot("Kling 4.0", "linear-gradient(135deg, #fefce8 0%, #fee32d 48%, #151514 100%)"),
     slot("Kling 3 Turbo Pro", "linear-gradient(135deg, #f5f5f4 0%, #a8a29e 50%, #151514 100%)"),
   ],
-  specs: {
+  specSheet: {
     sheet: {
       eyebrow: "Kling 4.0 in Phantra",
       title: "Kling 4.0 Specs",

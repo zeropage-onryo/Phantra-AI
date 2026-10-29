@@ -96,6 +96,8 @@ TONE_MAX = 1000
 CTA_MAX = 300
 LINE_MAX = 200
 PRODUCTS_MAX = 12
+LINK_PHOTOS_MAX = 4       # photos of one linked element a scene is held to
+ALIASES_MAX = 6           # per product or character link
 CHARACTERS_MAX = 12
 CLAIMS_MAX = 10
 SELLING_POINTS_MAX = 8
@@ -235,6 +237,22 @@ def _links(value, field: str, kinds, limit: int, claims: bool) -> list[dict]:
         link = {"kind": kind, "id": eid, "name": _text(item.get("name"), field, LIST_ITEM_MAX)}
         if claims:
             link["claims"] = _words(item.get("claims"), f"{field} claims", CLAIMS_MAX)
+        # the other words a scene calls it by ("the app", "tablet screen"):
+        # a shot that says one is held to the element's photo (link_refs).
+        # No key at all without any, so a kit saved before aliases hashes
+        # as it always did.
+        aliases = _words(item.get("aliases"), f"{field} aliases", ALIASES_MAX)
+        if aliases:
+            link["aliases"] = aliases
+        # how many of the element's photos a scene naming it is held to
+        # (2026-10-25: an app is its real screens, not one of them; the
+        # render test's best clip was held to three). No key at 1, so a kit
+        # saved before hashes as it always did. Refused off the range.
+        photos = _number(item.get("photos"), f"{field} photos", 1, LINK_PHOTOS_MAX, 1)
+        if int(photos) != photos:
+            raise KitError(field, f"{field} photos is a whole number")
+        if photos > 1:
+            link["photos"] = int(photos)
         out.append(link)
     if len(out) > limit:
         raise KitError(field, f"{field} holds at most {limit}")
@@ -876,7 +894,11 @@ def brief_lines(kit: Optional[dict], dsn: Optional[str] = None) -> str:
         name = names.get(("prop", p["id"])) or p.get("name") or f"product {p['id']}"
         claims = "; ".join(p.get("claims") or [])
         lines.append(f"- Product: {name}" + (f" -- the only claims allowed: {claims}" if claims
-                                             else " -- make no claims about it"))
+                                             else " -- make no claims about it")
+                     # only where the link asks for several photos, so every
+                     # other kit's lines read byte for byte as before
+                     + (f"; a shot that names it is held to {p['photos']} of its real photos"
+                        if int(p.get("photos") or 1) > 1 else ""))
     if spec.get("never_claim"):
         lines.append(f"- Never claim: {'; '.join(spec['never_claim'])}")
     cast = [names.get(("character", c["id"])) or c.get("name") for c in spec.get("characters") or []]
@@ -905,6 +927,114 @@ def _element_names(kit: dict, dsn: Optional[str]) -> dict:
     except Exception:
         pass
     return names
+
+
+# --------------------------------------------------------------------------
+# products and characters as references (2026-10-22, docs/tasks/
+# task-kit-products-and-screens.md Part B)
+# --------------------------------------------------------------------------
+# A kit's products and cast used to reach the WRITER only, as names and
+# claims (brief_lines); the photograph never reached a shot, so scene 442's
+# tablet was drawn from words. Now a scene held to a kit whose text names a
+# linked element -- its name as it is now, the name on the link, or one of
+# the link's aliases -- is held to that element's photo, as what it is FOR
+# (a product is `product`, a character `subject`: what the shot is OF, never
+# a look-only reference). Named means a whole-word phrase, case aside; a
+# name shorter than three letters names nothing.
+
+ALIAS_MIN = 3
+# what a linked element is to a shot (src/ref_roles.py)
+LINK_ROLE = {"prop": "product", "character": "subject"}
+# where an element's photos live (asset_shelf.URL_ROOTS, reversed)
+LINK_PLURAL = {"prop": "props", "character": "characters"}
+
+
+def _phrase(name: str) -> Optional[re.Pattern]:
+    name = " ".join((name or "").split())
+    if len(name) < ALIAS_MIN:
+        return None
+    words = r"\s+".join(re.escape(w) for w in name.split())
+    return re.compile(rf"(?<![\w-]){words}(?![\w-])", re.IGNORECASE)
+
+
+def linked(kit: Optional[dict], dsn: Optional[str] = None) -> list[dict]:
+    """Every product and character the kit links, with the names a scene
+    may call it by: [{"kind", "id", "name" (as it is now), "slug" (its
+    photo folder), "role", "names"}]. [] for no kit or no links."""
+    if not kit:
+        return []
+    spec = kit.get("spec") or {}
+    links = [*(spec.get("products") or []), *(spec.get("characters") or [])]
+    if not links:
+        return []
+    from .asset_shelf import slugify
+    now = _element_names(kit, dsn)
+    out = []
+    for link in links:
+        kind = link.get("kind")
+        if kind not in LINK_ROLE:
+            continue
+        name = now.get((kind, link["id"])) or link.get("name") or ""
+        names = [n for n in dict.fromkeys([name, link.get("name") or "",
+                                           *(link.get("aliases") or [])]) if n]
+        if not name or not names:
+            continue
+        out.append({"kind": kind, "id": link["id"], "name": name, "slug": slugify(name),
+                    "role": LINK_ROLE[kind], "names": names,
+                    "photos": int(link.get("photos") or 1)})
+    return out
+
+
+def names_in(element: dict, text: str) -> bool:
+    """Does `text` name this linked element (its name or an alias)?"""
+    for name in element.get("names") or []:
+        found = _phrase(name)
+        if found and found.search(text or ""):
+            return True
+    return False
+
+
+def named(kit: Optional[dict], text: str, dsn: Optional[str] = None) -> list[dict]:
+    """The linked elements `text` names, characters first, then products
+    (the order a shot's references keep: identity before prop)."""
+    hits = [e for e in linked(kit, dsn) if names_in(e, text)]
+    return sorted(hits, key=lambda e: 0 if e["kind"] == "character" else 1)
+
+
+def ref_element(ref: str, elements: list[dict]) -> Optional[dict]:
+    """The linked element a stored photo reference belongs to, or None --
+    read off the reference's own folder (asset_shelf.parse_ref)."""
+    from .asset_shelf import parse_ref
+    found = parse_ref(ref)
+    if not found or found["kind"] not in LINK_ROLE:
+        return None
+    return next((e for e in elements if e["kind"] == found["kind"]
+                 and e["slug"] == found["slug"]), None)
+
+
+def part_refs(parts: list, scene_refs: list, elements: list[dict]) -> list:
+    """A planned timeline's parts, each also held to the scene's photo of
+    every linked element its own words name. Only the SCENE's references
+    are ever added (a part narrows the scene's set, never adds to it), in
+    the scene's order. Parts that gain nothing come back as they were, so
+    a scene with no kit or no named element plans byte for byte as before."""
+    if not elements or not scene_refs:
+        return parts
+    owned = [(r, ref_element(r, elements)) for r in scene_refs]
+    owned = [(r, e) for r, e in owned if e]
+    if not owned:
+        return parts
+    out = []
+    for part in parts:
+        words = f"{part.get('text') or ''} {part.get('prompt') or ''}"
+        have = list(part.get("refs") or [])
+        want = [r for r, e in owned if r not in have and names_in(e, words)]
+        if not want:
+            out.append(part)
+            continue
+        held = set(have) | set(want)
+        out.append({**part, "refs": [r for r in scene_refs if r in held]})
+    return out
 
 
 def look_suffix(kit: Optional[dict]) -> str:

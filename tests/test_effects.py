@@ -56,7 +56,7 @@ def test_every_row_is_dated_and_complete():
 
 
 def test_the_enums_are_the_schemas_not_a_summary():
-    assert len(effects.KLING_EFFECTS) == 98 and "bullet_time_360" in effects.KLING_EFFECTS
+    assert len(effects.KLING_EFFECTS) == 91 and "bullet_time_360" in effects.KLING_EFFECTS
     assert len(effects.PIXVERSE_EFFECTS) == 154 and "Liquid Metal" in effects.PIXVERSE_EFFECTS
     assert len(effects.CAMERA_MOVES) == 20 and "whip_pan" in effects.CAMERA_MOVES
 

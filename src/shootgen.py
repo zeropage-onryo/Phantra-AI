@@ -1247,7 +1247,8 @@ def generate_scene_concept(spark=None, steer: str = "",
     # Checked against the DIRECTION, never the steer: the steer is craft
     # notes and winning prompts, whose own windows are not a request.
     warnings = (validate_concept(concept, location_names)
-                + timeline.shot_count_warnings(shot["prompt"], spark or ""))
+                + timeline.shot_count_warnings(shot["prompt"], spark or "")
+                + avoid_warnings(shot["prompt"], spark or ""))
     concept_id = preprod.save_concept(
         concept, spark=spark, prompt_template=prompt,
         warnings=warnings, **kwargs, account_id=account_id)
@@ -1465,7 +1466,8 @@ def generate_scene_concepts(idea: str, count: int = 4,
                    "card_line": card_line, "duration": f"{seconds}s",
                    "shots": [shot]}
         warnings = (validate_concept(concept, location_names)
-                    + timeline.shot_count_warnings(scene["prompt"], idea or ""))
+                    + timeline.shot_count_warnings(scene["prompt"], idea or "")
+                    + avoid_warnings(scene["prompt"], idea or ""))
         concept_id = preprod.save_concept(
             concept, spark=idea, prompt_template=hashed,
             warnings=warnings, **kwargs, account_id=account_id)
@@ -1532,6 +1534,30 @@ def parse_concept_response(text: str) -> dict:
     if not concept.get("title"):
         raise ValueError("concept has no title")
     return concept
+
+
+_AVOID_LINE = re.compile(r"^\s*(?:avoid|no|don'?t want|do not want)\s*:\s*(.+)$", re.I | re.M)
+
+
+def typed_avoids(idea: str) -> list:
+    """The items of an avoid list the person typed into the idea ("AVOID: studio
+    lighting, perfect skin, slow motion"), in their order; [] for none."""
+    items = []
+    for line in _AVOID_LINE.findall(idea or ""):
+        for item in re.split(r"[,;]|\band\b", line):
+            item = re.sub(r"^\s*(?:no|any)\s+", "", item.strip(), flags=re.I).strip(" .")
+            if item and item.lower() not in (i.lower() for i in items):
+                items.append(item)
+    return items
+
+
+def avoid_warnings(prompt: str, idea: str) -> list:
+    """The scene writer was asked to keep the person's own avoid list word for
+    word (2026-10-25, the Vesper audit: scene c448 lost the whole line). Any
+    item it dropped is said on the saved scene, never added behind its back."""
+    text = " ".join((prompt or "").lower().split())
+    lost = [i for i in typed_avoids(idea) if " ".join(i.lower().split()) not in text]
+    return [f"your avoid list lost: {', '.join(lost)}"] if lost else []
 
 
 def validate_concept(concept: dict, location_names: list, use_pov: bool = False,

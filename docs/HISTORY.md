@@ -3885,3 +3885,25 @@ as `src.autopilot` — gated, dry-run, default off, executors unwired.
 
 **The user's real data lives in `data/pipeline.db` (gitignored, ~128KB) and `locations/`
 (gitignored, photos).** A fresh clone gets the tool, empty. Never overwrite either without asking.
+
+
+<a id="cut-2026-10-22"></a>
+
+## Cut from CLAUDE.md on 2026-10-22
+
+Mike retired the manual render lane's commands from `CLAUDE.md` on 2026-10-22. The lines below
+are those commands exactly as `CLAUDE.md` gave them that day; the longer original note is in the
+Commands block above ("THE MANUAL RENDER LANE"). The code (`src/manual_lane.py`,
+`ops/render_queue.py`, the `accounts.manual_lane_operator` column) was not removed.
+
+The same day Mike confirmed `data/pipeline.db` is an empty leftover: where this file says the
+user's real data lives there, that stopped being true when the store moved to Postgres.
+
+```bash
+# From the account flags block:
+venv/bin/python -m src.accounts operator <slug> --on        # the manual render lane
+
+# The manual render lane (operator only): a clip rendered anywhere, filed free.
+python3 ops/render_queue.py --provider manual --account <slug> import \
+    --concept N --shot 1 --file clip.mp4 --model "kling 3 web app" --duration 10
+```

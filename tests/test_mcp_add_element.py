@@ -889,7 +889,10 @@ def test_a_signed_in_caller_quotes_approves_and_cannot_spend_the_yes_twice(mount
         quote = quoted["quote"]
         assert quote["credits"] > 0 and quote["balance"] == 500
         assert quote["balance_after"] == 500 - quote["credits"]
-        assert "usd" not in quote and "usd" not in str(quoted).lower()
+        # the signed token is random letters that may spell "usd" by chance (it did
+        # once in CI): the dollar check reads everything but the token
+        said = {**quoted, "quote": {k: v for k, v in quote.items() if k != "quote_token"}}
+        assert "usd" not in quote and "usd" not in str(said).lower()
         assert drawn == []                                      # a quote spends nothing
         token = quote["quote_token"]
 
@@ -1132,17 +1135,17 @@ def test_each_effect_tool_stands_for_one_effect_call():
     with pytest.raises(ValueError, match="takes no `aspect`"):
         call("edit_image", {"sources": ["gen:1"], "prompt": "x", "mode": "composite",
                             "aspect": "1:1"})
-    assert call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+    assert call("animate_still", {"sources": ["gen:1"], "template": "snowglobe",
                                   "seconds": 10}) == {
         "effect": "kling-effect", "sources": ["gen:1"], "prompt": "",
-        "options": {"effect_scene": "day_to_night", "duration": "10"}}
+        "options": {"effect_scene": "snowglobe", "duration": "10"}}
     assert call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge"}) == {
         "effect": "pixverse-effect", "sources": ["gen:1"], "prompt": "",
         "options": {"effect": "Muscle Surge", "resolution": "720p"}}
     with pytest.raises(ValueError, match="runs 5 seconds"):
         call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge", "seconds": 10})
     with pytest.raises(ValueError, match="no `resolution`"):
-        call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+        call("animate_still", {"sources": ["gen:1"], "template": "snowglobe",
                                "resolution": "1080p"})
     assert call("camera_move", {"source": "gen:1", "move": "zoom_in", "prompt": "p",
                                 "style": "clay"})["options"] == {
@@ -1158,8 +1161,15 @@ def test_each_effect_tool_stands_for_one_effect_call():
     from src import effects
     made = {"nano-banana-edit", "flux-kontext-pro", "seedream-edit", "remove-background",
             "remove-video-background", "remove-video-background-pro", "kling-effect",
-            "pixverse-effect", "camera-move", "upscale", "add-sound", "reframe", "reframe-hq"}
+            "pixverse-effect", "camera-move", "upscale", "add-sound", "reframe", "reframe-hq",
+            "costume-preview"}
     assert made == {row["id"] for row in effects.catalogue()}
+    # a Halloween costume is edit_image with a costume picked, never words
+    assert call("edit_image", {"sources": ["gen:1"], "costume": "witch"}) == {
+        "effect": "costume-preview", "sources": ["gen:1"], "prompt": "",
+        "options": {"costume": "witch"}}
+    with pytest.raises(ValueError, match="leave `prompt` empty"):
+        call("edit_image", {"sources": ["gen:1"], "costume": "witch", "prompt": "x"})
 
 
 def test_an_effect_the_balance_cannot_cover_is_a_refusal_with_no_link(effect_door,

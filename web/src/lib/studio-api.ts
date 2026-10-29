@@ -7,12 +7,16 @@
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
+import type { StudioPage } from "@/lib/ad-studio";
 import type { Effect, OptionValue } from "@/lib/effects";
 import type { TalkMenu } from "@/lib/talking-photo";
+import type { DubMenu } from "@/lib/dubbing";
+import type { VoiceMenu } from "@/lib/voice-tab";
 import type { RoleOption } from "@/lib/ref-roles";
 import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
 import type { Kit, KitSpec } from "@/lib/brand-kit";
+import type { ImageMenu, Quote, VideoMenu } from "@/lib/direct";
 
 export { ApiError };
 
@@ -323,6 +327,10 @@ export const getMedia = (f: MediaFilter = {}) => {
   if (f.provider) params.set("provider", f.provider);
   return apiFetch<MediaWall>(`/media?${params}`);
 };
+/** GET /api/media?kind=image&scope=elements — every element's photos as
+ *  rows (one per photo, `asset_name` the element), for the Library
+ *  drawer's Elements tab (2026-10-26). */
+export const getElementPhotos = () => apiFetch<MediaWall>("/media?kind=image&scope=elements");
 /** DELETE /api/assets/{characters|props|locations}/{id} — an element. */
 export const deleteAsset = (kind: "characters" | "props" | "locations", id: number, init?: RequestInit) =>
   apiFetch<{ deleted: number }>(`/assets/${kind}/${id}`, { ...init, method: "DELETE" });
@@ -457,6 +465,8 @@ export type Concept = {
   ref_thumbs?: string[];
   /** the timed shots a scene renders as, or null for one that renders whole */
   timeline?: Timeline | null;
+  /** what a look at each landed clip saw, by shot (src/render_qc.py) */
+  checks?: import("./render-checks").RenderChecks;
   /** what drawing this scene's keyframes would cost; null when nothing to draw (2026-09-29) */
   keyframes?: KeyframeQuote | null;
 };
@@ -473,7 +483,15 @@ export type TimelinePart = {
   reference_image?: string | null;
   media_url?: string | null;
 };
-export type Timeline = { planned: boolean; seconds?: number | null; parts: TimelinePart[] };
+export type Timeline = {
+  planned: boolean;
+  seconds?: number | null;
+  parts: TimelinePart[];
+  /** what the shot planner put back and what will not fit (src/timeline.py keep):
+   *  a reference it had left off every shot, a shot with no photos, a voiceover
+   *  line longer than its window. Facts about the plan, shown beside the shots. */
+  warnings?: string[];
+};
 export type RendererModel = { id: string; label: string; usd_per_second: number };
 /* the overnight branch's renderer catalogue (providers.render_options):
    every registered renderer with its gates, its models and each model's
@@ -539,6 +557,10 @@ export type RenderQuote = {
   model: string;
   frame: string;
   timed: boolean;
+  /** a timed scene rendered as ONE clip, its cuts in the prompt (src/timeline.py renders_as_one) */
+  one_clip?: boolean;
+  /** how many of the scene's photos go out with it, on the model's reference endpoint */
+  references?: number;
   durations: number[];
   estimate_usd: number;
   credits: number | null;
@@ -936,6 +958,11 @@ export const getPresetCounts = () =>
 /* ── skills (the brain's recipes; lib/skills.ts) ── */
 export const getSkills = () => apiFetch<{ items: Skill[] }>("/skills");
 
+/* ── studios (2026-10-26, src/studios.py; lib/ad-studio.ts) ──
+   A studio's page: its formats and brief, whether this account has the
+   add-on and whether it is on sale. Open to every account; nothing spends. */
+export const getStudio = (id: string) => apiFetch<StudioPage>(`/studios/${encodeURIComponent(id)}`);
+
 /* ── effects (src/effects.py; lib/effects.ts) ── */
 export type EffectsCatalogue = {
   items: Effect[];
@@ -998,6 +1025,80 @@ export const runTalk = (body: TalkBody & { expect_credits: number }) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+/* ── a dub (src/dubbing.py; lib/dubbing.ts) ── */
+export const getDubMenu = () => apiFetch<DubMenu>("/dubbing");
+export type DubBody = {
+  source: string;
+  target_language: string;
+  source_language?: string;
+  speakers?: number;
+  consent: boolean;
+  project_id?: number;
+};
+export type DubQuote = { credits: number; charged: boolean; language: string; clip_seconds: number; billed_minutes: number };
+/** what dubbing this clip into this language costs; spends nothing */
+export const quoteDub = (body: DubBody) =>
+  apiFetch<DubQuote>("/dubbing/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Render click, at the price the card showed */
+export const runDub = (body: DubBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/dubbing/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/* ── the Voice section (src/voice_studio.py; lib/voice-tab.ts) ── */
+export const getVoiceMenu = () => apiFetch<VoiceMenu>("/voice");
+export type SpeakBody = { script: string; voice: string; language: string; project_id?: number };
+export type SpeakQuote = { voice: string; language: string | null; characters: number; credits: number; charged: boolean };
+/** what reading this script costs; spends nothing */
+export const quoteSpeak = (body: SpeakBody) =>
+  apiFetch<SpeakQuote>("/voice/speak/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Make click, at the price the panel showed. The job's result names
+ *  the read (`audio`, asset:<id>), its `seconds` and where to play it (`output`). */
+export const runSpeak = (body: SpeakBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/speak/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export type LibraryBody = { script: string; voice: string; emotion: string; speed: number; pitch: number; project_id?: number };
+/** a library read's price (MiniMax Speech-02 HD); spends nothing */
+export const quoteLibrary = (body: LibraryBody) =>
+  apiFetch<SpeakQuote>("/voice/library/quote", { method: "POST", body: JSON.stringify(body) });
+export const runLibrary = (body: LibraryBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/library/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export type DialogueBody = { speakers: string[]; lines: { speaker: number; text: string }[]; project_id?: number };
+export type DialogueQuote = { speakers: number; lines: number; characters: number; estimate_seconds: number; credits: number; charged: boolean };
+/** a dialogue's price, an upper bound (VibeVoice 7B); spends nothing */
+export const quoteDialogue = (body: DialogueBody) =>
+  apiFetch<DialogueQuote>("/voice/dialogue/quote", { method: "POST", body: JSON.stringify(body) });
+export const runDialogue = (body: DialogueBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/dialogue/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export type CloneBody = { sample: string; name: string };
+/** what cloning this voice costs; spends nothing (the consent line is heard at the run) */
+export const quoteClone = (body: CloneBody) =>
+  apiFetch<{ name: string; sample_seconds: number; credits: number; charged: boolean }>("/voice/clone/quote", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+/** the Clone click, at the price the panel showed. The job's result names
+ *  the voice (`voice_id`, `name`) and its preview (`audio`, `output`). */
+export const runClone = (body: CloneBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/voice/clone/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+/** take a cloned voice off this account's library */
+export const removeClone = (voiceId: string) =>
+  apiFetch<{ removed: string }>(`/voice/clones/${encodeURIComponent(voiceId)}`, { method: "DELETE" });
 
 /** A free edit the brain proposed (POST /api/quick-edit): a new shape or a
  *  range, made on the studio's server for no credits, as a job. `source`
@@ -1066,7 +1167,7 @@ export type Balance = {
   yearly_configured: boolean;
   portal: boolean;
   /** what a still costs on THIS server (app/billing.action_prices) */
-  /** `sheet`: an element sheet, always Nano Banana Pro at 2K (2026-10-11) */
+  /** `sheet`: an element sheet, GPT Image 2.5 Sunburst since 2026-10-26 (Nano Banana Pro at 2K before) */
   prices?: { still: number; sheet?: number };
   /** the workspace these credits belong to: the person's FIRST one,
    *  whichever is open (lib/credits `countedElsewhere`) */
@@ -1127,9 +1228,13 @@ export type Project = {
   /** the cover's 480px tile, when one exists (app/api.py _ref_thumbs) */
   cover_thumb?: string | null;
 };
-/* PROJECTS ARE MADE THROUGH THE GUIDE (2026-10-07, Mike's call): there is
-   no create form. The pill or the composer's brain proposes create_project
-   / save_as_project and the confirm card posts runGuideAction. */
+/* Two doors make a project. The Guide (2026-10-07): the pill or the
+   composer's brain proposes create_project / save_as_project and the confirm
+   card posts runGuideAction. And, since 2026-10-22 (Mike: "there should be a
+   create project button"), the Projects board's New project button posts
+   here directly with a name and an optional brief. */
+export const createProject = (body: { title: string; brief?: string }) =>
+  apiFetch<Project>("/projects", { method: "POST", body: JSON.stringify(body) });
 export const listProjects = (archived = false) =>
   apiFetch<{ items: Project[] }>(`/projects${archived ? "?archived=true" : ""}`);
 export const getProject = (id: number) => apiFetch<Project>(`/projects/${id}`);
@@ -1232,6 +1337,28 @@ export const getImageModels = () => apiFetch<ImageModels>("/image-models");
 export const runImage = (form: FormData) =>
   apiForm<{ job_id: number; image_refs: number; video_refs: number }>("/generate/run", form);
 
+/* ── the direct generators (/studio/image, /studio/video; lib/direct.ts) ──
+   The menus and quotes spend nothing; a run is the click on the priced
+   button, held to `expect_credits` (409 price_changed if it moved). */
+export const getDirectVideo = () => apiFetch<VideoMenu>("/direct/video");
+export const getDirectImage = () => apiFetch<ImageMenu>("/direct/image");
+export const quoteDirectVideo = (body: {
+  model: string;
+  seconds: number;
+  resolution: string;
+  aspect: string;
+  start_frame: boolean;
+  references: number;
+}) =>
+  apiFetch<Quote & { seconds: number; resolution: string; aspect: string | null }>("/direct/video/quote", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export const quoteDirectImage = (body: { model: string; aspect: string; references: number }) =>
+  apiFetch<Quote & { references: number }>("/direct/image/quote", { method: "POST", body: JSON.stringify(body) });
+export const runDirect = (kind: "image" | "video", form: FormData) =>
+  apiForm<{ job_id: number; credits: number; charged: boolean }>(`/direct/${kind}/run`, form);
+
 /** GET /api/concepts/{id} — the card plus its shots; the composer reads
  *  the still off the card (reference_image) or the scene's timeline. */
 export type ConceptDetail = Concept & {
@@ -1304,6 +1431,165 @@ export async function cancelPublish(id: string): Promise<PublishSession> {
   return apiFetch<PublishSession>(`/publish/${encodeURIComponent(id)}/cancel`, { method: "POST" });
 }
 
+/* ── social accounts (2026-10-22, app/social_routes.py) ──
+   A person's own Instagram / Discord (later TikTok, YouTube, Facebook,
+   LinkedIn, Reddit), connected to the workspace through the platform's
+   own consent screen. Connecting is a top-level navigation to the API
+   origin (`{AUTH_ORIGIN}${start_url}`), the way sign-in goes; nothing here
+   spends, and no token ever reaches the page. */
+export type SocialProvider = {
+  id: string;
+  name: string;
+  /** this server has the platform's app keys */
+  configured: boolean;
+  /** what connecting means, in words: "a channel in a Discord server you manage" */
+  connects: string;
+  /** a step still to do after the consent screen (Discord: "channel") */
+  pending_step: string | null;
+  start_url: string;
+  redirect_uri: string;
+  /** the platform's own per-post form (2026-10-22): a subreddit, a story switch */
+  settings: ProviderField[];
+  caption_max: number;
+  /** the calendar's Feed view can draw this platform's own recent posts */
+  feed: boolean;
+};
+export type ProviderField = {
+  key: string;
+  label: string;
+  type: "text" | "select" | "boolean";
+  required: boolean;
+  placeholder?: string;
+  hint?: string;
+  options?: { id: string; label: string }[];
+};
+export type SocialConnection = {
+  id: number;
+  provider: string;
+  provider_name: string;
+  external_id: string;
+  display_name: string;
+  handle: string;
+  avatar_url: string;
+  /** the one line the card draws: "Phantra HQ · #showcase", "@phantra.ai" */
+  label: string;
+  status: "connected" | "pending" | "reconnect" | "expired";
+  pending: string | null;
+  expires_at: string | null;
+  scopes: string[];
+  meta: Record<string, unknown>;
+  connected_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  /** the hours this account likes to post, by weekday, in its zone (2026-10-22) */
+  posting_times: { tz: string; days: Record<string, string[]> };
+};
+export type SocialOption = { id: string; label: string; hint?: string; kind?: string; picture?: string };
+
+export const getSocialProviders = () =>
+  apiFetch<{ providers: SocialProvider[]; vault_ready: boolean }>("/social/providers");
+export const getSocialConnections = () => apiFetch<{ connections: SocialConnection[] }>("/social/connections");
+export const getSocialOptions = (id: number) => apiFetch<{ options: SocialOption[] }>(`/social/connections/${id}/options`);
+export const pickSocialOption = (id: number, choice: string) =>
+  apiFetch<SocialConnection>(`/social/connections/${id}/pick`, { method: "POST", body: JSON.stringify({ choice }) });
+export const disconnectSocial = (id: number) =>
+  apiFetch<{ ok: true; id: number }>(`/social/connections/${id}`, { method: "DELETE" });
+
+/* ── posts (2026-10-22, app/post_routes.py) ──
+   One clip or still, to one connected account, at one time. Creating one
+   sends nothing: the publish worker does, on the clock. Nothing spends. */
+export type PostState = "draft" | "queued" | "publishing" | "published" | "error" | "cancelled";
+export type Post = {
+  id: number;
+  connection_id: number;
+  provider: string;
+  provider_name: string;
+  group_id: string;
+  publish_at: string | null;
+  state: PostState;
+  caption: string;
+  source_ref: string;
+  media: { ref?: string; media_url?: string; kind?: string; seconds?: number | null };
+  settings: Record<string, unknown>;
+  concept_id: number | null;
+  project_id: number | null;
+  release_id: string | null;
+  release_url: string | null;
+  error: string | null;
+  creation_method: string;
+  attempts: number;
+  pending: boolean;
+  published_at: string | null;
+  video_id: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  events?: { at: string | null; event: string; detail: string }[];
+};
+export type NewPost = {
+  connection_id: number;
+  source: string;
+  caption?: string;
+  /** ISO 8601; empty = now */
+  publish_at?: string | null;
+  settings?: Record<string, unknown>;
+  draft?: boolean;
+  project_id?: number | null;
+  group_id?: string | null;
+};
+export const listPosts = (params: { start?: string; end?: string; state?: PostState } = {}) => {
+  const q = new URLSearchParams();
+  if (params.start) q.set("start", params.start);
+  if (params.end) q.set("end", params.end);
+  if (params.state) q.set("state", params.state);
+  const qs = q.toString();
+  return apiFetch<{ posts: Post[] }>(`/posts${qs ? `?${qs}` : ""}`);
+};
+export const createPost = (body: NewPost) => apiFetch<Post>("/posts", { method: "POST", body: JSON.stringify(body) });
+export const getPost = (id: number) => apiFetch<Post>(`/posts/${id}`);
+export const movePost = (id: number, publish_at: string | null) =>
+  apiFetch<Post>(`/posts/${id}/date`, { method: "PUT", body: JSON.stringify({ publish_at }) });
+export const setPostState = (id: number, state: "queued" | "draft" | "cancelled") =>
+  apiFetch<Post>(`/posts/${id}/state`, { method: "POST", body: JSON.stringify({ state }) });
+export const patchPost = (id: number, body: { caption?: string; settings?: Record<string, unknown> }) =>
+  apiFetch<Post>(`/posts/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const deletePost = (id: number) => apiFetch<{ ok: true; id: number }>(`/posts/${id}`, { method: "DELETE" });
+
+/* ── the calendar (2026-10-22, docs/tasks/task-calendar.md) ── */
+/** One clip to several accounts at one press: one row each, one group_id.
+ *  All or nothing: a refusal on any account writes no row. */
+export type NewPostGroup = {
+  connection_ids: number[];
+  source: string;
+  caption?: string;
+  /** per-connection words, when a tab holds its own */
+  captions?: Record<number, string>;
+  /** a platform's own form, per connection (merged over `settings`) */
+  settings_by?: Record<number, Record<string, unknown>>;
+  publish_at?: string | null;
+  settings?: Record<string, unknown>;
+  draft?: boolean;
+  project_id?: number | null;
+};
+export const createPostGroup = (body: NewPostGroup) =>
+  apiFetch<{ posts: Post[]; group_id: string | null }>("/posts/group", { method: "POST", body: JSON.stringify(body) });
+/** the connection's first free posting time, or null when it has none */
+export const nextFreeSlot = (connection_id: number, after?: string) => {
+  const q = new URLSearchParams({ connection_id: String(connection_id) });
+  if (after) q.set("after", after);
+  return apiFetch<{ slot: { publish_at: string; tz: string } | null }>(`/posts/next-slot?${q}`);
+};
+export type FreeSlot = { connection_id: number; provider: string; label: string; publish_at: string };
+export const freeSlots = (start: string, end: string) =>
+  apiFetch<{ slots: FreeSlot[] }>(`/posts/free-slots?${new URLSearchParams({ start, end })}`);
+export type FeedItem = { id: string; kind: "image" | "video"; thumb: string; url: string; at: string; caption: string };
+export type Feed = { connection: SocialConnection; offered: boolean; posts: Post[]; recent: FeedItem[]; note: string };
+export const getFeed = (connection_id: number) =>
+  apiFetch<Feed>(`/posts/feed?${new URLSearchParams({ connection_id: String(connection_id) })}`);
+/** {"tz": "America/New_York", "days": {"mon": ["09:00", "18:30"], ...}} */
+export type PostingTimes = { tz: string; days: Record<string, string[]> };
+export const setPostingTimes = (connection_id: number, times: PostingTimes) =>
+  apiFetch<SocialConnection>(`/social/connections/${connection_id}/posting-times`, { method: "PUT", body: JSON.stringify(times) });
+
 /* ── brand kits (2026-10-20, app/brand_routes.py) ──
    A kit belongs to the account; a project picks one. Nothing here spends:
    the end card is drawn by the API with Pillow, the preview composes text. */
@@ -1348,3 +1634,49 @@ export const setProjectKit = (projectId: number, kitId: number | null) =>
     method: "PUT",
     body: JSON.stringify({ brand_kit_id: kitId }),
   });
+
+/* ── editing-app panels (2026-10-22, app/plugin_api.py) ──
+   A Premiere Pro panel signs in with a code: it shows the code and opens
+   /studio/link, where the signed-in person approves it. These are the
+   studio's half: what a code is (the app and device asking), approving
+   it, and the list of connected panels with Disconnect. Approving and
+   disconnecting are guarded (GUARDED_HEADERS): another site cannot sign
+   its own panel in to a visitor's workspace in the background. */
+export type PluginLinkPreview = {
+  ok: true;
+  code: string;
+  client: string;
+  device: string;
+  expires_at: string;
+  /** the workspace the approval binds: the person's tenant, not the one open */
+  workspace: string | null;
+};
+export type PluginConnection = {
+  id: number;
+  client: string;
+  device: string;
+  created_at: string;
+  last_used_at: string | null;
+};
+const GUARDED_JSON = { ...GUARDED_HEADERS, "Content-Type": "application/json" };
+export const getPluginLink = (code: string) =>
+  apiFetch<PluginLinkPreview>(`/plugin/link?code=${encodeURIComponent(code)}`);
+export const approvePluginLink = (code: string) =>
+  apiFetch<{ ok: true; connection: PluginConnection }>("/plugin/link", {
+    method: "POST",
+    headers: GUARDED_JSON,
+    body: JSON.stringify({ code }),
+  });
+export const listPluginConnections = () => apiFetch<{ items: PluginConnection[] }>("/plugin/connections");
+export const revokePluginConnection = (id: number) =>
+  apiFetch<{ ok: true }>(`/plugin/connections/${id}/revoke`, { method: "POST", headers: GUARDED_JSON });
+
+/* An app screen drawn from a brand kit (src/kit_screens.py, 2026-10-22):
+   the preview draws it and writes nothing; keeping files it in the Library
+   as a free still. Neither spends. */
+export type KitScreenPreview = { image: string; spec: Record<string, unknown>; summary: string; warnings: string[]; size: [number, number] };
+export const previewKitScreen = (kitId: number, spec: Record<string, unknown>) =>
+  apiFetch<KitScreenPreview>(`/brand-kits/${kitId}/screens/preview`, { method: "POST", body: JSON.stringify({ spec }) });
+export type KitScreenKept = { asset: string; url: string; image: string; summary: string; warnings: string[] };
+export const keepKitScreen = (kitId: number, spec: Record<string, unknown>) =>
+  apiFetch<KitScreenKept>(`/brand-kits/${kitId}/screens`, { method: "POST", body: JSON.stringify({ spec }) });

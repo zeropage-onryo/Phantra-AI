@@ -938,7 +938,37 @@ def main(argv=None) -> None:
                            "account starts in)")
     p_cr.set_defaults(on=None)
 
+    p_st = sub.add_parser(
+        "studios",
+        help="grant or take back the Studios add-on (the Ad Studio) for one account "
+             "by hand -- before its Stripe Price exists, or for the operator's own "
+             "workspace. A Stripe-paid add-on is cancelled in Stripe, not here.")
+    p_st.add_argument("slug", help="the account slug, e.g. phantra")
+    door = p_st.add_mutually_exclusive_group(required=True)
+    door.add_argument("--on", dest="on", action="store_true",
+                      help="this account has the Ad Studio")
+    door.add_argument("--off", dest="on", action="store_false",
+                      help="it does not (the state every account starts in)")
+    p_st.set_defaults(on=None)
+
     args = parser.parse_args(argv)
+
+    if args.command == "studios":
+        from . import addons
+        try:
+            result = addons.grant(args.slug, "studios", args.on)
+        except ValueError as exc:
+            print(exc, file=sys.stderr)
+            sys.exit(1)
+        where = f"{result['slug']!r} (account {result['account_id']})"
+        if result["changed"]:
+            print(f"studios add-on {'OFF -> ON' if result['now'] else 'ON -> OFF'} for {where}")
+        else:
+            print(f"studios add-on already {'ON' if result['now'] else 'OFF'} for {where} "
+                  "-- nothing changed")
+        if not addons.gate_on():
+            print(f"note: {addons.GATE_ENV}=0 on this machine, so every account has it here")
+        return
 
     if args.command == "credits":
         try:

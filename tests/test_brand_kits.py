@@ -419,27 +419,37 @@ def test_a_composer_still_takes_the_project_kit_unless_the_chip_is_off(kitted, m
 
 
 def test_the_composer_route_hands_the_project_and_the_chip_to_the_still(kitted, monkeypatch):
+    """The kit dresses a Create still ONCE, in the route (2026-10-24): the
+    renderer is handed the kit to record, never to look up and add again,
+    on Gemini and on fal alike, with the kit on the project AND named in the
+    prompt. The chip off sends the prompt bare."""
     import time
 
     from app import api
-    from src import charge
+    from src import charge, fal
     k = kitted
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **kw: None)
     monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
     monkeypatch.setattr(api, "_enhance_generate_prompt", lambda c, p, **kw: f"ENHANCED[{p}]")
+    monkeypatch.setattr(fal, "has_key", lambda *a, **kw: True)
     import google.genai as genai_mod
     monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
     calls = []
 
     def fake(prompt, reference_image=None, db_path=None, **kw):
-        calls.append({"project_id": kw.get("project_id"), "brand_kit": kw.get("brand_kit")})
+        kit = kw.get("dressed_kit")
+        calls.append({"prompt": prompt, "kit": kit and kit["name"], "brand_kit": kw.get("brand_kit"),
+                      "literal": kw.get("literal"), "project_id": kw.get("project_id"),
+                      "additions": (kw.get("provenance") or {}).get("sent_additions")})
         return {"ok": True, "media_url": "/renders/frame.png"}
 
     monkeypatch.setattr(nano_banana, "generate_from_prompt", fake)
+    monkeypatch.setattr(fal, "generate_image_from_prompt", fake)
 
     def run(**data):
-        r = client.post("/api/generate/run", data={"prompt": "a cook", "output": "image", **data})
+        r = client.post("/api/generate/run",
+                        data={"prompt": "a Gygler cook", "output": "image", **data})
         if r.status_code != 200:
             return r
         deadline = time.time() + 5
@@ -454,16 +464,23 @@ def test_the_composer_route_hands_the_project_and_the_chip_to_the_still(kitted, 
     try:
         pid = str(k["project"]["id"])
         assert run(project_id=pid)["status"] == "done"
+        assert run(project_id=pid, image_model="seedream4.5")["status"] == "done"
         assert run(project_id=pid, brand_kit="off")["status"] == "done"
-        assert run()["status"] == "done"
+        assert run(prompt="a cook")["status"] == "done"
         theirs = projects.create("Theirs", "", k["pg"], account_id=k["mine"] + 1)
         refused = run(project_id=str(theirs["id"]))
         assert refused.status_code == 404
     finally:
         app.dependency_overrides[auth.current_account_id] = lambda: None
-    assert calls == [{"project_id": k["project"]["id"], "brand_kit": True},
-                     {"project_id": k["project"]["id"], "brand_kit": False},
-                     {"project_id": None, "brand_kit": True}]
+    gemini, on_fal, off, bare = calls
+    for dressed in (gemini, on_fal):
+        assert dressed["prompt"].startswith("a Gygler cook\n\n")      # as approved, then the look
+        assert dressed["prompt"].count("BRAND LOOK") == 1
+        assert dressed["kit"] == "Gygler" and dressed["brand_kit"] is False
+        assert dressed["additions"] == ["brand_kit"]
+    assert gemini["literal"] is True                               # no still-frame rewrap
+    assert off["prompt"] == "a Gygler cook" and off["kit"] is None and off["additions"] == []
+    assert bare["prompt"] == "a cook" and bare["kit"] is None and bare["project_id"] is None
 
 
 def test_a_kit_switched_after_the_price_refuses_the_quote(kitted, monkeypatch):
@@ -629,3 +646,31 @@ def test_the_prompt_preview_shows_the_kit_without_spending(kitted, monkeypatch):
     assert whole["part"] is None and "BRAND LOOK" not in whole["prompt"]
     assert whole["branded"].endswith("Avoid: neon, night clubs.")
     assert "Friendly, brisk, confident." in got["writer_block"]
+
+
+def test_a_kit_the_caller_dressed_is_recorded_never_added_again(kitted, monkeypatch):
+    """`dressed_kit` (2026-10-24): the Create route puts the look in once and
+    hands the renderer the kit to record. Even with the project's kit in
+    reach and `brand_kit` left on, the look is in the prompt one time."""
+    k = kitted
+    dressed = brand_kits.dress("A cook.", k["a"])
+    seen = []
+
+    def fake_request(model, prompt, **kw):
+        seen.append(prompt)
+        raise RuntimeError("stop")
+
+    def fake_frame(prompt, **kw):
+        seen.append(prompt)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(fal, "image_request", fake_request)
+    monkeypatch.setattr(nano_banana, "has_key", lambda account_id=None: True)
+    monkeypatch.setattr(nano_banana, "as_still_frame", fake_frame)
+    fal.generate_image_from_prompt(dressed, db_path=k["pg"], account_id=k["mine"],
+                                   project_id=k["project"]["id"], approved=True,
+                                   dressed_kit=k["a"])
+    nano_banana.generate_from_prompt(dressed, db_path=k["pg"], account_id=k["mine"],
+                                     project_id=k["project"]["id"], dressed_kit=k["a"])
+    assert seen == [dressed, dressed]
+    assert all(p.count("BRAND LOOK") == 1 for p in seen)

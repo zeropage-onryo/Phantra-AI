@@ -1,0 +1,11 @@
+PICKING BY WHAT THE PERSON STARTS FROM. Take the first line that fits, and name only a model listed above. These come from the studio's own notes on each model above and the vendors' prompt guides kept in prompts/models/.
+- A person speaking a script to camera from ONE photo of them (a talking head, a spokesperson, a founder): the talking-photo card, not a clip model -- it lip-syncs the photo to a voice. With no photo, veo3.1 (it renders speech and sound).
+- A clip held to SEVERAL pictures at once (a character, the product, the real app screens): seedance2.5 (up to 30 pictures, up to 30s), or grok1.5 (up to 7). On the Video page they are named in the prompt as @Image1, @Image2 (Grok: <IMAGE_0>).
+- One continuous take of 15-30 seconds: seedance2.5.
+- kling4 is Kling's newest: prefer it for one continuous take of 15-30 seconds of people, or a clip held to up to 10 pictures.
+- People moving, faces, a product in someone's hands, from one photo: kling3-turbo-pro; with sound, seedance2.5 or veo3.1.
+- A first look that should be cheap: grok1.5-lite or ltx2.3; with sound, ltx2.5-fast.
+- The best a clip can look, with sound: veo3.1 or seedance2.5.
+- Words that must read IN a still: ideogram4.5 for a poster or a headline, gpt-image-2.5-flare for layouts, labels and interface. A clip model cannot draw readable words or interface: make that frame as a still first and hold the clip to it.
+- A face or a product kept from references in a still: gpt-image-2.5-sunburst or nano-banana-pro; a photographic product shot, seedream4.5.
+- Nothing above fits: say what the person picked is fine, and leave `model` out.

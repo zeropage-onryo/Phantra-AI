@@ -1,7 +1,18 @@
 {
-  "pricing_version": "2026-09-26-fal-v3",
+  "pricing_version": "2026-10-27-fal-v4",
   "credit_cents": 1,
   "markup": "2.4",
+  "markup_by_model": {
+    "seedance2.5": "1.5",
+    "seedance2": "1.5",
+    "seedance2-fast": "1.5",
+    "kling3-turbo-pro": "1.5",
+    "kling4": "1.5",
+    "veo3.1": "1.5",
+    "wan3": "1.5",
+    "grok1.5": "1.64",
+    "grok1.5-lite": "1.73"
+  },
   "credit_floor": 10,
   "expiry_months": 2,
   "clip_seconds": 5,
@@ -68,7 +79,7 @@
       "tier": "standard",
       "max_seconds": null,
       "seconds": 6,
-      "credits": 87,
+      "credits": 116,
       "frame": "1080p"
     },
     {
@@ -101,7 +112,7 @@
       "tier": "standard",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 120,
+      "credits": 75,
       "frame": "720p"
     },
     {
@@ -112,7 +123,7 @@
       "tier": "standard",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 168,
+      "credits": 105,
       "frame": "1080p"
     },
     {
@@ -123,40 +134,62 @@
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 291,
+      "credits": 182,
       "frame": "720p"
     },
     {
       "provider": "fal",
       "model": "seedance2",
       "name": "Seedance 2.0",
-      "blurb": "Seedance at full quality; 1080p is premium.",
+      "blurb": "Seedance at full quality, up to 1080p.",
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 365,
+      "credits": 228,
       "frame": "720p"
     },
     {
       "provider": "fal",
       "model": "seedance2.5",
       "name": "Seedance 2.5",
-      "blurb": "ByteDance's newest, with sound, up to 30 seconds; 1080p is premium.",
+      "blurb": "ByteDance's newest, with sound, up to 30 seconds and 1080p.",
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 568,
+      "credits": 355,
       "frame": "720p"
     },
     {
       "provider": "fal",
       "model": "veo3.1",
       "name": "Veo 3.1",
-      "blurb": "Google's top model, with sound. Premium only.",
+      "blurb": "Google's top model, with sound.",
       "tier": "premium",
       "max_seconds": 8,
       "seconds": 6,
-      "credits": 576,
+      "credits": 360,
+      "frame": "720p"
+    },
+    {
+      "provider": "fal",
+      "model": "grok1.5",
+      "name": "Grok Imagine 1.5",
+      "blurb": "xAI's video model, with sound, 1 to 15 seconds, seven frame shapes.",
+      "tier": "standard",
+      "max_seconds": null,
+      "seconds": 5,
+      "credits": 115,
+      "frame": "720p"
+    },
+    {
+      "provider": "fal",
+      "model": "grok1.5-lite",
+      "name": "Grok Imagine 1.5 Lite",
+      "blurb": "Grok's quick tier, with sound, up to 1080p.",
+      "tier": "standard",
+      "max_seconds": null,
+      "seconds": 5,
+      "credits": 26,
       "frame": "720p"
     },
     {
@@ -167,7 +200,7 @@
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 189,
+      "credits": 118,
       "frame": "720p"
     }
   ],

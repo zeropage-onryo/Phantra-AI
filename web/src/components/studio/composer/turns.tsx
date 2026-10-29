@@ -20,6 +20,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Clapperboard,
+  Columns2,
   Download,
   Ellipsis,
   Film,
@@ -48,7 +49,9 @@ import { heldLine, stillsFor } from "@/lib/result-numbers";
 import { renderLine, type ModelOption, type StepModel } from "@/lib/step-model";
 import { LookCard, LookResearchNote } from "@/components/studio/look-research";
 import { KitChangeCard } from "@/components/studio/kit-change-card";
+import { KitScreenCard } from "@/components/studio/kit-screen-card";
 import { isKitTool } from "@/lib/kit-change";
+import { isScreenTool } from "@/lib/kit-screen";
 import { isSwitchTool } from "@/lib/explore";
 import { SwitchCard } from "@/components/studio/explore-switch";
 import { failLine, madeStatus } from "@/lib/made-state";
@@ -58,7 +61,9 @@ import type { Effect, EffectState } from "@/lib/effects";
 import { TalkingPhotoStep } from "@/components/studio/talking-photo-step";
 import { AdStep } from "@/components/studio/ad-step";
 import type { AdState } from "@/lib/ad-card";
+import { DubbingStep } from "@/components/studio/dubbing-step";
 import type { PhotoChoice, TalkMenu, TalkState } from "@/lib/talking-photo";
+import type { ClipChoice, DubMenu, DubState } from "@/lib/dubbing";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
 import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
@@ -66,6 +71,8 @@ import { RenderCard } from "@/components/studio/render-card";
 import { cardFonts } from "@/components/studio/card-fonts";
 import type { Concept } from "@/lib/studio-api";
 import { cutLine, joinable, trimProblem } from "@/lib/final-cut";
+import { pairOf, sideBySideHref } from "@/lib/before-after";
+import { BeforeAfter } from "@/components/studio/before-after";
 // vesper_v2 (docs/tasks/task-vesper-v2.md): a question the person taps,
 // and the next steps offered under a rendered scene
 import { isAskTool, questionOf } from "@/lib/tappable";
@@ -108,6 +115,10 @@ type Handlers = {
   stillModelOf: (t: Turn) => StepModel;
   onStillModel: (i: number, id: string) => void;
   stillWarn: (t: Turn) => string;
+  /** the frame a still's step is drawn in, its switch, and the kit added */
+  stillFrameOf: (t: Turn) => string;
+  onStillFrame: (i: number, id: string) => void;
+  stillKit: string;
   /** the clip models, for naming the one a scene was proposed for */
   clipModels: ModelOption[];
   /** an account that is not charged: no prices in the model menu */
@@ -157,6 +168,14 @@ type Handlers = {
   onAdBuild: (id: string) => void;
   /** a built ad's voiceover or music: the click that spends, at the price shown */
   onAdAudio: (id: string, which: "voice" | "music") => void;
+  /** a dub's card (lib/dubbing.ts): its menu, the clips it offers, the
+   *  project a clip is filed under, a change applied to the card's current
+   *  state, and the Render click */
+  dubMenu: DubMenu | null;
+  dubChoices: ClipChoice[];
+  dubProject: number | null;
+  onDubPatch: (id: string, fn: (s: DubState) => DubState) => void;
+  onDubApprove: (id: string, credits: number, charged: boolean) => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -231,6 +250,7 @@ const ICON: Record<ContinueKind, LucideIcon> = {
   canvas: Clapperboard,
   render: Play,
   reuse: RotateCcw,
+  pair: Columns2,
 };
 /* a send that did not finish puts its prompt back in the box */
 const RETRY: ContinueAction = { id: "reuse", kind: "reuse", label: "Try again", title: "", primary: true };
@@ -285,6 +305,15 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
       </>
     );
     const done = () => setOpen(false);
+    if (a.kind === "pair") {
+      const pair = pairOf(turn.effect, m);
+      const href = pair ? sideBySideHref(pair) : null;
+      return href ? (
+        <a key={a.id} className={cls} role={role} href={href} download title={a.title} onClick={done}>
+          {inner}
+        </a>
+      ) : null;
+    }
     if (a.kind === "download" && render !== null) {
       return (
         <a key={a.id} className={cls} role={role} href={renderDownloadHref(render)} title={a.title} onClick={done}>
@@ -348,6 +377,12 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
       ) : null}
     </div>
   );
+}
+
+/** A timed scene rendered as ONE clip has landed: the shot's clip, none on a part. */
+function oneClipLanded(m: Made): boolean {
+  const parts = m.parts ?? [];
+  return parts.length >= 2 && !!m.sceneClip && !parts.some((p) => !!p.media_url);
 }
 
 /** RUNWAY'S FINAL CUT, in the turn: the scene's shots joined into one
@@ -486,10 +521,11 @@ function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
   );
 }
 
-/** every shot of a written scene has its clip (or the whole scene does) */
+/** every shot of a written scene has its clip (or the whole scene does,
+    as ONE clip with its cuts inside -- src/timeline.py renders_as_one) */
 function sceneRendered(m: Made): boolean {
   const parts = m.parts ?? [];
-  return parts.length ? parts.every((p) => !!p.media_url) : !!m.sceneClip;
+  return !!m.sceneClip || (parts.length > 0 && parts.every((p) => !!p.media_url));
 }
 
 function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; turn: Turn }) {
@@ -517,6 +553,16 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
           <span className="zc-label on">Clip 01</span>
         </motion.div>
       </div>
+    ) : pairOf(turn.effect, m) ? (
+      // a costume still: compared with the photo it was made from
+      <div className="zc-tiles one">
+        <motion.div className="zc-tilewrap" {...tile(0)} style={{ maxWidth: 420 }}>
+          <div className="zc-tile on pair">
+            <BeforeAfter before={mediaSrc(pairOf(turn.effect, m)!.before)} after={mediaSrc(m.image ?? "")} alt="Your costume" />
+          </div>
+          <span className="zc-label on">Before and after · drag to compare</span>
+        </motion.div>
+      </div>
     ) : (
       <div className="zc-tiles one">
         <motion.div className="zc-tilewrap" {...tile(0)} style={{ maxWidth: `calc(420px * (${ratio}))` }}>
@@ -531,7 +577,19 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     );
   } else if (state === "done") {
     const parts = m.parts ?? [];
-    body = parts.length ? (
+    // a timed scene rendered as ONE clip: the clip on the shot, none on a part
+    const whole = parts.length && m.sceneClip && !parts.some((p) => !!p.media_url) ? m.sceneClip : null;
+    body = whole ? (
+      <div className="zc-tiles one">
+        <motion.div className="zc-tilewrap" {...tile(0)}>
+          <div className="zc-tile on clip">
+            <video src={mediaSrc(whole)} controls muted loop playsInline preload="metadata" />
+            {parts[parts.length - 1]?.end ? <span className="zc-badge">{parts[parts.length - 1].end}s</span> : null}
+          </div>
+          <span className="zc-label on">One clip · {parts.length} shots inside</span>
+        </motion.div>
+      </div>
+    ) : parts.length ? (
       <div className={`zc-tiles${parts.length >= 4 ? " four" : ""}`}>
         {parts.map((p, i) => {
           const on = p.n === selected;
@@ -598,7 +656,7 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     <>
       <Meta m={m} live={live} h={h} />
       {body}
-      {state === "done" && m.output === "video" && m.conceptId && joinable(m.parts) ? (
+      {state === "done" && m.output === "video" && m.conceptId && (joinable(m.parts) || oneClipLanded(m)) ? (
         <FinalCutView m={m} h={h} />
       ) : null}
       {state === "done" && m.output === "video" && m.conceptId && !m.planned && !sceneRendered(m) ? (
@@ -609,12 +667,9 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
         // spends. It reads the scene back when a render ends, and the clips
         // land on the tiles above; once every shot has one, it goes away.
         <div className={`ss ${cardFonts}`} data-render-turn={m.conceptId}>
-          <div className="ss-head">
-            <Film aria-hidden />
-            <b>Render</b>
-            <span>{m.title || "this scene"}</span>
-          </div>
-          <RenderCard conceptId={m.conceptId} noStrip onScene={(c) => h.onScene(m.id, c)} />
+          {/* just the priced Approve buttons here (2026-10-23, Mike); the
+              full card, with its model pick, opens from the storyboard */}
+          <RenderCard conceptId={m.conceptId} noStrip approveOnly onScene={(c) => h.onScene(m.id, c)} />
         </div>
       ) : null}
       {h.v2 && state === "done" && m.output === "video" && m.conceptId ? (
@@ -743,6 +798,15 @@ export function ComposerStream({
                     onDecide={(yes) => handlers.onDecide(i, yes)}
                   />
                 ) : null}
+                {/* an app screen drawn from the brand kit: free, Keep files it */}
+                {t.reply?.proposal && isScreenTool(t.reply.proposal.tool) ? (
+                  <KitScreenCard
+                    args={t.reply.proposal.args}
+                    decided={t.decided}
+                    busy={handlers.busy}
+                    onDecide={(yes) => handlers.onDecide(i, yes)}
+                  />
+                ) : null}
                 {/* asked to make while the project explores: the way out */}
                 {t.reply?.proposal && isSwitchTool(t.reply.proposal.tool) ? (
                   <SwitchCard
@@ -755,6 +819,7 @@ export function ComposerStream({
                 {t.reply?.proposal &&
                 !isLookTool(t.reply.proposal.tool) &&
                 !isKitTool(t.reply.proposal.tool) &&
+                !isScreenTool(t.reply.proposal.tool) &&
                 !isSwitchTool(t.reply.proposal.tool) &&
                 !isMake(t.reply.proposal.tool) &&
                 !isSheetTool(t.reply.proposal.tool) &&
@@ -794,6 +859,9 @@ export function ComposerStream({
                     model={handlers.stillModelOf(t)}
                     onModel={(id) => handlers.onStillModel(i, id)}
                     warn={handlers.stillWarn(t)}
+                    drawAt={handlers.stillFrameOf(t)}
+                    onFrame={(id) => handlers.onStillFrame(i, id)}
+                    kit={handlers.stillKit}
                   />
                 ) : null}
                 {t.plan ? <PlanCard plan={t.plan} h={handlers.plan(t.plan.id)} /> : null}
@@ -817,6 +885,17 @@ export function ComposerStream({
                     onPatch={(fn) => handlers.onTalkPatch(t.talk?.id ?? "", fn)}
                     onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
                     onError={handlers.onTalkError}
+                  />
+                ) : null}
+                {t.dub ? (
+                  <DubbingStep
+                    turn={t}
+                    menu={handlers.dubMenu}
+                    choices={handlers.dubChoices}
+                    busy={handlers.busy}
+                    projectId={handlers.dubProject}
+                    onPatch={(fn) => handlers.onDubPatch(t.dub?.id ?? "", fn)}
+                    onApprove={(credits, charged) => handlers.onDubApprove(t.dub?.id ?? "", credits, charged)}
                   />
                 ) : null}
                 {t.ad ? (

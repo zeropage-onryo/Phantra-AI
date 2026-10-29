@@ -91,6 +91,8 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
   },
   robots: { index: true, follow: true },
+  // Meta Business domain verification for phantra.ai (a public code, not a secret)
+  other: { "facebook-domain-verification": "2y1z259schy7wytrmmo6k0inxpcz6c" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

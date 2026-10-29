@@ -39,6 +39,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src import accounts as accounts_mod
 from src import (
+    addons,
     asset_shelf,
     assistant_store,
     autonomy,
@@ -58,16 +59,22 @@ from src import (
     mcp_preferences,
     mcp_recipes,
     outcomes,
+    plugin_tokens,
+    posts,
     preprod,
     publish_review,
     quote_redemptions,
     rag,
     render_assets,
+    render_qc,
     shares,
     shootgen,
+    social_connections,
     spend,
     upload_links,
+    voice_clone,
     watermark,
+    whats_new,
     winners,
     workflows,
     youtube,
@@ -86,10 +93,13 @@ from . import (
     mcp_auth,
     mcp_mount,
     oauth_consent,
+    plugin_api,
     security_headers,
     seo,
     share_page,
+    social_routes,
     upload_page,
+    whats_new_public,
 )
 from . import billing as billing_routes
 from .sparkline import render_sparkline
@@ -168,6 +178,13 @@ MCP_APP, MCP_SESSIONS = mcp_mount.build(
     # ...and the Elements page's create body, for `add_element` (2026-10-11)
     create_element=api.create_element,
 )
+# ...and the same callables for the editing-app panels' door (app/plugin_api.py),
+# which runs the render listing's tools as the signed-in panel's account
+plugin_api.configure(
+    start_job=jobs.start, job_status=jobs.get,
+    approve_render=api.approve_render, approve_keyframes=api.approve_keyframes,
+    create_element=api.create_element,
+)
 
 
 def init_tables() -> None:
@@ -193,8 +210,10 @@ def init_tables() -> None:
     accounts_mod.init()  # users / identities / accounts / members
     settings_mod.init()  # the Dev Studio tunables (gate/threshold/k)
     fal_requests.init()  # fal's queue receipts, persisted at submit
+    render_qc.init()     # what Gemini saw in each landed clip
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
+    plugin_tokens.init()    # editing-app panels' sign-in codes and tokens
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
     upload_links.init()     # the connector's one-time upload links, spent once
@@ -204,6 +223,11 @@ def init_tables() -> None:
     mcp_recipes.init()      # a creator's own recipes, every save a version
     brand_kits.init()       # brand kits a project may pick (opt-in)
     watermark.init()      # the free trial's marked renders and clean originals
+    social_connections.init()  # a person's own social accounts, tokens sealed
+    posts.init()             # posts and their log; the worker sends them
+    whats_new.init()         # the Create wall's announcements and who saw them
+    addons.init()            # a workspace's paid add-ons (the Ad Studio)
+    voice_clone.init()      # a person's own cloned voices, after the consent line
 
 
 @asynccontextmanager
@@ -223,6 +247,10 @@ async def lifespan(app: FastAPI):
         if os.environ.get("FAL_RECOVER", "1") != "0":
             fal_requests.start_background()
         retire_gold_standard()              # the exemplar is not a winner (2026-10-02)
+        # What's new (2026-10-25): file a pending announcement for every
+        # model / effect / look / skill the wall has never seen. Spends
+        # nothing; off with PHANTRA_WHATS_NEW_SYNC=0.
+        whats_new.start_sync()
         # The MCP transport is not self-starting: its session manager has
         # to be entered by whoever hosts it. A no-op when MCP is off.
         async with mcp_mount.session_lifespan(MCP_SESSIONS):
@@ -530,6 +558,7 @@ if MCP_APP is not None:
     app.get(mcp_auth.OPENAI_CHALLENGE_PATH)(mcp_mount.openai_challenge_endpoint)
 app.include_router(api.router, dependencies=[Depends(auth.require_user_api)])
 app.include_router(auth.router)
+app.include_router(social_routes.auth_router)
 # the OAuth consent step Supabase's OAuth server sends a connector's user to
 app.include_router(oauth_consent.router)
 # the connector's one-time upload page (/u/<token>): the token is the auth
@@ -537,9 +566,15 @@ app.include_router(upload_page.router)
 # a shared render's public read (/public/share/<token>, src/shares.py): the
 # token is the address, and only what the share page may show comes back
 app.include_router(share_page.router)
+# the public What's new page's read (/public/whats-new, src/whats_new.py):
+# live announcements only, nothing about any person
+app.include_router(whats_new_public.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)
+# an editing-app panel's door (Premiere Pro, app/plugin_api.py): outside /api,
+# because the panel holds a bearer token from its sign-in code, not a cookie
+app.include_router(plugin_api.router)
 
 
 def signin_showcase() -> list[dict]:
@@ -606,7 +641,7 @@ def signin(request: Request, error: Optional[str] = None,
            mode: Optional[str] = None, email: Optional[str] = None,
            next: Optional[str] = None, step: Optional[str] = None,
            open: Optional[str] = None, notice: Optional[str] = None,
-           consent: Optional[str] = None):
+           consent: Optional[str] = None, provider: Optional[str] = None):
     """The one door (2026-09-24, InVideo's shape): Google / Discord /
     Apple, or an email that gets a one-time code. Logging in and signing
     up are the same form -- `mode=signup` only changes the heading -- and
@@ -638,6 +673,13 @@ def signin(request: Request, error: Optional[str] = None,
             return auth.handoff_redirect(destination, user["id"])
         return (auth.studio_handoff(user["id"])
                 or RedirectResponse("/ui", status_code=303))
+    # `provider` (2026-10-26, the phone's sign-up sheet): a person who
+    # already picked Google or Discord goes straight on to it, `next`
+    # stashed above. Only a provider that is configured, and never during an
+    # OAuth consent (that page has its own reason to show the door).
+    if (provider in ("google", "discord") and not consenting
+            and auth.providers_available().get(provider)):
+        return RedirectResponse(f"/auth/{provider}/login", status_code=303)
     # the second screens: `code` (a sign-in code was sent), `reset` (a
     # recovery code was sent -- code + new password), `newpassword` (the
     # recovery LINK was clicked -- the new password alone; the session

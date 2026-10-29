@@ -329,7 +329,7 @@ def test_a_window_is_fitted_up_to_a_length_the_model_can_make():
     assert timeline.fit_seconds({"kind": "fixed", "values": [8]}, 3) == 8
 
 
-def test_the_timeline_price_is_the_sum_of_each_shots_own_render(monkeypatch):
+def test_the_timeline_price_is_the_sum_of_each_shots_own_render(monkeypatch, shot_by_shot):
     from src import pricing
     monkeypatch.setenv("FAL_KEY", "test-key")
     shot = {"n": 1, "prompt": "BEATS (0-3s) one. (3-7s) two. (7-10s) three.", "refs": ["/refs/a.jpg"]}
@@ -653,7 +653,8 @@ def fake_fal(monkeypatch, fail_on=None):
 
     def fake(concept_id, shot_n, *, part=None, duration=None, db_path=None,
              account_id=None, **kw):
-        calls.append({"part": part, "duration": duration, "approved": kw.get("approved")})
+        calls.append({"part": part, "duration": duration, "approved": kw.get("approved"),
+                      **({"one_clip": True} if kw.get("one_clip") else {})})
         if fail_on is not None and part == fail_on:
             return {"ok": False, "error": "FAL_DAILY_CAP reached"}
         if part:
@@ -669,7 +670,7 @@ def fake_fal(monkeypatch, fail_on=None):
     return calls
 
 
-def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, monkeypatch):
+def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, monkeypatch, shot_by_shot):
     planner_answers(monkeypatch, GOOD)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr("google.genai.Client", lambda **kw: object())
@@ -693,7 +694,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
                client.get("/api/queue/pending").json()["items"])
 
 
-def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, monkeypatch):
+def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, monkeypatch, shot_by_shot):
     planner_answers(monkeypatch, GOOD)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr("google.genai.Client", lambda **kw: object())
@@ -712,6 +713,27 @@ def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, mon
                                    json={"provider": "fal"}).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert [c["part"] for c in calls] == [2, 3]              # shot 1 not re-bought
+
+
+def test_a_timed_scene_that_fits_the_model_is_approved_as_one_clip(tmp_db, monkeypatch):
+    """2026-10-26: the shots are planned first, then ONE generation renders
+    the whole scene with its cuts inside, and the clip lands on the shot."""
+    planner_answers(monkeypatch, GOOD)
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("google.genai.Client", lambda **kw: object())
+    calls = fake_fal(monkeypatch)
+    cid = a_scene(tmp_db)
+    res = client.post(f"/api/queue/{cid}/approve",
+                      json={"provider": "fal", "model": "seedance2"})
+    assert res.status_code == 200, res.text
+    assert res.json()["render"]["one_clip"] and res.json()["render"]["duration"] == 10
+    job = wait_for_job(res.json()["job_id"])
+    assert job["status"] == "done", job.get("error")
+    assert calls == [{"part": None, "duration": 10, "approved": True, "one_clip": True}]
+    shot = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"][0]
+    assert shot["media_url"] == "https://x/clip.mp4"
+    assert timeline.is_current(shot)                 # planned before the render
+    assert not any(p.get("media_url") for p in shot["timeline"]["parts"])
 
 
 def test_a_single_window_scene_still_approves_as_one_clip(tmp_db, monkeypatch):
@@ -744,3 +766,185 @@ def test_create_plans_the_shots_on_the_brain_that_wrote_the_scene(tmp_db, monkey
     assert shot["timeline"]["planner"] == "reasoning"
     assert seen and seen[0]["model"] == gemini_utils.resolve_brain("reasoning")["model"]
     assert "3 shots across 1 scene(s)" in result["notes"]
+
+
+# --- what the planner must not lose (2026-10-22) -----------------------------
+# Found on one food scene whose chef and dish were earlier RENDERS out of the
+# Library, not elements: the re-plan put neither on any shot, the voiceover
+# line written in a window was gone from its shot, and a shot the planner
+# gave no refs at all rendered from its words alone with nothing on the card
+# saying so. The planner is a model; timeline.keep checks the answer.
+
+CHEF = "https://media.phantra.ai/m/1/renders/nano/wf-12-ab12cd34ef56ab12cd34ef56ab12cd34.png"
+DISH = "/renders/nano/wf-13-ab12cd34ef56ab12cd34ef56ab12cd34.png"
+FOOD = (
+    "Ultra-realistic grounded food video in 9:16. STYLE: warm kitchen light, 35mm.\n"
+    "3. BEATS: (0-4s) The chef plates the dish; steam rises. "
+    'VO: "Fresh every morning, from our kitchen to yours." '
+    "(4-8s) Hard cut to the dish on the pass, a hand slides it forward. "
+    "(8-10s) Close on the chef's face, a nod.\n"
+    "4. SOUND: No background music. Pans, a ticket printer.\n"
+    "5. AVOID: no plastic AI sheen."
+)
+# the planner's answer with the two renders on no shot, the voiceover gone
+# from shot 1, and shot 3 given nothing at all
+LOSSY = {"continuity": "A chef in whites, a white plate, warm tungsten light.",
+         "shots": [
+             {"window": "0-4s", "prompt": "Hands plate the dish, steam rising.", "refs": [3]},
+             {"window": "4-8s", "prompt": "The plate slides down the pass.", "refs": [3]},
+             {"window": "8-10s", "prompt": "Close on a face, a nod.", "refs": []},
+         ]}
+
+
+def test_a_render_out_of_the_library_is_captioned_for_the_planner_like_a_photo():
+    """shootgen.reference_label is "" for a render, so until today the
+    planner's list read "[1]" with nothing after it: told nothing about what
+    [1] was, it put the chef on no shot."""
+    assert shootgen.reference_label(CHEF) == ""
+    text = timeline.build_prompt(FOOD, timeline.parse_windows(FOOD), [CHEF, DISH, FACE],
+                                 seconds=10)
+    lines = [ln for ln in text.splitlines() if ln.startswith("[")]
+    assert lines[0].startswith("[1] Reference picture") and "earlier picture" in lines[0]
+    assert lines[1].startswith("[2] Reference picture")
+    assert lines[2] == f"[3] {shootgen.reference_label(FACE)}"
+    assert not any(ln.strip().endswith("]") for ln in lines)       # never a bare number
+    # a role the person put on a reference outranks what its address says
+    told = timeline.build_prompt(FOOD, timeline.parse_windows(FOOD), [CHEF], seconds=10,
+                                 roles={CHEF: "subject"})
+    from src import ref_roles
+    assert f"[1] {ref_roles.caption('subject')}" in told
+
+
+def test_the_pictures_shown_to_the_planner_carry_the_same_captions(monkeypatch):
+    seen = []
+    planner_answers(monkeypatch, LOSSY, seen)
+    timeline.plan(FOOD, [CHEF, FACE], gemini_client=object(), roles={FACE: "subject"})
+    captions = [c for c in seen[0]["contents"] if isinstance(c, str)]
+    assert captions[0].startswith("[1] Reference picture")
+    from src import ref_roles
+    assert captions[1] == f"[2] {ref_roles.caption('subject')}"
+
+
+def test_a_reference_the_planner_left_off_every_shot_is_put_back_on_every_shot(monkeypatch):
+    """The fallback's own grounding, for that one picture: over-grounding a
+    shot costs a little fidelity, under-grounding it costs the face. In the
+    scene's order, so the chef (refs[0]) still anchors."""
+    planner_answers(monkeypatch, LOSSY)
+    tl = timeline.plan(FOOD, [CHEF, DISH, FACE], gemini_client=object())
+    assert tl["planner"] == "fast"
+    assert [p["refs"] for p in tl["parts"]] == [[CHEF, DISH, FACE], [CHEF, DISH, FACE],
+                                               [CHEF, DISH]]
+    said = "\n".join(tl["warnings"])
+    assert "reference 1 (an earlier render from the Library) was on none" in said
+    assert "reference 2 (an earlier render from the Library) was on none" in said
+    assert "it is now on every shot" in said
+    # the face WAS placed (shots 1 and 2), so nothing is said about it
+    assert "reference 3" not in said
+
+
+def test_a_look_only_reference_may_stay_off_every_shot():
+    """A palette or light reference never anchors a shot and is the look's
+    business, not a subject the planner lost."""
+    windows = timeline.parse_windows(SCENE)
+    result = timeline.parse_response(json.dumps(GOOD), windows, [FACE, BIKE, ROOM])
+    light = "/refs/golden-hour.jpg"
+    warnings = timeline.keep(result, SCENE, windows, [FACE, BIKE, ROOM, light],
+                             roles={light: "light"})
+    assert light not in sum((p["refs"] for p in result["parts"]), [])
+    assert not any("reference 4" in w for w in warnings)
+
+
+def test_a_shot_with_no_photos_is_said_on_the_card_and_still_renders(monkeypatch):
+    """Advised, never refused: an empty hallway needs no portrait, but a
+    shot rendering from its words alone is never silent."""
+    planner_answers(monkeypatch, GOOD)                 # shot 3: "refs": []
+    tl = timeline.plan(SCENE, [FACE, BIKE, ROOM], gemini_client=object())
+    assert tl["parts"][2]["refs"] == []
+    assert any(w.startswith("shot 3 (7-10s): no reference photos on this shot")
+               for w in tl["warnings"])
+    assert not any(w.startswith("shot 1") or w.startswith("shot 2") for w in tl["warnings"])
+
+
+def test_the_render_card_prints_the_planners_notes(tmp_db, monkeypatch):
+    monkeypatch.setattr("src.fal.has_key", lambda account_id=None: True)
+    planner_answers(monkeypatch, LOSSY)
+    cid = a_scene(tmp_db, prompt=FOOD, refs=(CHEF, DISH, FACE))
+    timeline.ensure(cid, gemini_client=object(), db_path=tmp_db)
+    card = client.get(f"/api/scenes/{cid}/render").json()["scene"]
+    assert card["blocked"] == ""                      # the scene itself is grounded
+    notes = card["timeline"]["warnings"]
+    assert any("reference 1 (an earlier render" in w for w in notes)
+    # ...and beside the scene's own warnings, where the drawer reads them
+    assert all(w in card["warnings"] for w in notes)
+    # a stale timeline says nothing: the next read re-plans it
+    concept = preprod.get_concept(cid, dsn=tmp_db, account_id=None)
+    shot = dict(concept["shots"][0], prompt=FOOD + " Later.")
+    assert timeline.warnings_of(shot) == []
+
+
+def test_a_voiceover_line_the_planner_dropped_is_kept_on_its_shot(monkeypatch):
+    planner_answers(monkeypatch, LOSSY)
+    tl = timeline.plan(FOOD, [CHEF, DISH, FACE], gemini_client=object())
+    first = tl["parts"][0]["prompt"]
+    assert first.startswith("Hands plate the dish")
+    assert 'VOICEOVER, as written: "Fresh every morning, from our kitchen to yours."' in first
+    # the other shots did not carry it and do not get it
+    assert "Fresh every morning" not in tl["parts"][1]["prompt"]
+    # eight words in four seconds fits: nothing to warn about
+    assert not any("voiceover" in w for w in tl["warnings"])
+    # and it reaches the renderer through the composed prompt
+    assert "Fresh every morning" in timeline.render_prompt(tl["parts"][0], tl)
+
+
+def test_a_voiceover_the_planner_kept_is_not_written_twice(monkeypatch):
+    kept = dict(LOSSY, shots=[dict(LOSSY["shots"][0],
+                                   prompt='Hands plate the dish. Voiceover: "Fresh every '
+                                          'morning, from our kitchen to yours."'),
+                              *LOSSY["shots"][1:]])
+    planner_answers(monkeypatch, kept)
+    tl = timeline.plan(FOOD, [CHEF, DISH, FACE], gemini_client=object())
+    assert tl["parts"][0]["prompt"].count("Fresh every morning") == 1
+
+
+def test_a_voiceover_that_cannot_be_said_in_its_window_is_a_warning(monkeypatch):
+    long_line = ("Fresh every morning, from our kitchen to yours, with bread we bake "
+                 "before dawn and butter from the farm down the road")       # 22 words
+    scene = FOOD.replace("Fresh every morning, from our kitchen to yours.", long_line)
+    planner_answers(monkeypatch, LOSSY)
+    tl = timeline.plan(scene, [CHEF, DISH, FACE], gemini_client=object())
+    assert long_line in tl["parts"][0]["prompt"]                  # kept all the same
+    [why] = [w for w in tl["warnings"] if "voiceover" in w]
+    assert why.startswith("shot 1 (0-4s): the voiceover is 22 words, about 9s to say, "
+                          "and the window is 4s -- it will not fit")
+    # the split with no model in it is checked the same way
+    plain = timeline.fallback(scene, timeline.parse_windows(scene), [CHEF])
+    assert any("it will not fit" in w for w in
+               timeline.keep(plain, scene, timeline.parse_windows(scene), [CHEF]))
+
+
+def test_a_voiceover_written_after_the_beats_is_the_scenes_and_reaches_every_shot(monkeypatch):
+    """"VO:" under the windows is read over the whole scene, like its sound
+    line: it is the tail, not the last shot's action, and when the planner
+    forgets it the continuity carries it in front of every shot."""
+    scene = (FOOD.replace('VO: "Fresh every morning, from our kitchen to yours." ', "")
+             + '\nVoiceover (warm, low): "Fresh every morning, from our kitchen to yours."')
+    windows = timeline.parse_windows(scene)
+    assert windows[-1]["text"].endswith("a nod")                 # not the last shot's
+    planner_answers(monkeypatch, LOSSY)
+    tl = timeline.plan(scene, [CHEF, DISH, FACE], gemini_client=object())
+    assert "Fresh every morning" not in tl["parts"][0]["prompt"]
+    assert ('VOICEOVER over the whole scene, as written: "Fresh every morning, from our '
+            'kitchen to yours."') in tl["continuity"]
+    assert all("Fresh every morning" in timeline.render_prompt(p, tl) for p in tl["parts"])
+    # the same line in one paragraph is read the same way
+    flat = " ".join(scene.split("\n"))
+    assert timeline.voice_lines(timeline._outside_windows(flat))[0]["words"] == \
+        "Fresh every morning, from our kitchen to yours."
+
+
+def test_a_voiceover_every_beat_carries_is_each_shots_own():
+    scene = '(0-4s) A. VO: "One." (4-8s) B. VO: "Two." Sound: pans. Avoid: sheen.'
+    windows = timeline.parse_windows(scene)
+    assert [w["text"] for w in windows] == ['A. VO: "One."', 'B. VO: "Two."']
+    assert timeline.voice_lines(timeline._outside_windows(scene)) == []
+

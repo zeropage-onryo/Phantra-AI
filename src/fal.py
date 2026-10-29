@@ -207,9 +207,12 @@ VIDEO_MODELS: dict[str, dict] = {
         "duration_wire": "int",
         "resolutions": ("1080p", "1440p", "2160p"),
         "default_resolution": "1080p",
-        "prices": {"1080p": 0.06, "1440p": 0.12, "2160p": 0.24},
+        # fal raised LTX 2.3 from $0.06/0.12/0.24 (re-read 2026-10-27 off
+        # the models API: "$0.08 per second for 1080p, $0.16 ... 1440p or
+        # $0.32 ... 2160p"); at the old row every clip was held under cost
+        "prices": {"1080p": 0.08, "1440p": 0.16, "2160p": 0.32},
         "platform": "ltx",
-        "checked": "2026-09-26",
+        "checked": "2026-10-27",
         "source": "https://fal.ai/models/fal-ai/ltx-2.3/image-to-video/api",
     },
     # LTX 2.5 (added 2026-10-08, Mike: "use ltx 2.5 on runway, switch to
@@ -297,9 +300,12 @@ VIDEO_MODELS: dict[str, dict] = {
         "duration_wire": "str",
         "resolutions": ("480p", "720p"),
         "default_resolution": "720p",
-        "prices": {"480p": 0.2419, "720p": 0.2419},
+        # billed by tokens, (w * h * seconds * 24) / 1024 at $0.0112 per
+        # 1,000 (2026-10-27): 720p is the card's $0.2419/s, 480p about
+        # 10,300 tokens a second, $0.1154 -- it was priced at the 720p rate
+        "prices": {"480p": 0.1154, "720p": 0.2419},
         "platform": "seedance",
-        "checked": "2026-09-26",
+        "checked": "2026-10-27",
         "source": "https://fal.ai/models/bytedance/seedance-2.0/fast/image-to-video/api",
     },
     # 720p reads $0.3034/s and 1080p $0.682/s on the text-to-video rate
@@ -314,9 +320,10 @@ VIDEO_MODELS: dict[str, dict] = {
         "duration_wire": "str",
         "resolutions": ("480p", "720p", "1080p"),
         "default_resolution": "720p",
-        "prices": {"480p": 0.3034, "720p": 0.3034, "1080p": 0.682},
+        # 480p by the same token rule at $0.014 per 1,000 (2026-10-27)
+        "prices": {"480p": 0.1443, "720p": 0.3034, "1080p": 0.682},
         "platform": "seedance",
-        "checked": "2026-09-26",
+        "checked": "2026-10-27",
         "source": "https://fal.ai/models/bytedance/seedance-2.0/text-to-video",
     },
     # Seedance 2.5 (added 2026-10-06, Mike's call: the Seedance page is the
@@ -364,6 +371,50 @@ VIDEO_MODELS: dict[str, dict] = {
         "checked": "2026-09-26",
         "source": "https://fal.ai/models/fal-ai/veo3.1/image-to-video",
     },
+    # Grok Imagine Video 1.5 and 1.5 Lite (added 2026-10-23, Mike: "grok
+    # imagine is available on fal"). xAI's OWN namespace on fal (`xai/`, not
+    # a relay), read that day off fal's model listing (api.fal.ai/v1/models
+    # ?q=grok) and each endpoint's queue OpenAPI schema
+    # (fal.ai/api/openapi/queue/openapi.json?endpoint_id=<id>): duration is
+    # an INTEGER 1-15 (no enum), resolution 480p / 720p / 1080p (fal's
+    # default 720p, the house default too), aspect_ratio on text-to-video
+    # only (16:9 4:3 3:2 1:1 2:3 3:4 9:16), the start frame is `image_url`,
+    # sound is generated with the picture. Rates are the model pages' rate
+    # cards (fal's pricing API answers a placeholder $0.01/unit): 1.5 is
+    # $0.08 / $0.14 / $0.25 a second, Lite $0.02 / $0.03 / $0.14. Image-to-
+    # video adds $0.01 per input image, which is NOT in these rows: one
+    # start frame is a cent, and MARKUP covers it at every length and
+    # frame (the thinnest case, Lite 480p for 1 s, bills $0.03 against a
+    # $0.048 quote before the credit floor). `enable_safety_checker` stays
+    # at fal's default (on) and is never sent. The reference-to-video
+    # endpoints (`reference_image_urls`, 720p max) and the 1.0 edit /
+    # extend routes exist and are not wired.
+    "grok1.5": {
+        "t2v": "xai/grok-imagine-video/v1.5/text-to-video",
+        "i2v": "xai/grok-imagine-video/v1.5/image-to-video",
+        "params": ("duration", "resolution", "aspect_ratio"),
+        "durations": (1, 15),
+        "duration_wire": "int",
+        "resolutions": ("480p", "720p", "1080p"),
+        "default_resolution": "720p",
+        "prices": {"480p": 0.08, "720p": 0.14, "1080p": 0.25},
+        "platform": "grok",
+        "checked": "2026-10-23",
+        "source": "https://fal.ai/models/xai/grok-imagine-video/v1.5/text-to-video",
+    },
+    "grok1.5-lite": {
+        "t2v": "xai/grok-imagine-video/v1.5/lite/text-to-video",
+        "i2v": "xai/grok-imagine-video/v1.5/lite/image-to-video",
+        "params": ("duration", "resolution", "aspect_ratio"),
+        "durations": (1, 15),
+        "duration_wire": "int",
+        "resolutions": ("480p", "720p", "1080p"),
+        "default_resolution": "720p",
+        "prices": {"480p": 0.02, "720p": 0.03, "1080p": 0.14},
+        "platform": "grok",
+        "checked": "2026-10-23",
+        "source": "https://fal.ai/models/xai/grok-imagine-video/v1.5/lite/text-to-video",
+    },
 }
 
 for _key, _spec in VIDEO_MODELS.items():
@@ -401,6 +452,9 @@ SLOTS: dict[str, dict] = {
         # fal's official endpoint ids (2026-10-22)
         "t2v": "kling/v4/text-to-video",
         "i2v": "kling/v4/image-to-video",
+        # the start frame's field (2026-10-27, the queue schema: required
+        # `start_image_url`, no `image_url`); every i2v came back 422
+        "image_field": "start_image_url",
         "params": ("duration", "resolution", "aspect_ratio"),
         "durations": (3, 30),
         "duration_wire": "int",
@@ -486,6 +540,103 @@ DEFAULT_DURATION = 5
 # 9:16 keyframe is a fight the image wins or the request loses.
 DEFAULT_ASPECT = "9:16"
 
+# The frames each model takes on TEXT-TO-VIDEO, read 2026-10-22 off fal's
+# queue OpenAPI schema for every `t2v` id above (and the Kling 4.0 slot's):
+# fal.ai/api/openapi/queue/openapi.json?endpoint_id=<t2v id>. The direct
+# Video page (src/direct.py) offers exactly these and refuses anything
+# else -- with a start frame the model takes the picture's shape and none
+# is sent (build_body). Left out on purpose: Wan's "adaptive" and
+# Seedance's "auto", which are not a frame a person picks. LTX and Veo
+# take only the two platform shapes; 21:9 is Seedance's and Kling 4.0's.
+# tests/test_direct.py fails a VIDEO_MODELS row (or slot) missing here.
+T2V_ASPECTS: dict[str, tuple[str, ...]] = {
+    "ltx2.3": ("16:9", "9:16"),
+    "ltx2.5-fast": ("16:9", "9:16"),
+    "ltx2.5": ("16:9", "9:16"),
+    "wan3": ("16:9", "9:16", "1:1", "4:3", "3:4"),
+    "kling3-turbo-pro": ("16:9", "9:16", "1:1"),
+    "seedance2-fast": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
+    "seedance2": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
+    "seedance2.5": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
+    "veo3.1": ("16:9", "9:16"),
+    "grok1.5": ("16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"),
+    "grok1.5-lite": ("16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"),
+    "kling4": ("16:9", "9:16", "1:1", "21:9"),
+}
+
+
+# THE PROMPT EACH MODEL TAKES (2026-10-25), read off the same queue OpenAPI
+# schemas (the `maxLength` on `prompt`, text- and image-to-video alike). A
+# prompt past it is REFUSED by the door, never cut. Seedance's schemas set no
+# limit; PROMPT_MAX_UNSET guards a paste there (Higgsfield's best clip was
+# 6,487 characters -- the old house cap of 4,000 refused it).
+PROMPT_MAX: dict[str, int] = {
+    "ltx2.3": 5000, "ltx2.5-fast": 5000, "ltx2.5": 5000,
+    "wan3": 20000, "kling3-turbo-pro": 3072, "veo3.1": 20000,
+    "grok1.5": 4096, "grok1.5-lite": 4096, "kling4": 26000,
+}
+PROMPT_MAX_UNSET = 10000
+
+
+def prompt_max(model: str) -> int:
+    return PROMPT_MAX.get(model, PROMPT_MAX_UNSET)
+
+
+# REFERENCE-TO-VIDEO (2026-10-25, the render test: Higgsfield's best clip was
+# held to three pictures -- a storyboard, the character and the real app
+# screens -- and our Video door took one start frame). Read that day off each
+# endpoint's queue schema and model page; images only (video and audio
+# references exist and are not wired). The person names a picture in the
+# prompt by its tag (`tag`, numbered from `tag_from`). Every row is the
+# model's own per-second price; Grok adds $0.01 a picture and renders 480p or
+# 720p only with references. Kling 4.0's row counts only while its slot is
+# on VIDEO_MODELS.
+REF2V: dict[str, dict] = {
+    "seedance2.5": {"endpoint": "bytedance/seedance-2.5/reference-to-video",
+                    "field": "image_urls", "max": 30, "tag": "@Image{n}", "tag_from": 1},
+    "seedance2": {"endpoint": "bytedance/seedance-2.0/reference-to-video",
+                  "field": "image_urls", "max": 9, "tag": "@Image{n}", "tag_from": 1},
+    "seedance2-fast": {"endpoint": "bytedance/seedance-2.0/fast/reference-to-video",
+                       "field": "image_urls", "max": 9, "tag": "@Image{n}", "tag_from": 1},
+    "kling4": {"endpoint": "kling/v4/reference-to-video",
+               "field": "image_urls", "max": 10, "tag": "@Image{n}", "tag_from": 1},
+    "grok1.5": {"endpoint": "xai/grok-imagine-video/v1.5/reference-to-video",
+                "field": "reference_image_urls", "max": 7, "tag": "<IMAGE_{n}>", "tag_from": 0,
+                "resolutions": ("480p", "720p"), "per_image_usd": 0.01},
+}
+
+
+def ref_spec(model: str) -> Optional[dict]:
+    """The model's reference-to-video row, or None (it takes one start frame)."""
+    return REF2V.get(model) if model in VIDEO_MODELS else None
+
+
+def ref_max(model: str) -> int:
+    spec = ref_spec(model)
+    return spec["max"] if spec else 0
+
+
+def ref_tags(model: str, n: int) -> list[str]:
+    """What the person writes in the prompt to name each of `n` pictures."""
+    spec = ref_spec(model)
+    if not spec:
+        return []
+    return [spec["tag"].format(n=spec["tag_from"] + i) for i in range(n)]
+
+
+def shot_aspect(shot: dict, model: str) -> str:
+    """The frame a scene was written for (`shot["ratio"]`, the composer's
+    Frame pick) when `model` draws it on text or references, else the
+    platform vertical. Sent only where no start frame goes (build_body)."""
+    ratio = (shot or {}).get("ratio")
+    return ratio if ratio in t2v_aspects(model) else DEFAULT_ASPECT
+
+
+def t2v_aspects(model: str) -> tuple[str, ...]:
+    """The frames `model` takes on text-to-video; the platform vertical
+    alone for a model nobody has read the schema of yet."""
+    return T2V_ASPECTS.get(model) or (DEFAULT_ASPECT,)
+
 # The bridge that wakes the dormant four: shot.PLATFORMS name -> the model
 # a shot planned for that platform renders on. `connector(name)` binds
 # this module to one of these, and orchestrator.generate_render maps the
@@ -499,6 +650,9 @@ PLATFORM_MODELS: dict[str, str] = {
     "seedance": "seedance2-fast",
     # Veo through fal since 2026-09-26: the platform survived veo.py.
     "veo": "veo3.1",
+    # Grok Imagine through fal since 2026-10-23: Lite is the family's
+    # cheapest-credible, 1.5 is one pick away on the card.
+    "grok": "grok1.5-lite",
 }
 # What generations_today() counts for the FAL daily cap: every tool name
 # this adapter can write. NOT "fal" -- a row is logged under the platform
@@ -506,6 +660,12 @@ PLATFORM_MODELS: dict[str, str] = {
 # one label. The image tool name is deliberately outside this set (see the
 # module docstring's IMAGES note).
 VIDEO_LOG_TOOLS = tuple(sorted(PLATFORM_MODELS))
+
+# Platforms whose clips go out WITHOUT timeline.MOTION_DIRECTIVE on top
+# (2026-10-23, Mike's call after the first Grok renders). The directive is
+# the house rule for every other model; a platform joins this set only on
+# evidence that its own prompt guidance contradicts it.
+DIRECTIVE_OFF_PLATFORMS: frozenset[str] = frozenset({"grok"})
 
 # THE IMAGE MODELS (widened 2026-10-04, Mike's call: "images don't just
 # pull from nano banana, they use fal.ai and can choose between different
@@ -539,10 +699,14 @@ IMAGE_MODELS: dict[str, dict] = {
         "note": "Sharp, fast, the default. Text-only (no reference input).",
         "endpoint": "fal-ai/flux-pro/v1.1",
         "edit": None,
+        # `image_size` as {width, height}: the schema has no width/height
+        # fields, and with them every still came back at fal's default
+        # landscape_4_3 whatever frame was picked (2026-10-27, read off the
+        # queue OpenAPI schema)
         "size": "wh",
-        "params": ("width", "height", "num_inference_steps", "guidance_scale", "seed"),
+        "params": ("image_size", "seed"),
         "usd_per_megapixel": 0.04,
-        "checked": "2026-09-08",
+        "checked": "2026-10-27 (queue OpenAPI: image_size, default landscape_4_3)",
         "source": "https://fal.ai/models/fal-ai/flux-pro/v1.1",
     },
     "flux2-pro": {
@@ -566,6 +730,9 @@ IMAGE_MODELS: dict[str, dict] = {
         "endpoint": "fal-ai/nano-banana-pro",
         "edit": "fal-ai/nano-banana-pro/edit",
         "size": "aspect",
+        # fal's default is png; the studio files every still as a .jpg
+        "output_format": "jpeg",
+        "min_prompt": 3,
         "params": ("aspect_ratio", "resolution"),
         "usd_per_image": 0.15,
         "checked": "2026-10-04 (fal page via search: 1K/2K $0.15; 4K $0.30, not offered here)",
@@ -596,9 +763,12 @@ IMAGE_MODELS: dict[str, dict] = {
         "note": "OpenAI's image model; strong on text and instructions, takes up to 16 references.",
         # the OPENAI namespace, not fal-ai/ (the Wan / Seedance lesson)
         "endpoint": "openai/gpt-image-2",
+        "output_format": "jpeg",       # fal's default is png; filed as .jpg
         "edit": "openai/gpt-image-2/edit",
-        # three named sizes, priced each; `quality` is sent explicitly at
-        # medium -- fal's default is high, four times the price
+        # three named sizes, priced each, and the PIXEL BUDGET for the frame
+        # actually sent (`named_dims`: the aspect's true shape, 2026-10-24);
+        # `quality` is sent explicitly at medium -- fal's default is high,
+        # four times the price
         "size": "named",
         "sizes": {"square": "1024x1024", "portrait": "1024x1536", "landscape": "1536x1024"},
         "quality": "medium",
@@ -624,6 +794,7 @@ IMAGE_MODELS: dict[str, dict] = {
         "label": "GPT Image 2.5 Flare",
         "note": "OpenAI's fast default; text, layouts and edits, up to 16 references.",
         "endpoint": "openai/gpt-image-2.5/flare/text-to-image",
+        "output_format": "jpeg",       # fal's default is png; filed as .jpg
         "edit": "openai/gpt-image-2.5/flare/edit",
         "size": "wh",
         "quality": "high",
@@ -637,6 +808,7 @@ IMAGE_MODELS: dict[str, dict] = {
         "label": "GPT Image 2.5 Sunburst",
         "note": "OpenAI's precision tier; fine detail and identity kept across edits, up to 16 references.",
         "endpoint": "openai/gpt-image-2.5/sunburst/text-to-image",
+        "output_format": "jpeg",       # fal's default is png; filed as .jpg
         "edit": "openai/gpt-image-2.5/sunburst/edit",
         "size": "wh",
         "quality": "high",
@@ -659,7 +831,13 @@ IMAGE_MODELS: dict[str, dict] = {
         "note": "Graphic, typographic, poster-like. Text-only.",
         "endpoint": "ideogram/v4.5",
         "edit": None,
-        "size": "enum",
+        # explicit sizes off the schema's list (2026-10-27): its named
+        # presets drew 4:5 and 2:3 as 3:4, 5:4 and 3:2 as 4:3. It has no
+        # 21:9, so that frame is not offered on it.
+        "size": "exact",
+        "exact": {"1:1": (1024, 1024), "4:5": (896, 1120), "5:4": (1120, 896),
+                  "3:4": (864, 1152), "4:3": (1152, 864), "2:3": (832, 1248),
+                  "3:2": (1248, 832), "9:16": (720, 1280), "16:9": (1280, 720)},
         "quality": "medium",
         "params": ("image_size", "quality"),
         "usd_per_image": 0.06,
@@ -693,12 +871,41 @@ def image_dims(aspect: Optional[str]) -> tuple[int, int]:
     return IMAGE_SIZES.get(aspect or "", IMAGE_SIZES[DEFAULT_IMAGE_ASPECT])
 
 
+def image_aspects(model: str) -> tuple[str, ...]:
+    """The frames `model` really draws: every composer aspect, except a
+    model with a fixed size list (Ideogram), which takes only its own."""
+    spec = IMAGE_MODELS.get(model) or {}
+    if spec.get("size") == "exact":
+        return tuple(a for a in IMAGE_SIZES if a in spec["exact"])
+    return tuple(IMAGE_SIZES)
+
+
 def named_size(spec: dict, aspect: Optional[str]) -> str:
     """A `size: "named"` model's size string for the composer's aspect:
-    square, portrait or landscape by the frame's orientation."""
+    square, portrait or landscape by the frame's orientation. It is the
+    PRICE row and the pixel budget; `named_dims` is what is sent."""
     w, h = image_dims(aspect)
     key = "square" if w == h else "portrait" if h > w else "landscape"
     return spec["sizes"][key]
+
+
+def named_dims(spec: dict, aspect: Optional[str]) -> tuple[int, int]:
+    """The frame a `size: "named"` model is sent: the aspect's TRUE shape at
+    no more pixels than its named size (2026-10-24, the render test: "9:16"
+    went out as 1024x1536, a 2:3 still, and every clip drawn from it came out
+    3:4). fal's GPT Image 2 takes any {width, height} in multiples of 16, so
+    the shape is kept and the price row (billed by pixels) still covers it."""
+    w, h = image_dims(aspect)
+    nw, nh = (int(n) for n in named_size(spec, aspect).split("x"))
+    budget = nw * nh
+    k = (budget / (w * h)) ** 0.5
+    sw, sh = round(w * k / 16) * 16, round(h * k / 16) * 16
+    while sw * sh > budget:
+        if sw >= sh:
+            sw -= 16
+        else:
+            sh -= 16
+    return sw, sh
 
 
 def image_usd(model: str, aspect: Optional[str] = None, references: int = 0) -> float:
@@ -771,17 +978,25 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
     w, h = image_dims(aspect)
     if spec.get("quality"):
         body["quality"] = spec["quality"]
+    if spec.get("output_format"):
+        body["output_format"] = spec["output_format"]
     if size == "named":
         # fal's image_size takes a named enum or an {width, height} object,
         # never a "WxH" string (a 422 after the hold, 2026-10-15)
-        sw, sh = (int(n) for n in named_size(spec, aspect).split("x"))
+        sw, sh = named_dims(spec, aspect)
         body["image_size"] = {"width": sw, "height": sh}
     elif size == "aspect":
         body["aspect_ratio"] = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT
     elif size == "enum":
         body["image_size"] = IMAGE_SIZE_ENUM.get(aspect or "", "square_hd")
-    elif "width" in spec["params"]:
-        body["width"], body["height"] = w, h
+    elif size == "exact":
+        # an aspect off the composer's list draws square, as on every model
+        frame = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT
+        if frame not in spec["exact"]:
+            raise ValueError(f"{spec['label']} does not draw {frame} -- one of "
+                             f"{', '.join(image_aspects(model))}")
+        ew, eh = spec["exact"][frame]
+        body["image_size"] = {"width": ew, "height": eh}
     else:
         k = int(spec.get("scale", 1))
         body["image_size"] = {"width": w * k, "height": h * k}
@@ -789,6 +1004,15 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
 # The tool name an image attempt is logged under -- generative.IMAGE_TOOLS,
 # beside midjourney and nano, never a video platform.
 IMAGE_LOG_TOOL = "fal"
+
+
+def _video_label(model: str) -> str:
+    """A clip model's public name, else its id."""
+    try:
+        from .direct import video_label
+        return video_label(model)
+    except Exception:                                   # noqa: BLE001
+        return model
 
 
 def model_spec(model: str) -> dict:
@@ -869,7 +1093,8 @@ def build_body(prompt: str, *, model: str = DEFAULT_MODEL,
                image_url: Optional[str] = None, duration: int = DEFAULT_DURATION,
                aspect_ratio: str = DEFAULT_ASPECT,
                resolution: Optional[str] = None,
-               negative_prompt: str = "") -> tuple[str, dict]:
+               negative_prompt: str = "",
+               reference_urls=None) -> tuple[str, dict]:
     """(model_id, json body) for one render -- pure, so the entire request
     shape is testable without spending a cent.
 
@@ -891,6 +1116,20 @@ def build_body(prompt: str, *, model: str = DEFAULT_MODEL,
     model_id = spec["i2v"] if image_url else spec["t2v"]
     allowed = spec["params"]
     body: dict = {"prompt": prompt}
+    refs = list(reference_urls or [])
+    if refs:
+        # REFERENCES, not a start frame (REF2V): the model's own endpoint and
+        # field. The frame is still the person's pick -- pictures held for
+        # their content do not set it.
+        ref = ref_spec(model)
+        if ref is None:
+            raise ValueError(f"{model} takes one start frame, not references")
+        if image_url:
+            raise ValueError("a start frame or references, not both")
+        if len(refs) > ref["max"]:
+            raise ValueError(f"{model} takes up to {ref['max']} references")
+        model_id = ref["endpoint"]
+        body[ref["field"]] = refs
     if image_url:
         body[spec.get("image_field", "image_url")] = image_url
     if "duration" in allowed:
@@ -988,7 +1227,8 @@ def price_per_second(model: str = DEFAULT_MODEL,
 
 def estimate_cost(n: int, *, model: str = DEFAULT_MODEL,
                   duration: int = DEFAULT_DURATION,
-                  resolution: Optional[str] = None) -> float:
+                  resolution: Optional[str] = None,
+                  references: int = 0) -> float:
     """What n clips will cost, off the dated table above.
 
     Real per-second pricing, not an estimate scaled off a clip: fal publishes a
@@ -1001,7 +1241,8 @@ def estimate_cost(n: int, *, model: str = DEFAULT_MODEL,
     Seedance is $3.034, not $3.03).
     """
     seconds = fit_duration(model, duration)
-    return round(n * price_per_second(model, resolution) * seconds, 4)
+    per_image = (ref_spec(model) or {}).get("per_image_usd", 0) if references else 0
+    return round(n * (price_per_second(model, resolution) * seconds + per_image * references), 4)
 
 
 def estimate_image_cost(n: int, *, megapixels: float = 1.0) -> float:
@@ -1338,7 +1579,8 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
                    approved: Optional[bool] = None,
                    account_id: Optional[int] = None,
                    charge: Optional[charging.Charge] = None,
-                   track: Optional[dict] = None) -> Path:
+                   track: Optional[dict] = None,
+                   reference_urls=None) -> Path:
     """
     The thin wrapper: submit -> poll -> fetch -> download. Raises on
     anything, including a missing spend approval, which is checked HERE so
@@ -1372,16 +1614,18 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
     model_id, body = build_body(prompt, model=model, image_url=image_url,
                                 duration=duration, aspect_ratio=aspect_ratio,
                                 resolution=resolution,
-                                negative_prompt=negative_prompt)
+                                negative_prompt=negative_prompt,
+                                reference_urls=reference_urls)
     out_path = Path(out_path)
     own = charge is None
     if own:
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=estimate_cost(1, model=model, duration=duration,
-                                       resolution=resolution),
+                                       resolution=resolution,
+                                       references=len(reference_urls or [])),
             key_source=KEY_SOURCE,
-            dsn=db_path)
+            dsn=db_path, model=model)
     charge.take()          # InsufficientCredit raises HERE: nothing submitted
     tracker = None
     if track is not None or charge.billed:
@@ -1439,8 +1683,9 @@ def generate_image(prompt: str, out_path, *, model: str = DEFAULT_IMAGE_MODEL,
     prompt = safe_prompt(prompt, db_path, account_id)
     endpoint, body, _ = image_request(model, prompt, aspect=aspect,
                                       reference_urls=reference_urls)
-    if aspect is None and "width" in spec["params"]:
-        body["width"], body["height"] = int(width), int(height)
+    if aspect is None and spec.get("size", "wh") == "wh" and width and height:
+        k = int(spec.get("scale", 1))
+        body["image_size"] = {"width": int(width) * k, "height": int(height) * k}
     result, skip = _submit_and_wait(endpoint, body, http=http,
                                     account_id=account_id)
     url = _output_url(result, skip)
@@ -1510,7 +1755,12 @@ def as_image_url(value, *, resolve_photo=None,
                 except OSError:
                     data = None
         if data is None:
-            return media.bucket_url_for(value, account_id)
+            # a render this machine has no file for (Fly) is its bucket
+            # copy, which on a free trial is the MARKED one: the clean
+            # original goes, as for a URL above
+            from . import watermark
+            found = media.bucket_url_for(value, account_id)
+            return watermark.clean_url(found) if found else None
     elif isinstance(value, (bytes, bytearray)):
         data = bytes(value)
     else:
@@ -1625,7 +1875,7 @@ def generate_candidates(prompt: str, out_dir, n: int = 3, *,
                 account_id, provider="fal", ref=charging.attempt_ref(out_path),
                 estimate_usd=estimate_cost(1, model=model, duration=duration,
                                            resolution=cfg.get("resolution")),
-                key_source=key_source, dsn=db_path)
+                key_source=key_source, dsn=db_path, model=model)
 
             base_params = {"provider": "fal", "model": model,
                            "model_id": model_spec(model)["t2v"],
@@ -1706,11 +1956,20 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                       account_id: Optional[int] = None,
                       quote=None,
                       part: Optional[int] = None,
+                      one_clip: bool = False,
 ) -> dict:
     """
     `part` (2026-09-10) renders ONE shot of a timed scene -- its composed
     prompt, anchored on its own still, attached to that part (see
     src/timeline.py). None is the whole scene, exactly as before.
+
+    `one_clip` (2026-10-26) renders a TIMED scene whole: every shot in one
+    prompt with its window and a hard cut between them
+    (timeline.one_clip_target), and the scene's photos sent as references
+    on the model's reference-to-video endpoint (REF2V), each named in the
+    prompt by its tag. A model with no such endpoint gets the first shot's
+    still (or the scene's) as its start frame, as a whole scene always did.
+    The clip attaches to the shot, like any whole-scene render.
 
     Never raises: {"ok", "media_url", "generation_id", "path", "error"}.
     One render for one concept shot -- the providers.REQUIRED contract the
@@ -1748,7 +2007,21 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         if shot is None:
             return {"ok": False, "error": f"concept {concept_id} has no shot {shot_n}"}
         from . import timeline
-        target = timeline.render_target(shot, part)
+        ref_urls: list = []
+        if one_clip:
+            # the photos first, because which of them can be fetched decides
+            # which tags the prompt may name
+            sent = []
+            if ref_spec(model):
+                for ref in timeline.one_clip_refs(shot)[:ref_max(model)]:
+                    url = as_image_url(ref, account_id=account_id, resolve_photo=resolve_photo)
+                    if url:
+                        sent.append(ref)
+                        ref_urls.append(url)
+            target = timeline.one_clip_target(
+                shot, dict(zip(sent, ref_tags(model, len(sent)))))
+        else:
+            target = timeline.render_target(shot, part)
         if target is None:
             return {"ok": False, "error": f"shot {shot_n} has no part {part}"}
         prompt = target["prompt"]
@@ -1759,9 +2032,10 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         # as_image_url: fal fetches an
         # image_url server-side, so a local keyframe with no R2 behind it
         # is dropped and prompt_image records False -- nothing downstream
-        # gets to claim an anchor that never left the building.
-        image_url = as_image_url(target["reference_image"], account_id=account_id,
-                                 resolve_photo=resolve_photo)
+        # gets to claim an anchor that never left the building. References
+        # and a start frame never go together (build_body refuses both).
+        image_url = None if ref_urls else as_image_url(
+            target["reference_image"], account_id=account_id, resolve_photo=resolve_photo)
         # The prompt as THIS model is asked for it (src/prompts_for.py),
         # decided only once it is known whether a start frame really goes
         # out. Switched off -- the default -- it is the prompt as written
@@ -1769,12 +2043,29 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         from . import prompts_for
         shaped = prompts_for.render(model, target, anchored=bool(image_url))
         prompt = shaped["prompt"]
+        # Grok Imagine is sent the prompt as written, without the motion
+        # directive (timeline.MOTION_DIRECTIVE): its guidance is one camera
+        # move the prompt names and a start frame that holds the subject,
+        # and "open already mid-motion, move the camera only with the
+        # subject" fought both on the first live renders (2026-10-23,
+        # scenes 443/444: a subject faded in, a push-in ignored).
+        if model_spec(model)["platform"] in DIRECTIVE_OFF_PLATFORMS:
+            prompt = timeline.without_directive(prompt)
         # the project's BRAND KIT, when it picked one (src/brand_kits.py):
         # its look and avoid-list after whatever the model rule made, so no
         # rule can drop them. No kit: the prompt exactly as it was.
         from . import brand_kits
         kit = brand_kits.for_concept(concept_id, db_path, account_id=account_id)
         prompt = brand_kits.dress(prompt, kit)
+        # the model's own prompt cap, before the hold (2026-10-27): a one-clip
+        # scene carries every shot, and Kling 3 stops at 3,072 characters --
+        # fal refused it only after the queue wait, with no reason given
+        cap = prompt_max(model)
+        if len(prompt) > cap:
+            return {"ok": False,
+                    "error": (f"the scene's prompt is {len(prompt):,} characters and "
+                              f"{_video_label(model)} takes up to {cap:,}: "
+                              f"shorten the scene or pick a model that takes longer prompts")}
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         out_path = RENDER_DIR / (render_names.unguessable(
@@ -1783,14 +2074,16 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=estimate_cost(1, model=model, duration=duration,
-                                       resolution=resolution),
-            key_source=key_source, dsn=db_path, quote=quote)
+                                       resolution=resolution, references=len(ref_urls)),
+            key_source=key_source, dsn=db_path, quote=quote, model=model)
         platform = model_spec(model)["platform"]
         base_params = {"provider": "fal", "model": model,
                        "duration": duration,
                        "resolution": resolution or model_spec(model)["default_resolution"],
                        "concept_id": concept_id, "shot_n": shot_n,
                        **({"part": part} if part else {}),
+                       **({"one_clip": True} if one_clip else {}),
+                       **({"references": len(ref_urls)} if ref_urls else {}),
                        "prompt_image": bool(image_url),
                        "key_source": key_source,
                        # which per-model rule shaped the prompt, when one did:
@@ -1804,6 +2097,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         track = {"kind": "shot", "concept_id": concept_id, "shot_n": shot_n,
                  "part": part, "model": model, "duration": duration,
                  "resolution": resolution, "prompt": prompt,
+                 "references": len(ref_urls),
                  "platform": platform,
                  "params": base_params}
 
@@ -1821,9 +2115,11 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                 dsn=db_path, account_id=account_id):
             generate_video(prompt, out_path, model=model, image_url=image_url,
                            duration=duration, resolution=resolution,
+                           aspect_ratio=shot_aspect(shot, model),
                            negative_prompt=shaped["negative_prompt"],
                            http=http, db_path=db_path, approved=approved,
-                           account_id=account_id, charge=charge, track=track)
+                           account_id=account_id, charge=charge, track=track,
+                           **({"reference_urls": ref_urls} if ref_urls else {}))
 
         result = _finish_shot(
             track, out_path,
@@ -1863,7 +2159,8 @@ def _finish_shot(track: dict, out_path: Path, *, settle, extra_params: dict,
             params=params,
             output_path=str(out_path),
             cost_usd=estimate_cost(1, model=model, duration=track["duration"],
-                                   resolution=track.get("resolution")),
+                                   resolution=track.get("resolution"),
+                                   references=track.get("references") or 0),
             **kwargs,
             account_id=account_id)
     settle(generation_id)
@@ -1961,10 +2258,15 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                          resolution: Optional[str] = None,
                          aspect_ratio: Optional[str] = None,
                          source: str = "workflow", bank: bool = False,
-                         project_id: Optional[int] = None) -> dict:
+                         project_id: Optional[int] = None,
+                         references=None) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error"}.
     The free-standing render behind the Director canvas's Generate node.
+    `references` (2026-10-25, the Video page) are pictures the model is held
+    to on its reference-to-video endpoint (REF2V), each made fetchable like
+    a start frame; one that cannot be is dropped and `references` on the
+    result says how many went.
 
     `duration` / `resolution` / `aspect_ratio` (2026-10-07, the MCP's
     generate_video) are the caller's pick, priced and sent as given; None
@@ -1994,6 +2296,14 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         image_url = as_image_url(reference_image, resolve_photo=resolve_photo,
                                  account_id=account_id)
+        ref_urls = [u for u in (as_image_url(r, resolve_photo=resolve_photo, account_id=account_id)
+                                for r in (references or [])) if u]
+        if references and not ref_urls:
+            return {"ok": False, "error": "none of the reference pictures could be read"}
+        # a start frame the person picked and the model cannot be handed is
+        # refused, never quietly rendered as text-to-video (2026-10-27)
+        if reference_image and not image_url:
+            return {"ok": False, "error": "the start frame could not be read"}
         # filed under a project that picked a brand kit: its look rides along
         from . import brand_kits
         kit = brand_kits.for_project_id(project_id, db_path, account_id=account_id)
@@ -2003,12 +2313,13 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         out_path = RENDER_DIR / (render_names.unguessable(f"wf-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
-        usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution)
+        usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution,
+                            references=len(ref_urls))
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=usd,
             key_source=key_source, source=source, dsn=db_path,
-            quote=quote)
+            quote=quote, model=model)
         platform = model_spec(model)["platform"]
         base_params = {"provider": "fal", "model": model,
                        "duration": seconds, "source": source,
@@ -2016,6 +2327,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                        **({"project_id": int(project_id)} if project_id else {}),
                        **brand_kits.provenance(kit),
                        "prompt_image": bool(image_url),
+                       **({"references": len(ref_urls)} if ref_urls else {}),
                        "key_source": key_source,
                        **fal_requests.ref_params(charge.ref)}
         track = {"kind": "row", "platform": platform, "prompt": prompt,
@@ -2038,6 +2350,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
             generate_video(prompt, out_path, model=model, image_url=image_url,
                            http=http, db_path=db_path, approved=approved,
                            account_id=account_id, charge=charge, track=track,
+                           **({"reference_urls": ref_urls} if ref_urls else {}),
                            **({"duration": seconds} if duration is not None else {}),
                            **({"resolution": resolution} if resolution else {}),
                            **({"aspect_ratio": aspect_ratio} if aspect_ratio else {}))
@@ -2081,10 +2394,16 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                                source: str = "workflow",
                                bank: bool = True,
                                project_id: Optional[int] = None,
-                               quote=None, brand_kit: bool = True) -> dict:
+                               quote=None, brand_kit: bool = True,
+                               dressed_kit: Optional[dict] = None,
+                               provenance: Optional[dict] = None) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error",
     "references", "asset_id"}.
+    `dressed_kit` (2026-10-24) is the kit the CALLER already put into the
+    prompt: it is recorded, never added again (the Create still, which
+    dresses once in the route). `provenance` rides into the generations row
+    and the Library's metadata as given (the provenance rule: no columns).
     A still on one of IMAGE_MODELS -- the composer's alternative to
     nano_banana (2026-10-04), on the same key and the same gates as the
     clips. Logged under IMAGE_LOG_TOOL so it never lands in the video
@@ -2128,10 +2447,11 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
         # picture can move the price past the one the person was shown.
         from . import brand_kits
         # `brand_kit=False` is the composer's kit chip switched off for one still
-        kit = ((brand_kits.for_project_id(project_id, db_path, account_id=account_id)
-                or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
-               if brand_kit else None)
-        prompt = brand_kits.dress(prompt, kit)
+        kit = dressed_kit
+        if kit is None and brand_kit:
+            kit = (brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+                   or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
+            prompt = brand_kits.dress(prompt, kit)
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else ""
@@ -2164,6 +2484,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                   # a still no scene carries, filed under a project (2026-10-08)
                   **({"project_id": int(project_id)} if project_id else {}),
                   **brand_kits.provenance(kit),
+                  **(provenance or {}),
                   **charge.params()}
         try:
             shot_row_id = _shot_row_for_prompt(

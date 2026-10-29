@@ -250,6 +250,256 @@
    "credits": 89,
    "model": "reframe",
    "gen_id": "gen:185"
+  },
+  "create.usecase.launch_teaser": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-162900-f6b241e2b1580c72d65dabddbe064fcc.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:190"
+  },
+  "create.usecase.seasonal": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164016-8524db5f11dcb488ffbcbb16b19cf982.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:191"
+  },
+  "create.usecase.founder": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164020-0bc4ef04b70b831ecaebafed4bbe94d2.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:192"
+  },
+  "create.usecase.hook": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164025-a3744f57632561f6f401cfb6b3f9b0f4.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:193"
+  },
+  "create.usecase.day_in_life": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164028-84aec29df1bbf82b49f6dab65769ee83.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:194"
+  },
+  "create.usecase.unboxing": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164032-28c202900b779f66cb5a07c655fb5ba9.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:195"
+  },
+  "create.usecase.scifi": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164041-72cf5bf4a0a548c4b2fbd201813e0871.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:196"
+  },
+  "create.usecase.horror": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164043-1658b260486712288a1d08d597db9e47.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:197"
+  },
+  "create.usecase.period": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164045-1d514c65694d9b38ed213f9a43feeca5.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:198"
+  },
+  "create.usecase.real_estate": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164051-4880850a7665e3bcc7676fbc86e88628.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:199"
+  },
+  "create.usecase.gym": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164057-80c0938f60acc355d5b0a2cdc39cd14b.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:200"
+  },
+  "create.usecase.event": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164059-e36da87a4ab83cd0db177e3e729ec555.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:201"
+  },
+  "effect.window_grab": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/nano-banana-pro-20261021-133421.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222443-b2b599ac5f0a3603db17b17bf0c8df73.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/nano-banana-pro-20261021-133421.jpg",
+   "aspect": "9:16",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:242"
+  },
+  "effect.gone": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/gpt-image-2-20261024-185706-9f58894c8a9d386d1a754fae64fd764a.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222449-5690acd988b092d40887397c4e56f84e.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/gpt-image-2-20261024-185706-9f58894c8a9d386d1a754fae64fd764a.jpg",
+   "aspect": "2:3",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:244"
+  },
+  "effect.iris_dive": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261023-171638-9b373781c1935e064bd394d2b02e01bb.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222455-a803deb79c13dacc17d67b4133946a85.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261023-171638-9b373781c1935e064bd394d2b02e01bb.jpg",
+   "aspect": "4:3",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:245"
+  },
+  "effect.echo_crowd": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261022-050506.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222501-9cf7431594c3899bf0948f5cb2d5b723.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261022-050506.jpg",
+   "aspect": "4:3",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:246"
+  },
+  "effect.time_stop": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122005-791a044fcd0abc1d07b0e6418fe13122.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222506-f5d64ad2a4f986f6fb08ce19a7397b48.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122005-791a044fcd0abc1d07b0e6418fe13122.jpg",
+   "aspect": "4:5",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:247"
+  },
+  "effect.city_giant": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261023-171638-9ac4df993470b46195083a3608093b3a.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222512-6a905b35189bbf54cca6d73dbeae6292.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261023-171638-9ac4df993470b46195083a3608093b3a.jpg",
+   "aspect": "4:3",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:248"
+  },
+  "effect.meltdown": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164041-72cf5bf4a0a548c4b2fbd201813e0871.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222524-d8b4d12bc1fb3f673f5be182fb5df263.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164041-72cf5bf4a0a548c4b2fbd201813e0871.jpg",
+   "aspect": "4:5",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:249"
+  },
+  "effect.pocket_me": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164025-a3744f57632561f6f401cfb6b3f9b0f4.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222530-55b6f761db470d3aba8ad192bb66a915.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164025-a3744f57632561f6f401cfb6b3f9b0f4.jpg",
+   "aspect": "4:5",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:250"
+  },
+  "effect.overhead_flip": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/nano-banana-pro-20261021-124001.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261026-222529-cbb688c3cac02aee0d68a022ff6c7a97.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/nano-banana-pro-20261021-124001.jpg",
+   "aspect": "9:16",
+   "credits": 168,
+   "model": "kling3-turbo-pro",
+   "gen_id": "gen:251"
+  },
+  "look.title_sequence": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
+   "after": "https://media.phantra.ai/site/showcase/halloween-v1/title_sequence.mp4",
+   "poster": "https://media.phantra.ai/site/showcase/halloween-v1/title_sequence.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py title_sequence (real module, with the Made in Phantra end card; 720p web encode)",
+   "gen_id": null
+  },
+  "look.the_ward": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
+   "after": "https://media.phantra.ai/site/showcase/halloween-v1/the_ward.mp4",
+   "poster": "https://media.phantra.ai/site/showcase/halloween-v1/the_ward.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py the_ward (real module, with the Made in Phantra end card; 720p web encode)",
+   "gen_id": null
+  },
+  "look.haunted_manor": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
+   "after": "https://media.phantra.ai/site/showcase/halloween-v1/haunted_manor.mp4",
+   "poster": "https://media.phantra.ai/site/showcase/halloween-v1/haunted_manor.jpg",
+   "aspect": "16:9",
+   "credits": 0,
+   "model": "src/free_looks.py haunted_manor (real module, with the Made in Phantra end card; 720p web encode)",
+   "gen_id": null
+  },
+  "look.found_tape": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
+   "after": "https://media.phantra.ai/site/showcase/halloween-v1/found_tape.mp4",
+   "poster": "https://media.phantra.ai/site/showcase/halloween-v1/found_tape.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py found_tape (real module, with the Made in Phantra end card; 720p web encode)",
+   "gen_id": null
   }
  },
  "cards": {
@@ -298,7 +548,8 @@
   }
  },
  "pending": {
-  "effect.4k_smooth": "skipped: cap (355 new + 236 would exceed the 458 left; quoted 236)"
+  "effect.4k_smooth": "skipped: cap (355 new + 236 would exceed the 458 left; quoted 236)",
+  "effect.float_drop": "kept off the wall: gen:243 (2026-10-26) never falls, only the bottle floats -- the source was a close-up selfie; re-render on a full-body still"
  },
- "note": "Rendered 2026-10-22 00:55-08:40 ET on Mike's word, 897 of the 1,000-credit cap: six LTX 2.3 source clips + two FLUX start frames (542) through the Desktop MCP server, then 14 stills (140) and four paid effects (215) through the studio server on current main (`python -m src.mcp_server` from this worktree, quote then approve). 4K Smooth skipped by the cap. Examples, not customer footage."
+ "note": "Rendered 2026-10-22 00:55-08:40 ET on Mike's word, 897 of the 1,000-credit cap: six LTX 2.3 source clips + two FLUX start frames (542) through the Desktop MCP server, then 14 stills (140) and four paid effects (215) through the studio server on current main (`python -m src.mcp_server` from this worktree, quote then approve). 4K Smooth skipped by the cap. Examples, not customer footage. 2026-10-22 afternoon (the Runway / Higgsfield pass, Mike's yes): 12 more use-case stills (120) on Seedream 4.5 at 4:5, gen:190-201, three per tab. 2026-10-26 evening (Mike's yes, 1,680 credits): one example per recipe effect, ten renders on Kling 3 Turbo Pro 5s 1080p (168 each) through the studio server's generate_video with each recipe's exact prompt (src/effect_recipes.prompt_for) and a different invented person per recipe, gen:242-251; nine kept, Float Drop kept off. 2026-10-27 (Mike's yes, 0 credits): the four Halloween free looks on sources clip1-4, rendered with src/free_looks.py and uploaded to site/showcase/halloween-v1/."
 }

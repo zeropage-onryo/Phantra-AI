@@ -31,6 +31,7 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
     title: "Plans",
     links: [
       ["Pricing", "/pricing"],
+      ["What's new", "/whats-new"],
       ["FAQ", "/faq"],
       ["Support", "/support"],
       ["Sign in", "/studio"],
@@ -42,23 +43,33 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
     links: [
       ["Terms", "/terms"],
       ["Privacy", "/privacy"],
+      ["Data deletion", "/data-deletion"],
     ],
   },
 ];
 
-export function SiteFooter() {
+/** `compact` (the home page, 2026-10-26): on a phone the footer is the
+ *  Studio, Plans and Legal links in two columns; the Tools and Models lists
+ *  stay in the page (crawlers follow them) but are not drawn under 640px,
+ *  where the header's menu carries both. */
+export function SiteFooter({ compact = false }: { compact?: boolean }) {
   return (
     <footer className="border-t border-border">
       <div className="mx-auto max-w-[1200px] px-6 py-14">
-        <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-[1.4fr_repeat(5,1fr)]">
-          <div className="max-w-xs">
+        <div
+          className={`grid sm:grid-cols-2 md:grid-cols-[1.4fr_repeat(5,1fr)] ${compact ? "grid-cols-2 gap-x-6 gap-y-10 sm:gap-10" : "gap-10"}`}
+        >
+          <div className={`max-w-xs ${compact ? "col-span-2 sm:col-span-1" : ""}`}>
             <Wordmark />
             <p className="mt-4 text-sm leading-relaxed text-[var(--ink-2)]">
               The AI content studio that creates for you — for filmmakers, brands, and creators.
             </p>
           </div>
           {COLUMNS.map((column) => (
-            <div key={column.title} className="flex flex-col gap-3">
+            <div
+              key={column.title}
+              className={`flex-col gap-3 ${compact && (column.title === "Tools" || column.title === "Models") ? "hidden sm:flex" : "flex"}`}
+            >
               <span className="eyebrow">{column.title}</span>
               {column.links.map(([label, href]) => (
                 <Link

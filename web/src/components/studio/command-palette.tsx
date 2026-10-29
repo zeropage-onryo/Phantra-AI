@@ -25,6 +25,8 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
 import {
   AtSign,
+  CalendarDays,
+  Megaphone,
   Clapperboard,
   CornerDownLeft,
   CreditCard,
@@ -203,6 +205,8 @@ export function CommandPalette({
         page("Edit", "/studio/cut", Scissors, "timeline editor cuts"),
         page("Elements", "/studio/elements", AtSign, "characters props products places cast"),
         page("Renders", "/studio/renders", ListVideo, "rendering jobs running finished clips queue"),
+        page("Calendar", "/studio/calendar", CalendarDays, "schedule posts publish social week month feed queue"),
+        page("Ad Studio", "/studio/ads", Megaphone, "ads advert commercial ugc product showcase tv spot motion ad"),
         page("Settings", SETTINGS_HOME, Settings, "account password email profile"),
       ],
       // one per section of the settings area (lib/settings-sections.ts):

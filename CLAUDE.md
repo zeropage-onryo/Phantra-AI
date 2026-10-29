@@ -22,8 +22,21 @@ What a signed-in person has:
 
 - **Create** (`/studio`): one chat box. The brain talks, proposes a plan, and makes a still or
   writes a scene only on an ask; every spend waits on a priced card.
+- **Image and Video** (`/studio/image`, `/studio/video`, 2026-10-22): the direct generators. Pick
+  any image or clip model, type a prompt (sent as typed), see the price on the one Generate
+  button; a clip may be made from text alone, one start frame, or (on Seedance, Kling 4 and
+  Grok 1.5, 2026-10-25) several pictures held as references and named in the prompt by tag
+  (`fal.REF2V`), each model's prompt held to its own cap (`fal.PROMPT_MAX`), and writes no
+  scene (`docs/tasks/task-direct-generators.md`).
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
   work. A brand lives inside a project, never studio-wide.
+- **Ad Studio** (`/studio/ads`, 2026-10-26, `docs/tasks/task-ad-studio.md`): a page over the one
+  composer -- a format (each rides on an ad skill), a product element, a short brief and a brand
+  kit -- whose "Start in Create" link carries them into the box and puts the brief on the
+  conversation's draft (`studio`), told to every turn by `src/studios.py`. Config in
+  `prompts/studios/`. A paid flat add-on (`src/addons.py`, OWNED `account_addons`,
+  `pricing.ADDONS`): its Stripe events are routed before any plan branch; the page is open to
+  all, the brief reaches the brain only with the add-on.
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
   Veo, Seedance, LTX, Wan). The priced button on the card is the only place a clip is paid for.
 - **Elements** (`/studio/elements`): the characters, products and places a scene is held to,
@@ -37,6 +50,14 @@ What a signed-in person has:
   studio), plus the stdio studio server Claude Desktop launches.
 - **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
   one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.
+  Beside them, the editor panels `phantra-premiere-plugin` (Adobe Premiere Pro) and
+  `phantra-resolve-plugin` (DaVinci Resolve Studio), PRIVATE repos since 2026-10-23 (Mike: a
+  proprietary license, offered later as downloads from phantra.ai, never from GitHub)
+  (`../phantra-premiere-plugin`, `../phantra-resolve-plugin`), clients of the API that PR #457
+  adds (`docs/tasks/task-premiere-plugin.md`, `task-resolve-plugin.md` on its branch).
+- **The growth bots**: `phantra-growth`, a repo of its own (`../phantra-growth`, 2026-10-22): the
+  Discord bot (free looks on a dropped clip) and the read-only Reddit listener, clients of `/api`
+  over HTTP. Nothing here imports them; `docs/tasks/task-bots.md` says what they depend on here.
 - **Credits and plans**: Stripe plans grant credits; every render and still takes a ledger hold
   before the provider call; model text is free on a plan.
 
@@ -87,7 +108,6 @@ open -a Terminal ops/register-claude-desktop.command
 # Account flags. src.accounts NEVER loads .env: export DATABASE_URL first or the flag
 # lands on the local throwaway database (the tell: "no account '<slug>'" with no list).
 set -a && source .env && set +a && venv/bin/python -m src.accounts credits <slug> --on
-venv/bin/python -m src.accounts operator <slug> --on        # the manual render lane
 venv/bin/python -m src.accounts edits-teach <slug> --on     # hand edits teach the shelf
 venv/bin/python -m src.accounts seed you@example.com        # bootstrap the auth tables
 
@@ -100,7 +120,12 @@ venv/bin/python -m src.cut.index backfill [--account <slug>] [--dry-run]
 
 # Reference photos dropped into a folder BY HAND need pushing to R2 (the app's own
 # uploads mirror as they save), then stored refs rewritten (report first, --write to act).
-venv/bin/python ops/backfill_reference_photos_r2.py
+# The backfill writes where the media rung READS: on `legacy` the flat keys, a bare run
+# uploads; from `tenant` up the element folders go to the account PHANTRA_FOLDER_ACCOUNT
+# names (m/<account>/..., with the 480px derivative), data/refs to the shared bin, a machine
+# that names nobody is REFUSED the folders (exit 3), and a bare run is a report. It loads
+# .env itself and reads that one account's row.
+venv/bin/python ops/backfill_reference_photos_r2.py [--write]
 venv/bin/python -m ops.canonicalize_shot_refs [--account <slug>] [--write]
 
 # Supabase auth email (templates, SMTP, Site URL) through the Management API;
@@ -113,10 +138,6 @@ venv/bin/python -m ops.supabase_auth_email apply --templates [--dry-run]
 venv/bin/python -m ops.ig_tokens check [--probe]
 venv/bin/python -m ops.ig_tokens refresh|publish|keep
 
-# The manual render lane (operator only): a clip rendered anywhere, filed free.
-python3 ops/render_queue.py --provider manual --account <slug> import \
-    --concept N --shot 1 --file clip.mp4 --model "kling 3 web app" --duration 10
-
 # The reference library (RAG, pgvector)
 venv/bin/python -m src.rag ingest <files...>
 venv/bin/python -m src.rag query "<text>" [--k 5]
@@ -124,6 +145,10 @@ venv/bin/python -m src.rag query "<text>" [--k 5]
 # Pricing table for the public site (web/src/content/pricing.json)
 venv/bin/python -m src.pricing export
 ```
+
+Cut from this list (the text is kept in the history):
+- The manual render lane (`ops/render_queue.py --provider manual ... import`) and its `src.accounts operator` flag, retired by Mike on 2026-10-22: [docs/HISTORY.md](docs/HISTORY.md#cut-2026-10-22).
+- The commands for code that is off or retired (the shadow run `src.trigger`, `src.autopilot`, `src.rework`, `src.promote_winners`, `src.scheduling`, the research scout) left this file on 2026-10-14: [docs/HISTORY.md, Commands](docs/HISTORY.md#commands).
 
 **Tests block all network access** (`tests/conftest.py`). If a test fails with
 `NetworkUseInTest`, it is patching a function the code under test no longer calls; the guard
@@ -196,7 +221,16 @@ No Supabase token is stored after sign-in.
 
 ### Create: the composer and the brain
 
-`web/src/app/studio/page.tsx` + `components/studio/composer/` + `lib/composer.ts`. One box under
+`web/src/app/studio/(create)/create-view.tsx` + `components/studio/composer/` + `lib/composer.ts`. **Two
+addresses, one composer** (2026-10-22): the `(create)` layout draws the view on `/studio`, the HOME (the box
+and the front page around it, never the thread; a "Continue your chat" card when there is one), and on
+`/studio/chat`, the conversation; a layout stays mounted between its pages, so a send on the home moves to
+the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). **The front page** (2026-10-22,
+`components/studio/front/`, `lib/front-page.ts`, `docs/tasks/task-create-front-page.md`): renders behind
+the box, a peek tab on its top edge (the tray of the person's own work under the box was removed
+2026-10-23, Mike) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
+offers until one is live; Trending is picked by hand). Each tile is the whole click and only fills the
+box or opens a door. One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
 Auto, Fast / Reasoning), `/` for commands, drop to attach.
 
@@ -220,7 +254,9 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
 - **Skills** (`src/skills.py`, `prompts/skills/*.md`): recipes for one kind of work, loaded by
   the brain (`load_skill`) or picked from `/`.
 - **The brain proposes models** from `src/model_menu.py` (the same list the pickers read); a
-  proposal is only where a card opens, never a choice made for the person.
+  proposal is only where a card opens, never a choice made for the person. The Video line's
+  "Which model renders" is Auto (proposals stand) or one model the person picked, sent as every
+  scene's `render_model` and told to the brain as `clip_model` (propose no other).
 - **References say what they are for** (`src/ref_roles.py`): subject / product / place, or
   light / palette / framing / style (look-only, never first, since the first anchors).
 - **Pasted links** (`src/linkrefs.py`): one fetch of the page the person chose, its preview
@@ -244,7 +280,8 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
 A project holds a brief, a LOOK (`projects.look`; the studio has no house style), a memory of what
 it learned, its scenes and its chat history (`project_messages`). The writer reads the brief,
 look and memory through a ContextVar (`shootgen.project_brief`, `looks.look_block`). Projects are made
-only through the brain (`create_project`, `save_as_project`), never a form. Deleting a project
+through the brain (`create_project`, `save_as_project`) or the board's New project button (2026-10-22:
+a name and optional brief, `POST /projects`, `project-new.tsx`). Deleting a project
 DETACHES its scenes (never deletes them) so a rendered clip stays in the Library. A scene outside
 any project opens on its own canvas at `/studio/scene/<id>`. The workspace
 (`/studio/projects/<id>`) is the scene list, the Director canvas (React Flow, `FlowWorkspace`) and
@@ -256,6 +293,15 @@ until the card's Apply. With NO project, the same spot is a "Kit: none ▾" pick
 "sometimes i just want to generate an ad"): the pick is kept on the conversation's draft
 (`brand_kit_id`), New session clears it, and it reaches Vesper, stills and the scenes written
 there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the project's pick).
+A kit's linked products and characters are REFERENCES, not just names (2026-10-23,
+`docs/tasks/task-kit-products-and-screens.md`): a scene held to a kit whose words name one (its
+name, or an `aliases` entry on the link) is held to its photo as `product` / `subject`
+(`api._kit_refs`; up to four of the person's own uploads when the link sets `photos`, 2026-10-25,
+for an app's real screenshots: `element_sheet.element_photos`), and a timed part naming it gets that photo (`brand_kits.part_refs`); no kit or
+nothing named changes nothing. With a kit in play the composer's brain may propose `make_screen`:
+an app screen drawn in code from the kit's palette, fonts and logo (`src/kit_screens.py`, Pillow,
+free), kept on its card into the Library ("Kit screen") and put first in the box, because a video
+model cannot draw readable UI. The in-chat Final cut ends on the kit's end card like an export.
 
 ### Scenes: writing, shots and references
 
@@ -269,13 +315,22 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   each with its own prompt, refs (picked by number from the scene's own refs) and still/clip;
   continuity is prepended in code; staleness is checked on read (`source` hash), and a re-plan
   carries over unchanged shots' stills and clips. The scene's tail (sound, avoid list, look
-  lines) belongs to every shot, not the last one.
+  lines, a voiceover written under the beats) belongs to every shot, not the last one.
+  **The planner's answer is checked and kept** (`timeline.keep`, 2026-10-22,
+  `docs/tasks/task-shot-planner-keeps.md`): a reference it left off every shot (a Library render
+  was listed to it with no caption; `timeline.caption` now names one) goes back on every shot, a
+  shot with no photos is said, a voiceover line is put back on its shot (or the continuity) and
+  one that cannot be said in its window is a warning; all in `timeline["warnings"]`, printed on
+  the Render card and beside the scene's own warnings. A part whose words name a product or
+  character the scene's brand kit links also gets its photo (`brand_kits.part_refs`, in `ensure`).
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.
 - **No photographs, no render.** `preprod.reference_gate` is the one predicate: a scene written
   with no refs is a draft (the connector says `needs_reference`) and every quote and approve
-  refuses it. This is the ONE place output is rejected rather than warned about.
+  refuses it. This is the ONE place output is rejected rather than warned about. It guards
+  SCENES: the direct Video page (`src/direct.py`) renders one free-standing clip from text alone,
+  on Mike's call, and writes no scene.
 - **Keyframes**: one still per shot (`scene_chain.keyframe_scene`), each shot's first frame, the
   previous shot's still alongside for continuity only. Drawn only on a priced approve, the whole
   strip or one shot (`POST /api/scenes/{id}/keyframes {"part": n}`). **The keyframe price is the
@@ -297,8 +352,20 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
 - **The Render card** (`render-card.tsx`) is the only place a clip is paid for:
   `GET /api/scenes/{id}/render` is its whole state, `/quote` re-prices a changed pick, `/approve`
   renders (`app.api.approve_render`, the same body the connector's `approve` calls). Approving
-  stamps `picked_at` ("rendered on purpose"). A timed scene renders shot by shot, skipping shots
-  that have a clip and stopping at the first failure, so approving again resumes.
+  stamps `picked_at` ("rendered on purpose"). **A timed scene that fits the model's longest
+  render is ONE clip** (2026-10-26, `timeline.renders_as_one`, `docs/tasks/task-one-clip-render.md`):
+  the shots are planned, then one generation gets the cut list in its prompt
+  (`timeline.one_clip_prompt`: continuity, the scene's style/sound/avoid, each shot's window and a
+  hard cut) and the scene's photos as references on the model's REF2V endpoint, each named by its
+  tag; one render, one token, the clip on the shot (`pricing` `one_clip`). It splits, shot by shot,
+  only when the scene is longer than the model renders or a shot already has its own clip; then it
+  skips shots that have a clip and stops at the first failure, so approving again resumes.
+  `PHANTRA_ONE_CLIP=0` splits every timed scene.
+- **Every landed clip is watched once** (`src/render_qc.py`, 2026-10-25): inside the render job,
+  after each shot, Gemini checks the clip against its prompt and the scene's kit (the brand said,
+  readable words, the product's shape, hands and faces) and up to three notes print under the
+  Render card (`checks`, by shot; OWNED `render_qc`, `ensure(dsn)`). Free, advice only, never
+  fails a render; `PHANTRA_RENDER_QC=0` turns it off.
 - **Draft then finish** (`src/drafts.py`): where a model's cheapest resolution is strictly cheaper,
   the card offers a draft; Finish upscales the liked take (Topaz) rather than re-rendering it.
 - **Pricing** (`src/pricing.py`): `estimate()` is the provider's USD, `quote()` is credits
@@ -404,6 +471,8 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   carries the account (`asset_shelf.source_key`: `assets/a<id>/<kind>-<slug>`, the old flat key
   retired only when labelled for the same tenant). The connector is stricter still
   (`bucket_is_store`: never the folder where the bucket is per account).
+  `ops/backfill_reference_photos_r2.py` writes the same keys (`media.mirror` for the named
+  account from `tenant` up; refused when nobody is named; `tests/test_backfill_reference_photos.py`).
 
 ### Library and Renders
 
@@ -517,6 +586,42 @@ keystroke.
   live tables are dropped. Do not re-add one without reading why it went.
 - `src/autopilot.py`, `src/scheduling.py`, `src/instagram.py`: gated posting, off by default;
   nothing auto-posts. Instagram metrics refresh and the token keeper are live.
+- **Social connections** (2026-10-22, `docs/tasks/task-social-connections.md`): a person connects
+  their own Instagram account or Discord channel under Settings -> Connections
+  (`src/social_connections.py`, the OWNED table with Fernet-sealed tokens under
+  `SOCIAL_TOKEN_SECRET`; `src/social/<provider>.py`, Postiz's provider shape; `app/social_routes.py`,
+  the OAuth door on the API origin with a signed, nonce-bound state). `publish_review.token_for`
+  prefers a connection; the operator env token is the TikTok-only fallback. Providers built:
+  Discord, Instagram, **Reddit** (a link post to a subreddit named per post, the words as the
+  title), **LinkedIn** (a member's own profile; images in one call, a video uploaded in parts
+  and posted once LinkedIn says AVAILABLE; 60-day tokens with no refresh on self-serve apps),
+  **LinkedIn Page** (a Company Page, on its own Community Management app, waiting on LinkedIn's
+  approval), **X** (2026-10-25: PKCE, two-hour tokens renewed on use, the v2 chunked media upload;
+  posts spend the developer account's prepaid credit) and **YouTube** (2026-10-26: a channel,
+  one resumable upload, every video disclosed as synthetic media).
+  A provider's `SETTINGS` is its per-post form, drawn by the drawer and the Library's Post…
+  panel (`calendar/provider-fields.tsx`); `POST /api/posts/group` takes `settings_by` per
+  connection. `docs/ops/social-apps.md` is what Mike registers on each platform.
+- **Posts and the publish worker** (2026-10-22, `docs/tasks/task-publish-worker.md`): a post is
+  one clip or still to one connection at one time (`src/posts.py`, OWNED `posts` +
+  `post_events`; `/api/posts`; "Post…" in the Library viewer). `src/publish_worker.py` is the
+  only sender: a 20s tick claims due rows with `FOR UPDATE SKIP LOCKED`, runs the provider's
+  `post_start` / `post_check` / `post_finish`, retries a 5xx with backoff, never retries the
+  platform's no, and marks a dead worker's row an error rather than resending. A landed post
+  writes a `videos` row (the audience loop) and `outcomes.record("post")`. It runs as a third
+  supervisord program on Fly. TikTok and Facebook are the next providers.
+- **The calendar** (2026-10-22, `docs/tasks/task-calendar.md`): `/studio/calendar` (a rail entry
+  and header tab beside Timeline; `components/studio/calendar/`), four views over `GET /api/posts`
+  (week with drag-to-move, month, list with Post again, and Feed: one account's grid over its
+  real recent posts, `posts.feed` through the provider's `recent_media`, cached a day on the
+  connection's `meta_json._feed_cache`), one drawer (avatar account picks -> `POST /api/posts/group`,
+  one row per account, one `group_id`, all-or-nothing; a preview in the platform's shape; the
+  send button split with Post now), a strip of unposted renders to drag onto a day, and
+  **posting times** per connection (`meta_json.posting_times`, `PUT /api/social/connections/
+  {id}/posting-times`), drawn as empty slots and read by `posts.next_free_slot`; the worker never
+  reads them. State is one glyph in five fills (`marks.tsx`), platform marks come from
+  `simple-icons`. The Renders page lists refused posts above its jobs ("Needs you"). Nothing on the
+  calendar spends.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,
   preferred, not filtered) and `post_seo` / `promote_winners` / `rework`.
 - The dev console at `/studio` on the API (only with `DEV_TOOLS=1`) and the classic `/ui` shell
@@ -567,3 +672,5 @@ keystroke.
   measured video (#375). The most valuable next step is real repeated use.
 - The user's real data is the live database and the R2 bucket; `data/` and the element folders
   on the Mac are gitignored. Never overwrite either without asking.
+- `data/pipeline.db` is an empty SQLite leftover from before Postgres (Mike confirmed,
+  2026-10-22). Never write to it; the live database is Postgres on Supabase.

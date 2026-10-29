@@ -1,53 +1,67 @@
 "use client";
 
-/* The Effects tab (/studio/effects, 2026-10-22, docs/tasks/task-effects-tab.md),
-   behind the `effects_tab` capability (the server page does the 404).
+/* The Effects page (/studio/effects), behind the `effects_tab` capability
+   (the server page does the 404). Rebuilt 2026-10-26 to Mike's pick "R2·04"
+   (docs/tasks/task-effects-page-r2.md): an upload panel on the left, and on
+   the right a featured strip over pill tabs and a dense wall of examples.
 
-   One table, two doors. This page reads the SAME effects listing the
-   composer's `/effects` gallery reads (GET /api/effects, lib/effects.ts) and
-   opens the SAME priced card (effect-step.tsx) -- so an effect is never
-   described in two places and never priced in two places. What this page
-   adds is a way in: a drop zone whose clip or still becomes the source for
-   every card, before / after cards that play on hover, a Free or Pro badge
-   (never a credit number; the number is on the card a click opens), and
-   two filters read off the table's own fields.
+   One table, two doors, still. The page reads the SAME listing the
+   composer's `/effects` gallery reads (GET /api/effects, lib/effects.ts);
+   every templated row is split into one tile per template
+   (lib/effects-wall.ts) off that listing's own option values. A tile with no
+   example in the showcase manifest is not on the wall (Mike, 2026-10-25); a
+   search finds every tile.
 
-   NOTHING RUNS FROM A CARD. A click opens the priced card; its Approve is
-   the one click that spends, at the price it showed, through
-   POST /api/effects/run exactly as the composer does. A finished result
-   offers Make It Pro (the bundle's own card, when the table has it), Share
-   (the Library's share and download) and a hand-off to Vesper. */
+   NOTHING RUNS FROM A TILE. A tile is chosen into the panel; the price is
+   the server's (POST /api/effects/quote), asked again as a choice changes,
+   and the panel's Approve -- showing that number -- is the one click that
+   spends, through POST /api/effects/run with `expect_credits`, exactly as the
+   composer's card. A finished result offers Make It Pro, Share, Download and
+   a hand-off to Vesper. */
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
-import { Download, FolderOpen, Sparkles, Upload, Wand2, X } from "lucide-react";
+import { Check, Download, FolderOpen, Plus, Search, Sparkles, Upload, Wand2, X } from "lucide-react";
+import { LibraryDrawer } from "@/components/studio/library-drawer";
 import { useShell } from "@/components/studio/shell";
-import { EffectStep } from "@/components/studio/effect-step";
 import { ShareControls } from "@/components/studio/asset-viewer";
 import { mediaSrc, newMadeId, type Made } from "@/lib/composer";
 import { madeStatus } from "@/lib/made-state";
 import { assetId } from "@/lib/continue";
-import { begin, candidateOf, requestOf, unavailable, type Candidate, type Effect, type EffectState } from "@/lib/effects";
 import {
-  AUDIENCES,
-  TIERS,
-  acceptsFile,
-  badgeOf,
-  filterEffects,
-  fits,
-  makeItPro,
-  sourceLine,
-  tierCounts,
-  tierOf,
-  vesperHref,
-  type Audience,
-  type Tier,
-} from "@/lib/effects-tab";
-import { isPlaceholder, itemFor, loadShowcase, restingFrame, type ShowcaseItem, type ShowcaseManifest } from "@/lib/showcase";
+  begin,
+  candidateOf,
+  COSTUME_EFFECT,
+  COSTUME_VIDEO,
+  missing,
+  optionLabel,
+  requestOf,
+  unavailable,
+  valueLabel,
+  type Candidate,
+  type Effect,
+  type EffectState,
+  type OptionValue,
+} from "@/lib/effects";
+import { acceptsFile, fits, makeItPro, vesperHref } from "@/lib/effects-tab";
+import {
+  featured as pickFeatured,
+  halloweenOn,
+  openOptions,
+  readContent,
+  slotLabel,
+  tabsShown,
+  tilesFrom,
+  waiting,
+  wallFor,
+  type TabId,
+  type Tile,
+} from "@/lib/effects-wall";
+import { loadShowcase, restingFrame, type ShowcaseItem, type ShowcaseManifest } from "@/lib/showcase";
 import {
   announceBalanceChange,
   cutUploadMedia,
   getEffects,
-  getMedia,
+  quoteEffect,
   renderDownloadHref,
   runEffect,
   uploadRefs,
@@ -57,61 +71,73 @@ import {
   type MediaItem,
 } from "@/lib/studio-api";
 import type { Turn } from "@/lib/assistant";
+import pageFile from "@/content/effects-page.json";
+import { pairOf, sideBySideHref } from "@/lib/before-after";
+import { BeforeAfter } from "@/components/studio/before-after";
 import "@/components/studio/asset-viewer.css";
 import "@/components/studio/effects-tab.css";
 /* eslint-disable @next/next/no-img-element */
 
-/* ── one before / after card ── */
-function ShowcaseCard({ effect, item, why, onOpen }: { effect: Effect; item: ShowcaseItem; why: string; onOpen: () => void }) {
-  const video = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const clip = item.kind === "clip";
-  const play = () => {
-    const v = video.current;
-    if (!clip || !v) return;
-    v.play()
-      .then(() => setPlaying(true))
-      .catch(() => {});
-  };
-  const stop = () => {
-    const v = video.current;
-    if (!clip || !v) return;
-    v.pause();
-    v.currentTime = 0;
-    setPlaying(false);
-  };
+const CONTENT = readContent(pageFile);
+
+/* ── an example, playing: a clip loops muted, a still is drawn ── */
+function Example({ item, alt = "" }: { item: ShowcaseItem; alt?: string }) {
+  // a still with its original: half and half (2026-10-27, before and after)
+  if (item.kind === "still" && item.before && item.after) {
+    return <BeforeAfter before={item.before} after={item.after} alt={alt} still />;
+  }
+  const rest = restingFrame(item);
+  if (item.kind === "clip") {
+    return <video src={item.after} poster={rest ?? undefined} autoPlay muted loop playsInline preload="metadata" aria-label={alt || undefined} />;
+  }
+  return <img src={rest ?? item.after} alt={alt} loading="lazy" />;
+}
+
+/* ── the Halloween neon sign (2026-10-27, Mike's pick: design 08) ──
+   Drawn over the wall while the season is on (halloweenOn); its one button
+   opens the Halloween tab. Nothing on it runs or spends. */
+function HalloweenSign({ onOpen }: { onOpen: () => void }) {
+  return (
+    <section className="fxw-neon" aria-label="Halloween effects">
+      <span className="fxw-neon-kicker">Now showing</span>
+      <h2 className="fxw-neon-word">
+        Hallow<span className="fxw-neon-buzz">e</span>en
+      </h2>
+      <span className="fxw-neon-fx" aria-hidden>
+        FX
+      </span>
+      <div className="fxw-neon-foot">
+        <span>Transforms, looks and recipes for your clips and photos</span>
+        <button type="button" className="fxw-neon-go" onClick={onOpen}>
+          Step inside
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/* ── one tile on the wall ── */
+function WallTile({ tile, chosen, why, onPick }: { tile: Tile; chosen: boolean; why: string; onPick: () => void }) {
   return (
     <li>
       <button
         type="button"
-        className="fxt-card"
-        disabled={!!why}
-        onClick={onOpen}
-        onMouseEnter={play}
-        onMouseLeave={stop}
-        onFocus={play}
-        onBlur={stop}
-        aria-label={`${effect.label} · ${badgeOf(effect)}${why ? ` · ${why}` : ""}`}
+        className="fxw-tile"
+        data-chosen={chosen ? "1" : undefined}
+        data-dim={why ? "1" : undefined}
+        aria-pressed={chosen}
+        onClick={onPick}
+        aria-label={`${tile.name}${tile.free ? " · free" : ""}${why ? ` · ${why}` : ""}`}
       >
-        {/* every tile is 16:9 so the rows line up; a vertical or square
-            example sits letterboxed inside it (data-fit), never stretched */}
-        <span className="fxt-media" data-fit={item.aspect === "16:9" ? undefined : "contain"} data-playing={playing ? "1" : undefined}>
-          <img src={restingFrame(item)} alt="" loading="lazy" />
-          {clip ? (
-            <video ref={video} className="after" src={item.after} poster={item.poster ?? undefined} muted loop playsInline preload="none" />
-          ) : item.before ? (
-            <img className="after" src={item.after} alt="" loading="lazy" />
-          ) : null}
-          {!isPlaceholder(item) ? <span className="lab">{clip || item.before ? "hover · after" : "example"}</span> : null}
-          <span className="fxt-badge" data-tier={tierOf(effect)}>
-            {badgeOf(effect)}
+        {tile.media ? <Example item={tile.media} /> : <span className="fxw-none">No example yet</span>}
+        {tile.isNew ? <span className="fxw-tag">NEW</span> : tile.free ? <span className="fxw-tag">FREE</span> : null}
+        {chosen ? (
+          <span className="fxw-check" aria-hidden>
+            <Check strokeWidth={3} />
           </span>
-        </span>
-        <span className="fxt-card-body">
-          <b>{effect.label}</b>
-          <span>{effect.blurb}</span>
-          {why ? <i>{why}</i> : <small>{effect.takes === "video" ? "on a clip" : "on a still"}</small>}
-        </span>
+        ) : null}
+        <span className="fxw-name">{tile.name}</span>
+        {why ? <span className="fxw-why">{why}</span> : null}
       </button>
     </li>
   );
@@ -123,19 +149,28 @@ export function EffectsTab() {
   const [fx, setFx] = useState<EffectsCatalogue | null>(null);
   const [fxError, setFxError] = useState("");
   const [showcase, setShowcase] = useState<ShowcaseManifest | null>(null);
-  const [tier, setTier] = useState<Tier>("all");
-  const [audience, setAudience] = useState<Audience>("all");
+  const [tab, setTab] = useState<TabId>("all");
+  const bar = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
+  const [chosenKey, setChosenKey] = useState<string | null>(null);
+  // what the effect works on: one source, and a second for a row that takes two
   const [source, setSource] = useState<Candidate | null>(null);
+  const [second, setSecond] = useState<Candidate | null>(null);
+  const [options, setOptions] = useState<Record<string, OptionValue>>({});
+  const [prompt, setPrompt] = useState("");
+  // the last quote, for the request it priced: a stale one is never shown
+  const [quote, setQuote] = useState<{ key: string; price: { credits: number; charged: boolean } | null; problem: string } | null>(null);
   const [over, setOver] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [picker, setPicker] = useState<MediaItem[] | null>(null);
-  // the open priced card: one at a time, the composer's own component on a
-  // turn this page holds. `made` lands on it when Approve has run.
-  const [card, setCard] = useState<{ turn: Turn; effect: Effect } | null>(null);
+  const [loading, setLoading] = useState<"" | "first" | "second">("");
+  // which slot the Library drawer is open for (2026-10-26), or none
+  const [picker, setPicker] = useState<"first" | "second" | null>(null);
   const [busy, setBusy] = useState(false);
-  // every result this visit made, newest first, each with its three actions
+  // the run in the panel now, and every result this visit made, newest first
+  const [current, setCurrent] = useState<{ turn: Turn; effect: Effect } | null>(null);
   const [results, setResults] = useState<{ turn: Turn; effect: Effect }[]>([]);
   const file = useRef<HTMLInputElement>(null);
+  const fileFor = useRef<"first" | "second">("first");
+  const asked = useRef(0);
   const workspace = me?.account?.slug ?? "";
 
   useEffect(() => {
@@ -150,85 +185,114 @@ export function EffectsTab() {
     };
   }, [workspace]);
 
-  const items = useMemo(() => filterEffects(fx?.items ?? [], tier, audience), [fx, tier, audience]);
-  const counts = useMemo(() => tierCounts(fx?.items ?? []), [fx]);
+  const tiles = useMemo(() => tilesFrom(fx?.items ?? [], showcase, CONTENT), [fx, showcase]);
+  const wall = useMemo(() => wallFor(tiles, tab, query), [tiles, tab, query]);
+  const tabs = useMemo(() => tabsShown(tiles), [tiles]);
+  const strip = useMemo(() => pickFeatured(tiles, CONTENT), [tiles]);
   const bundle = useMemo(() => makeItPro(fx?.items ?? []), [fx]);
-  const candidates = useMemo(() => (source ? [source] : []), [source]);
+  // the Halloween Costumes section (2026-10-27, Mike: "can this be a section
+  // of the effects tab"): every costume, shown with or without an example --
+  // the one seasonal exception to "a tile shows once it has an example"
+  const costumes = useMemo(() => tiles.filter((t) => t.effect.id === COSTUME_EFFECT), [tiles]);
+  const costumeVideo = useMemo(() => tiles.find((t) => t.effect.id === COSTUME_VIDEO) ?? null, [tiles]);
+  const chosen = useMemo(() => tiles.find((t) => t.key === chosenKey) ?? null, [tiles, chosenKey]);
+  const effect = chosen?.effect ?? null;
+  const ready = !!fx?.ready;
+  const exempt = !!fx?.exempt;
 
-  /* ── the source: a dropped file, or a pick from the Library ──
-     "It becomes the source for every card": a card already open and still
-     waiting is bound to the new source too (a card that has run keeps the
-     source it ran on). */
-  const load = useCallback((next: Candidate | null) => {
-    setSource(next);
-    setCard((c) => {
-      if (!c || c.turn.made || !c.turn.effect) return c;
-      const on = next && fits(c.effect, next) ? [next] : [];
-      const state = begin(c.effect, on, c.turn.effect.id, { on, options: c.turn.effect.options, prompt: c.turn.effect.prompt });
-      return { ...c, turn: { ...c.turn, effect: state } };
-    });
-  }, []);
+  // the run's request, as the server is sent it: the tile's fixed option
+  // and the person's choices on top of the row's defaults
+  const state: EffectState | null = useMemo(() => {
+    if (!chosen || !effect) return null;
+    const on = [source, second].filter((c): c is Candidate => !!c && fits(effect, c));
+    const base = begin(effect, [], "panel", { on, options: { ...options, ...(chosen.preset ? { [chosen.preset.name]: chosen.preset.value } : {}) } });
+    return { ...base, prompt: effect.prompt === "none" ? "" : prompt };
+  }, [chosen, effect, source, second, options, prompt]);
+  const gap = effect && state ? missing(effect, state) : "Pick an effect";
+  const unquotable = effect && state ? missing(effect, { ...state, prompt: "x" }) : "pick";
+  const running = current?.turn.made?.status === "running";
+
+  /* the price: the server's, asked again whenever something that moves it changes */
+  const priced = state ? JSON.stringify([state.effect, state.sources.map((s) => s.ref), state.options]) : "";
+  const price = quote && quote.key === priced && !unquotable ? quote.price : null;
+  const problem = quote && quote.key === priced && !unquotable ? quote.problem : "";
+  useEffect(() => {
+    if (!state || unquotable || !ready) return;
+    const mine = ++asked.current;
+    const key = priced;
+    const timer = setTimeout(() => {
+      quoteEffect({ ...requestOf(state), prompt: effect?.prompt === "required" ? state.prompt.trim() || "x" : requestOf(state).prompt })
+        .then((q) => mine === asked.current && setQuote({ key, price: { credits: q.credits, charged: q.charged }, problem: "" }))
+        .catch((e) => mine === asked.current && setQuote({ key, price: null, problem: e instanceof Error ? e.message : "That cannot be priced." }));
+    }, 250);
+    return () => clearTimeout(timer);
+    // `priced` stands for the effect, its sources and its options
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priced, unquotable, ready]);
+
+  /* ── choosing a tile: the panel takes it; the source stays ── */
+  const choose = (tile: Tile) => {
+    if (running) return;
+    setChosenKey(tile.key);
+    setOptions({});
+    setPrompt("");
+    setCurrent(null);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /* ── the source: a dropped or chosen file, or a pick from the Library ── */
   const takeFile = useCallback(
-    async (f: File) => {
+    async (f: File, slot: "first" | "second") => {
       const kind = acceptsFile(f);
       if (!kind) {
-        toast("Drop a clip (mp4, mov, webm) or a still (jpg, png, webp)", "err");
+        toast("Drop a clip (mp4, mov, webm) or a photo (jpg, png, webp)", "err");
         return;
       }
-      setLoading(true);
+      setLoading(slot);
       try {
+        let next: Candidate;
         if (kind === "clip") {
           const up = await cutUploadMedia(f);
-          load({ ref: up.handle, kind: "clip", from: `dropped · ${f.name}` });
+          next = { ref: up.handle, kind: "clip", from: f.name };
         } else {
           const up = await uploadRefs([f]);
           const url = up.urls[0];
           if (!url) throw new Error("That image could not be read");
-          load({ ref: url, kind: "image", thumb: url, from: `dropped · ${f.name}` });
+          next = { ref: url, kind: "image", thumb: url, from: f.name };
         }
+        (slot === "first" ? setSource : setSecond)(next);
         setPicker(null);
       } catch (e) {
         toast(e instanceof Error ? e.message : "That could not be loaded", "err");
       } finally {
-        setLoading(false);
+        setLoading("");
       }
     },
-    [load, toast],
+    [toast],
   );
-  const onDrop = (e: DragEvent) => {
+  const onDrop = (e: DragEvent, slot: "first" | "second") => {
     e.preventDefault();
     setOver(false);
     const f = e.dataTransfer.files?.[0];
-    if (f) void takeFile(f);
+    if (f) void takeFile(f, slot);
   };
-  const openPicker = () => {
-    if (picker) return setPicker(null);
-    getMedia({})
-      .then((w) => setPicker(w.items.filter((m) => m.generated_id)))
-      .catch(() => toast("The Library could not be read", "err"));
+  const chooseFile = (slot: "first" | "second") => {
+    fileFor.current = slot;
+    file.current?.click();
   };
-  const pick = (m: MediaItem) => {
+  const openPicker = (slot: "first" | "second") => setPicker((was) => (was === slot ? null : slot));
+  const pick = (list: MediaItem[]) => {
+    const m = list[0];
+    if (!m?.generated_id) return;
     const clip = m.kind === "video";
-    load({
-      ref: `gen:${m.generated_id}`,
-      kind: clip ? "clip" : "image",
-      thumb: clip ? (m.poster ?? undefined) : (m.thumb ?? m.url),
-      from: "your Library",
-    });
-    setPicker(null);
+    const next: Candidate = { ref: `gen:${m.generated_id}`, kind: clip ? "clip" : "image", thumb: clip ? (m.poster ?? undefined) : (m.thumb ?? m.url), from: "your Library" };
+    (picker === "second" ? setSecond : setSource)(next);
   };
 
-  /* ── a card: the composer's own priced step, on this page's turn ── */
-  const open = (effect: Effect, on?: Candidate[]) => {
-    const state = begin(effect, candidates, newMadeId(), { on: on ?? null });
-    setCard({ turn: { role: "assistant", content: effect.label, effect: state }, effect });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-  const change = (next: EffectState) =>
-    setCard((c) => (c && c.turn.effect?.id === next.id && c.turn.made?.status !== "running" ? { ...c, turn: { ...c.turn, effect: next } } : c));
+  /* ── a result ── */
   const patch = (id: string, fields: Partial<Made>) => {
     const apply = (t: Turn) => (t.made?.id === id && t.made ? { ...t, made: { ...t.made, ...fields } } : t);
-    setCard((c) => (c ? { ...c, turn: apply(c.turn) } : c));
+    setCurrent((c) => (c ? { ...c, turn: apply(c.turn) } : c));
     setResults((all) => all.map((r) => ({ ...r, turn: apply(r.turn) })));
   };
   const finish = (madeId: string, job: Job) => {
@@ -248,249 +312,399 @@ export function EffectsTab() {
       ...(extra.media === "video" ? { clip: out, image: null } : { image: out, clip: null }),
     });
   };
-  /* Approve: the one click that spends, at the price the card showed. The
-     body is the composer's (page.tsx approveEffect), on this page's turn. */
-  async function approve(credits: number, charged: boolean) {
-    const state = card?.turn.effect;
-    if (!card || !state || busy || card.turn.made?.status === "running") return;
+
+  /* Approve: the one click that spends, at the price the button shows. */
+  async function approve() {
+    if (!state || !effect || !price || busy || running || gap) return;
     const madeId = newMadeId();
-    const made: Made = {
-      id: madeId,
-      output: "image",
-      refs: [],
-      status: "running",
-      detail: `${state.label}…`,
-      prompt: state.prompt,
-      effect: state.effect,
-      model: state.effect,
-    };
-    const running = { ...card, turn: { ...card.turn, made, effect: { ...state, paid: { credits, charged } } } };
+    const made: Made = { id: madeId, output: "image", refs: [], status: "running", detail: `${chosen?.name ?? state.label}…`, prompt: state.prompt, effect: state.effect, model: state.effect };
+    const run = { turn: { role: "assistant" as const, content: chosen?.name ?? state.label, effect: { ...state, paid: price }, made }, effect };
     setBusy(true);
-    setCard(running);
-    setResults((all) => [running, ...all]);
+    setCurrent(run);
+    setResults((all) => [run, ...all]);
     try {
-      const started = await runEffect({ ...requestOf(state), expect_credits: credits });
+      const started = await runEffect({ ...requestOf(state), expect_credits: price.credits });
       patch(madeId, { jobId: started.job_id });
       const job = await waitForJob(started.job_id, (j) => patch(madeId, { detail: j.detail || "" }));
       finish(madeId, job);
     } catch (e) {
-      // refused before anything ran (a price that moved, a source that is
-      // gone): the card goes back to waiting and prices itself again
+      // refused before anything ran (a price that moved, a source that is gone)
       setResults((all) => all.filter((r) => r.turn.made?.id !== madeId));
-      setCard((c) => (c && c.turn.effect?.id === state.id ? { ...c, turn: { ...c.turn, made: undefined, effect: { ...state, paid: undefined } } } : c));
+      setCurrent(null);
       toast(e instanceof Error ? e.message : "That did not go through.", "err");
     } finally {
       setBusy(false);
     }
   }
+  /* a costume still's "Make it a video": the try-on recipe in the panel, on
+     the ORIGINAL photo, with the same costume as its one detail */
+  const costumeVideoOn = (run: { turn: Turn; effect: Effect }) => {
+    const fxState = run.turn.effect;
+    if (!costumeVideo || !fxState) return;
+    const name = fxState.options.costume;
+    choose(costumeVideo);
+    if (fxState.sources[0]) setSource(fxState.sources[0]);
+    setPrompt(name === undefined ? "" : valueLabel("costume", name));
+  };
+  const makeProOn = (on: Candidate[]) => {
+    if (!bundle) return;
+    const tile = tiles.find((t) => t.key === bundle.id);
+    if (tile) choose(tile);
+    if (on[0]) setSource(on[0]);
+  };
 
-  const ready = !!fx?.ready;
-  const sourceThumb = source?.thumb ? mediaSrc(source.thumb) : "";
+  const wants = effect ? slotLabel(effect, chosen?.preset?.name) : "Photo or clip";
+  const takesTwo = !!effect && effect.sources.max > 1;
+  const mismatch = effect && source && !fits(effect, source) ? (effect.takes === "video" ? "This effect works on a clip" : "This effect works on a photo") : "";
+  const buttonLine = !chosen
+    ? "Pick an effect"
+    : !ready
+      ? "Effects are not set up on this server yet"
+      : gap
+        ? gap.startsWith("Needs") && !source
+          ? `Add a ${wants.toLowerCase()} to continue`
+          : gap
+        : problem
+          ? problem
+          : !price
+            ? "Pricing…"
+            : price.credits === 0 && !price.charged
+              ? `Run ${chosen.name} · Free`
+              : `Approve · ${price.credits.toLocaleString()} credits${price.charged && !exempt ? "" : " · not charged"}`;
+  const canRun = !!chosen && ready && !gap && !!price && !busy && !running;
 
-  return (
-    <section className="view fxt" style={{ paddingTop: 0 }}>
-      <div className="vhead" style={{ marginTop: 8 }}>
-        <h2>Effects</h2>
-        <span className="spacer" />
-        <span className="m">Browsing is free. A card shows its price before anything runs.</span>
-      </div>
-
-      {/* 1. the drop zone: what every card works on */}
+  const slot = (which: "first" | "second") => {
+    const held = which === "first" ? source : second;
+    const label = which === "first" ? wants : `Second ${wants.toLowerCase()}`;
+    return (
       <div
-        className="fxt-drop"
-        data-over={over ? "1" : undefined}
-        data-loaded={source ? "1" : undefined}
+        key={which}
+        className="fxp-slot"
+        data-over={over && which === "first" ? "1" : undefined}
+        data-filled={held ? "1" : undefined}
         onDragOver={(e) => {
           e.preventDefault();
-          setOver(true);
+          if (which === "first") setOver(true);
         }}
         onDragLeave={() => setOver(false)}
-        onDrop={onDrop}
+        onDrop={(e) => onDrop(e, which)}
       >
-        <div className="fxt-drop-what">
-          {sourceThumb ? <img src={sourceThumb} alt="" /> : <Upload strokeWidth={1.5} />}
-          <div>
-            <b>{source ? (source.kind === "clip" ? "Your clip" : "Your still") : "Drop a clip"}</b>
-            <span>{loading ? "Loading…" : sourceLine(source)}</span>
-          </div>
-        </div>
-        <div className="fxt-drop-acts">
-          <input
-            ref={file}
-            type="file"
-            accept="video/*,image/*"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void takeFile(f);
-              e.target.value = "";
-            }}
-          />
-          <button type="button" className="fxt-btn primary" onClick={() => file.current?.click()} disabled={loading}>
-            <Upload strokeWidth={1.8} /> Choose a file
-          </button>
-          <button type="button" className="fxt-btn" onClick={openPicker} disabled={loading} aria-expanded={!!picker}>
-            <FolderOpen strokeWidth={1.8} /> Pick from the Library
-          </button>
-          {source ? (
-            <button type="button" className="fxt-btn" onClick={() => load(null)}>
-              <X strokeWidth={1.8} /> Clear
+        {held ? (
+          held.thumb ? (
+            <img src={mediaSrc(held.thumb)} alt="" className="fxp-thumb" />
+          ) : (
+            <span className="fxp-thumb fxp-thumb-clip">clip</span>
+          )
+        ) : (
+          <span className="fxp-thumb fxp-thumb-empty" aria-hidden>
+            {loading === which ? <span className="fxp-spin" /> : <Plus strokeWidth={1.8} />}
+          </span>
+        )}
+        <span className="fxp-slot-words">
+          <b>{label}</b>
+          <span>{loading === which ? "Loading…" : held ? held.from : which === "second" ? "Optional · for effects with two people" : "Drop it here, choose a file or use your Library"}</span>
+        </span>
+        <span className="fxp-slot-acts">
+          {held ? (
+            <button type="button" className="fxp-icon" aria-label={`Remove the ${label.toLowerCase()}`} onClick={() => (which === "first" ? setSource : setSecond)(null)}>
+              <X strokeWidth={2} />
+            </button>
+          ) : (
+            <>
+              <button type="button" className="fxp-icon" aria-label="Choose a file" title="Choose a file" onClick={() => chooseFile(which)} disabled={!!loading}>
+                <Upload strokeWidth={1.8} />
+              </button>
+              <button type="button" className="fxp-icon" aria-label="Pick from the Library" title="Pick from the Library" aria-expanded={picker === which} onClick={() => openPicker(which)} disabled={!!loading}>
+                <FolderOpen strokeWidth={1.8} />
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+    );
+  };
+
+  const shown = current?.turn.made && madeStatus(current.turn.made) !== "running" ? current : null;
+
+  return (
+    <section className="view fxw" style={{ paddingTop: 0 }}>
+      <input
+        ref={file}
+        type="file"
+        accept="video/*,image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void takeFile(f, fileFor.current);
+          e.target.value = "";
+        }}
+      />
+
+      {/* ── the panel: what runs, on what, at what price ── */}
+      <aside className="fxp" aria-label="Run an effect" data-idle={!chosen && !shown && !running ? "1" : undefined}>
+        <div className="fxp-cover" data-result={shown ? "1" : undefined}>
+          {running ? (
+            <div className="fxp-running">
+              <span className="fxp-spin" />
+              <span>{current?.turn.made?.detail || "Working…"}</span>
+            </div>
+          ) : shown?.turn.made?.clip ? (
+            <video src={mediaSrc(shown.turn.made.clip)} controls playsInline autoPlay muted loop />
+          ) : shown?.turn.made?.image && pairOf(shown.turn.effect, shown.turn.made) ? (
+            <BeforeAfter
+              before={mediaSrc(pairOf(shown.turn.effect, shown.turn.made)!.before)}
+              after={mediaSrc(shown.turn.made.image)}
+              alt={`${shown.effect.label} result`}
+            />
+          ) : shown?.turn.made?.image ? (
+            <img src={mediaSrc(shown.turn.made.image)} alt={`${shown.effect.label} result`} />
+          ) : chosen?.media ? (
+            <Example item={chosen.media} />
+          ) : null}
+          {!running && !shown ? <span className="fxp-title">{chosen ? chosen.name : "Pick an effect"}</span> : null}
+          {chosen && !running ? (
+            <button
+              type="button"
+              className="fxp-change"
+              onClick={() => {
+                setChosenKey(null);
+                setCurrent(null);
+              }}
+            >
+              {shown ? "New run" : "Change"}
             </button>
           ) : null}
         </div>
-      </div>
 
-      {picker ? (
-        <div className="fxt-pick" role="dialog" aria-label="Pick from the Library">
-          <div className="fxt-pick-head">
-            <b>Your Library</b>
-            <span>{picker.length ? "A render becomes the source for every card." : "Nothing on the wall yet."}</span>
-            <button type="button" className="fxt-btn" style={{ marginLeft: "auto" }} onClick={() => setPicker(null)}>
-              <X strokeWidth={1.8} /> Close
-            </button>
-          </div>
-          <ul className="fxt-pick-grid">
-            {picker.map((m) => (
-              <li key={m.asset_id}>
-                <button type="button" onClick={() => pick(m)} title={m.prompt || m.asset_name} aria-label={`Use ${m.kind} ${m.generated_id}`}>
-                  {m.kind === "video" ? m.poster ? <img src={mediaSrc(m.poster)} alt="" loading="lazy" /> : null : <img src={mediaSrc(m.thumb ?? m.url)} alt="" loading="lazy" />}
-                  <span className="k">{m.kind === "video" ? "clip" : "still"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+        {chosen && !shown ? <small className="fxp-model">{chosen.effect.recipe ? `Phantra recipe · ${chosen.effect.made_with || chosen.effect.label}` : chosen.effect.label}{chosen.free ? " · free" : ""}</small> : null}
 
-      {/* the open priced card, beside its result */}
-      {card ? (
-        <div className="fxt-open" role="region" aria-label={`${card.effect.label} card`}>
-          <div className="fxt-open-head">
-            <Wand2 strokeWidth={1.6} width={14} height={14} />
-            <b>{card.effect.label}</b>
-            <span>{badgeOf(card.effect)} · the price is on the card; nothing runs until Approve</span>
-            <button type="button" className="x" aria-label="Close the card" onClick={() => setCard(null)}>
-              <X strokeWidth={1.8} />
-            </button>
-          </div>
-          <EffectStep turn={card.turn} effect={card.effect} busy={busy} exempt={!!fx?.exempt} onChange={change} onApprove={approve} />
-          <ResultPane turn={card.turn} effect={card.effect} bundle={bundle} onMakeItPro={(on) => bundle && open(bundle, on)} />
-        </div>
-      ) : null}
+        {shown ? <ResultPane turn={shown.turn} effect={shown.effect} bundle={bundle} onMakeItPro={makeProOn} onCostumeVideo={costumeVideo ? () => costumeVideoOn(shown) : undefined} /> : null}
 
-      {/* 2. the filters, read off the table */}
-      <div className="fxt-filters">
-        <div role="group" aria-label="Free or Pro">
-          {TIERS.map((t) => (
-            <button key={t.id} type="button" aria-pressed={tier === t.id} onClick={() => setTier(t.id)}>
-              {t.label}
-              {t.id === "free" && counts.free ? ` · ${counts.free}` : t.id === "pro" && counts.pro ? ` · ${counts.pro}` : ""}
-            </button>
-          ))}
-        </div>
-        <div role="group" aria-label="What it is for">
-          {AUDIENCES.map((a) => (
-            <button key={a.id} type="button" aria-pressed={audience === a.id} onClick={() => setAudience(a.id)}>
-              {a.label}
-            </button>
-          ))}
-        </div>
-        <span className="m">{fx ? `${items.length} of ${fx.items.length}` : fxError ? "" : "Loading…"}</span>
-      </div>
-      {fxError ? <p className="fxt-note">{fxError}</p> : null}
-      {fx && !ready ? <p className="fxt-note">Effects are not set up on this server yet. The cards show what each one does.</p> : null}
+        {slot("first")}
+        {mismatch ? <p className="fxp-note">{mismatch}</p> : null}
+        {takesTwo ? slot("second") : null}
 
-      {/* 3. the grid: one before / after card per effect the table runs today */}
-      <ul className="fxt-grid" aria-label="Effects">
-        {items.map((e) => (
-          <ShowcaseCard
-            key={e.id}
-            effect={e}
-            item={itemFor(showcase, e.id)}
-            why={!ready ? "" : source && !fits(e, source) ? (e.takes === "video" ? "Needs a clip" : "Needs a still") : ""}
-            onOpen={() => open(e)}
+        <LibraryDrawer
+          open={!!picker}
+          onClose={() => setPicker(null)}
+          accept={effect ? (effect.takes === "video" ? "video" : "image") : "any"}
+          max={1}
+          onPick={pick}
+          onFiles={(files) => picker && files[0] && void takeFile(files[0], picker)}
+        />
+
+        {chosen && effect && effect.prompt !== "none" ? (
+          <label className="fxp-field">
+            <span>{effect.hint || (effect.prompt === "required" ? "Prompt" : "Prompt · optional")}</span>
+            <textarea
+              value={prompt}
+              rows={2}
+              maxLength={effect.recipe ? 200 : 2000}
+              placeholder={effect.recipe ? "Leave it empty and the recipe decides" : effect.takes === "video" ? "What it should sound like…" : effect.category === "image_edit" ? "What to change…" : "Describe the scene…"}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+          </label>
+        ) : null}
+
+        {chosen
+          ? openOptions(chosen).map(([name, o]) => {
+              const value = state?.options[name];
+              const few = o.values.length <= 4;
+              return (
+                <div key={name} className="fxp-field">
+                  <span>{optionLabel(name)}</span>
+                  {few ? (
+                    <div className="fxp-seg" role="group" aria-label={optionLabel(name)}>
+                      {o.values.map((v) => (
+                        <button key={String(v)} type="button" aria-pressed={String(value) === String(v)} onClick={() => setOptions((all) => ({ ...all, [name]: v }))}>
+                          {valueLabel(name, v)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <select
+                      value={value === undefined ? "" : String(value)}
+                      aria-label={optionLabel(name)}
+                      onChange={(e) => {
+                        const v = o.values.find((x) => String(x) === e.target.value);
+                        setOptions((all) => {
+                          const next = { ...all };
+                          if (v === undefined) delete next[name];
+                          else next[name] = v;
+                          return next;
+                        });
+                      }}
+                    >
+                      {o.required ? (
+                        <option value="" disabled>
+                          Pick one
+                        </option>
+                      ) : o.default === null ? (
+                        <option value="">None</option>
+                      ) : null}
+                      {o.values.map((v) => (
+                        <option key={String(v)} value={String(v)}>
+                          {valueLabel(name, v)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              );
+            })
+          : null}
+
+        <span className="fxp-grow" />
+        <button type="button" className="fxp-approve" disabled={!canRun} onClick={() => void approve()}>
+          {running ? "Working…" : buttonLine}
+        </button>
+        <small className="fxp-small">{chosen && price ? "Nothing is charged if it fails." : "Browsing is free. Nothing runs until you approve."}</small>
+      </aside>
+
+      {/* ── the wall ── */}
+      <div className="fxw-main">
+        {halloweenOn() && !query ? (
+          <HalloweenSign
+            onOpen={() => {
+              setTab("halloween");
+              bar.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
           />
-        ))}
-      </ul>
-      {fx && items.length === 0 ? <p className="m">Nothing under these filters.</p> : null}
-
-      {/* 4. what this visit made */}
-      {results.length ? (
-        <>
-          <div className="vhead">
-            <h2>Results</h2>
-            <span className="spacer" />
-            <span className="m">Every result is in your Library too.</span>
-          </div>
-          <ul className="fxt-results">
-            {results.map((r) => (
-              <li key={r.turn.made?.id ?? r.turn.effect?.id}>
-                <b>{r.effect.label}</b>
-                <ResultPane turn={r.turn} effect={r.effect} bundle={bundle} onMakeItPro={(on) => bundle && open(bundle, on)} compact />
-              </li>
+        ) : null}
+        {/* the costumes leave with the season, like the sign above */}
+        {halloweenOn() && costumes.length && !query ? (
+          <section className="fxw-season" aria-label="Halloween Costumes">
+            <div className="fxw-season-head">
+              <h3>Halloween Costumes</h3>
+              <p>Pick a costume and add your photo to see yourself in it, face kept. Then make it a video.</p>
+            </div>
+            <ul className="fxw-season-row">
+              {costumes.map((t) => (
+                <li key={t.key}>
+                  <button type="button" className="fxw-costume" data-chosen={t.key === chosenKey ? "1" : undefined} aria-pressed={t.key === chosenKey} onClick={() => choose(t)}>
+                    {t.media ? <Example item={t.media} alt={t.name} /> : null}
+                    <span>{t.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {strip.length && !query ? (
+          <div className="fxw-strip" data-n={strip.length}>
+            {strip.map((t, i) => (
+              <button key={t.key} type="button" className="fxw-feature" data-big={i === 0 ? "1" : undefined} data-chosen={t.key === chosenKey ? "1" : undefined} onClick={() => choose(t)} aria-label={`${t.name}${t.free ? " · free" : ""}`}>
+                {t.media ? <Example item={t.media} /> : null}
+                <span className="fxw-tag">{i === 0 && t.isNew ? "NEW THIS WEEK" : t.isNew ? "NEW" : t.free ? "FREE" : "POPULAR"}</span>
+                <span className="fxw-feature-name">{t.name}</span>
+              </button>
             ))}
-          </ul>
-        </>
-      ) : null}
+          </div>
+        ) : null}
+
+        <div className="fxw-bar" ref={bar}>
+          <div className="fxw-tabs" role="group" aria-label="Effect groups">
+            {tabs.map((t) => (
+              <button key={t.id} type="button" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <label className="fxw-search">
+            <Search strokeWidth={1.8} aria-hidden />
+            <input type="search" value={query} placeholder={tiles.length ? `Search ${tiles.length} effects` : "Search"} aria-label="Search effects" onChange={(e) => setQuery(e.target.value)} />
+          </label>
+        </div>
+
+        {fxError ? <p className="fxw-note">{fxError}</p> : null}
+        {fx && !ready ? <p className="fxw-note">Effects are not set up on this server yet. The tiles show what each one does.</p> : null}
+
+        <ul className="fxw-grid" aria-label="Effects">
+          {wall.map((t) => (
+            <WallTile key={t.key} tile={t} chosen={t.key === chosenKey} why={source && !fits(t.effect, source) ? (t.effect.takes === "video" ? "Needs a clip" : "Needs a photo") : ""} onPick={() => choose(t)} />
+          ))}
+        </ul>
+        {fx && !wall.length ? <p className="fxw-note">{query ? "No effect by that name." : "Nothing here yet."}</p> : null}
+        {fx && !query && waiting(tiles) ? (
+          <p className="fxw-more">
+            {waiting(tiles).toLocaleString()} more effects are ready to run and land here as their examples are made. Search to use one now.
+          </p>
+        ) : null}
+
+        {results.length > 1 ? (
+          <>
+            <h3 className="fxw-h">This visit</h3>
+            <ul className="fxw-results">
+              {results.slice(1).map((r) => (
+                <li key={r.turn.made?.id ?? r.turn.effect?.id}>
+                  <b>{r.turn.content}</b>
+                  <ResultPane turn={r.turn} effect={r.effect} bundle={bundle} onMakeItPro={makeProOn} onCostumeVideo={costumeVideo ? () => costumeVideoOn(r) : undefined} compact />
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </div>
     </section>
   );
 }
 
-/* ── a result and its three doors ── */
+/* ── a result and its doors ── */
 function ResultPane({
   turn,
   effect,
   bundle,
   onMakeItPro,
+  onCostumeVideo,
   compact,
 }: {
   turn: Turn;
   effect: Effect;
   bundle: Effect | null;
   onMakeItPro: (on: Candidate[]) => void;
+  /** a Halloween costume still: put its video in the panel */
+  onCostumeVideo?: () => void;
   compact?: boolean;
 }) {
   const made = turn.made;
   const status = made ? madeStatus(made) : undefined;
   if (!made || status !== "done") {
-    return (
-      <div className="fxt-result">
-        <div className="fxt-result-empty">
-          {!made
-            ? "The result lands here. Approve on the card runs it at the price shown."
-            : status === "running"
-              ? made.detail || "Working…"
-              : made.detail || "Not made. Nothing was charged."}
-        </div>
-      </div>
-    );
+    return <p className="fxp-note">{!made ? "" : status === "running" ? made.detail || "Working…" : made.detail || "Not made. Nothing was charged."}</p>;
   }
   const id = assetId(made.asset);
   const self = candidateOf({ image: made.image, clip: made.clip, asset: made.asset }, "this result");
   const toVesper = vesperHref(made.asset, effect.label);
   const proWhy = bundle && self ? unavailable(bundle, [self]) : "";
+  const pair = pairOf(turn.effect, made);
+  const pairHref = pair ? sideBySideHref(pair) : null;
   return (
-    <div className="fxt-result">
-      {made.clip ? (
-        <video className="fxt-result-media" src={mediaSrc(made.clip)} controls playsInline />
-      ) : made.image ? (
-        <img className="fxt-result-media" src={mediaSrc(made.image)} alt={`${effect.label} result`} />
-      ) : null}
-      <div className="fxt-result-acts">
+    <div className="fxp-result">
+      {compact ? made.clip ? <video src={mediaSrc(made.clip)} controls playsInline /> : made.image ? <img src={mediaSrc(made.image)} alt={`${effect.label} result`} /> : null : null}
+      <div className="fxp-result-acts">
+        {effect.id === COSTUME_EFFECT && onCostumeVideo ? (
+          <button type="button" className="fxp-pill primary" title="Puts the costume video in the panel, from your original photo. Nothing runs until you approve." onClick={onCostumeVideo}>
+            <Sparkles strokeWidth={1.8} /> Make it a video
+          </button>
+        ) : null}
         {bundle && bundle.id !== effect.id && self ? (
-          <button type="button" className="fxt-btn primary" disabled={!!proWhy} title={proWhy || "Opens the bundle's card with its price. Nothing runs until you approve."} onClick={() => onMakeItPro([self])}>
+          <button type="button" className="fxp-pill primary" disabled={!!proWhy} title={proWhy || "Puts Make It Pro in the panel with this result. Nothing runs until you approve."} onClick={() => onMakeItPro([self])}>
             <Sparkles strokeWidth={1.8} /> Make It Pro
           </button>
         ) : null}
+        {pairHref ? (
+          <a className="fxp-pill" href={pairHref} download title="Your original photo beside the result, as one image. Free.">
+            <Download strokeWidth={1.8} /> Download side-by-side
+          </a>
+        ) : null}
         {id !== null ? <ShareControls key={id} id={id} /> : null}
         {id !== null ? (
-          <a className="fxt-btn" href={renderDownloadHref(id)} download title="Save the file">
-            <Download strokeWidth={1.8} /> {compact ? "" : "Download"}
+          <a className="fxp-pill" href={renderDownloadHref(id)} download title="Save the file">
+            <Download strokeWidth={1.8} /> Download
           </a>
         ) : null}
         {toVesper ? (
-          <Link className="fxt-btn" href={toVesper} title="Opens Create with this result attached">
-            <Wand2 strokeWidth={1.8} /> Turn this into a full piece with Vesper
+          <Link className="fxp-pill" href={toVesper} title="Opens Create with this result attached">
+            <Wand2 strokeWidth={1.8} /> Make a full piece with Vesper
           </Link>
         ) : null}
       </div>

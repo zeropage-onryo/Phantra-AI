@@ -25,5 +25,9 @@ export function openingProject(
 ): number {
   const named = Number(params.get("project")) || 0;
   if (named) return named;
+  // a "Use kit" link (?kit=, lib/kit-use.ts) is a conversation outside any
+  // project: a remembered project would hide the kit it asked for
+  const kit = Number(params.get("kit"));
+  if (Number.isInteger(kit) && kit > 0) return 0;
   return handoffKind(params) ? 0 : remembered() || 0;
 }

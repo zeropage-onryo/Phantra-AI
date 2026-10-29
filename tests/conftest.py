@@ -553,3 +553,11 @@ def seed_two(email, dsn):
     accounts.add_member(second, seeded["user_id"], dsn=dsn)
     return {**seeded, "accounts": [*seeded["accounts"], second]}
 
+
+
+@pytest.fixture
+def shot_by_shot(monkeypatch):
+    """A timed scene renders one clip a shot, as it did before 2026-10-26:
+    for the tests of that split, which a scene renders as only when it is
+    longer than the model renders (src/timeline.py renders_as_one)."""
+    monkeypatch.setenv("PHANTRA_ONE_CLIP", "0")

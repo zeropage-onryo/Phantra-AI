@@ -220,18 +220,33 @@ def _account_slug(account_id: Optional[int], dsn: Optional[str]) -> Optional[str
 
 
 def token_for(account_id: Optional[int], platform: str, dsn: Optional[str] = None) -> str:
-    """The credential that posts for this account. Today: the
-    installation's env token, and only for the operator's account
-    (PUBLISH_OPERATOR_ACCOUNT, a slug or an id). Per-account OAuth
-    connections replace this function's body; nothing else changes."""
+    """The credential that posts for this account on this platform.
+
+    A connection the person made themselves wins (src/social_connections,
+    2026-10-22: Settings -> Connections), renewed on the way when it is
+    near expiry. With none, the installation's env token still answers,
+    and only for the operator's account (PUBLISH_OPERATOR_ACCOUNT, a
+    slug or an id) and only for TikTok, which is what it posted with
+    before anyone could connect their own. Everybody else is told to
+    connect."""
+    from . import social, social_connections
+    from .social.base import ConnectRefused
+    if account_id is not None and social.get(platform) is not None:
+        try:
+            token, _conn = social_connections.token_for(int(account_id), platform, dsn=dsn)
+            return token
+        except ConnectRefused as e:
+            if social_connections.has(int(account_id), platform, dsn=dsn) \
+                    or platform != "tiktok":
+                raise PublishError(str(e))
+            # no connection of their own: the operator fallback below
     if platform != "tiktok":
         raise PublishError(f"posting to {platform} is not built yet")
     operator = (os.environ.get(OPERATOR_ENV) or "").strip()
     is_operator = bool(operator) and (
         operator == str(account_id) or operator == _account_slug(account_id, dsn))
     if not is_operator:
-        raise PublishError("Connect your TikTok account first -- posting from this "
-                           "workspace is not set up yet.")
+        raise PublishError("Connect your TikTok account first (Settings -> Connections).")
     token = tiktok.access_token()
     if not token:
         raise PublishError("The studio's TikTok connection has no token "

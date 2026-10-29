@@ -39,6 +39,7 @@ import { followJob, type Job, type TimelinePart } from "@/lib/studio-api";
 import { PLAN_TOOL } from "@/lib/make-plan";
 import { EFFECT_TOOL } from "@/lib/effects";
 import { TALK_TOOL } from "@/lib/talking-photo";
+import { DUB_TOOL } from "@/lib/dubbing";
 
 export type Output = "image" | "video";
 
@@ -56,6 +57,8 @@ export const isPlanTool = (tool?: string | null) => tool === PLAN_TOOL;
 export const isEffectTool = (tool?: string | null) => tool === EFFECT_TOOL;
 /** the talking-photo card (lib/talking-photo.ts): opened, never run */
 export const isTalkTool = (tool?: string | null) => tool === TALK_TOOL;
+/** the dub card (lib/dubbing.ts): opened, never run */
+export const isDubTool = (tool?: string | null) => tool === DUB_TOOL;
 /* The free edits (src/guide_tools.py QUICK_TOOLS, 2026-10-19): a new shape
    or a range of something this conversation made, on the studio's own
    server for no credits -- so the page runs one the moment it arrives
@@ -68,7 +71,13 @@ export const isQuickTool = (tool?: string | null): tool is QuickTool =>
 export const isAdTool = (tool?: string | null) => tool === "make_ad";
 export const isMake = (tool?: string | null) =>
   !!tool &&
-  (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL || tool === TALK_TOOL || isAdTool(tool) || isQuickTool(tool));
+  (tool in MAKE_TOOLS ||
+    tool === PLAN_TOOL ||
+    tool === EFFECT_TOOL ||
+    tool === TALK_TOOL ||
+    tool === DUB_TOOL ||
+    isAdTool(tool) ||
+    isQuickTool(tool));
 
 /* The Guide's element sheet (src/guide_tools.SHEET_TOOL, 2026-10-09): a
    step card like a still's, but its Approve saves the person in the
@@ -172,6 +181,7 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { id: "animate", cmd: "animate", desc: "Turn the last image into a shot", group: "use", needsImage: true },
   { id: "effects", cmd: "effects", desc: "Change a still or a clip", group: "use" },
   { id: "talking-photo", cmd: "talking-photo", desc: "Make a photo of a person talk", group: "use" },
+  { id: "dub", cmd: "dub", desc: "Dub a clip into another language", group: "use" },
   { id: "ref", cmd: "ref", desc: "Attach a reference image", group: "use" },
   { id: "element", cmd: "element", desc: "Reference a saved element (@)", group: "use" },
 ];
@@ -254,6 +264,25 @@ export function saveImageModel(id: string) {
   }
 }
 
+/* which clip model renders a scene (2026-10-22): "" = Auto (the brain may
+   propose one; the Render card opens on its proposal or the default), an
+   id = the person's pick, which every scene sent then renders on */
+const VIDEO_MODEL_KEY = "phantra:composer:video-model";
+export function loadVideoModel(): string {
+  try {
+    return localStorage.getItem(VIDEO_MODEL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+export function saveVideoModel(id: string) {
+  try {
+    localStorage.setItem(VIDEO_MODEL_KEY, id);
+  } catch {
+    /* fine */
+  }
+}
+
 /* waitForJob with a stop: a Stop on the composer has to end the wait at
    once, whatever the server does with the cancel. Resolves to null when
    stopped. On the job stream while it is live (studio-api followJob). */
@@ -281,7 +310,8 @@ export function madeMeta(m: Made, modelLabel?: string): string {
     m.title,
     n ? `${n} shot${n === 1 ? "" : "s"}` : "one continuous shot",
     m.frame,
-    m.seconds ? `${m.seconds}s` : null,
+    // a saved scene may carry its length as "10s": never "10ss"
+    m.seconds ? `${String(m.seconds).replace(/s$/i, "")}s` : null,
   ]
     .filter(Boolean)
     .join(" · ");

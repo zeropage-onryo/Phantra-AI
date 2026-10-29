@@ -555,6 +555,7 @@ export default function AssetsPage() {
             onMakeElement={() => setMaking(open)}
             ratio={ratios[ratioKey(open.url)]}
             onCopied={(ok) => toast(ok ? "prompt copied" : "Could not copy — select the text instead", ok ? "ok" : "err")}
+            onToast={(text, kind) => toast(text, kind)}
           />
         ) : null}
       </AnimatePresence>

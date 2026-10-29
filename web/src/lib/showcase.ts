@@ -17,7 +17,7 @@
 export const SHOWCASE_URL = "/showcase/manifest.json";
 export const PLACEHOLDER_URL = "/showcase/placeholder/still.svg";
 
-export type ShowcaseAspect = "16:9" | "9:16" | "4:5" | "1:1";
+export type ShowcaseAspect = "16:9" | "9:16" | "4:5" | "1:1" | "4:3" | "2:3";
 export type ShowcaseItem = {
   kind: "clip" | "still";
   /** the untouched source; null when the example has no before (a still
@@ -65,7 +65,7 @@ export function showcaseKey(effectId: string): string {
   return EFFECT_KEYS[id] ?? `effect.${id}`;
 }
 
-const ASPECTS: readonly string[] = ["16:9", "9:16", "4:5", "1:1"];
+const ASPECTS: readonly string[] = ["16:9", "9:16", "4:5", "1:1", "4:3", "2:3"];
 
 /** One entry, whole, or null when it is not one (no `after`, an unknown
  *  kind): a half-written entry draws the placeholder, never a broken tile. */
@@ -108,8 +108,21 @@ export function itemFor(manifest: ShowcaseManifest | null | undefined, effectId:
 
 export const isPlaceholder = (item: ShowcaseItem) => item.after === PLACEHOLDER_URL;
 
-/** What a card shows at rest: the before, else the poster, else the after. */
-export const restingFrame = (item: ShowcaseItem) => item.before ?? item.poster ?? item.after;
+/** Is this address a picture an <img> can draw (not a clip)? */
+export const isPicture = (url: string | null | undefined) => !!url && /\.(jpe?g|png|webp|gif|avif|svg)(\?|#|$)/i.test(url);
+
+/** What a card shows at rest, as a PICTURE an <img> can draw, or null when
+ *  the entry has none (a clip with no poster: the card shows the clip's
+ *  first frame instead). A clip's `before` is often a clip too -- the
+ *  looks' untouched source -- so it is only used when it is a picture;
+ *  putting an .mp4 into an <img> was what drew the looks as broken images
+ *  (2026-10-26). */
+export function restingFrame(item: ShowcaseItem): string | null {
+  if (isPicture(item.before)) return item.before;
+  if (isPicture(item.poster)) return item.poster;
+  if (item.kind === "still" || isPicture(item.after)) return item.after;
+  return null;
+}
 
 /** "16:9" -> "16 / 9", for CSS aspect-ratio. */
 export const cssAspect = (aspect: ShowcaseAspect) => aspect.replace(":", " / ");

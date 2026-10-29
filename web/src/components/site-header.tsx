@@ -13,6 +13,8 @@ import { Wordmark } from "@/components/wordmark";
 import { skinClass, useTone } from "@/components/editorial-skin";
 import { makePath, pagesIn, menuUseCases } from "@/landing-pages/pages";
 import { isVideoModelPage, pageLabel } from "@/landing-pages/shared";
+import { SOCIALS } from "@/lib/socials";
+import { SocialIcon } from "@/components/social-icon";
 
 // Fixed 60px bar: transparent while the page is at the top, glass (blur +
 // hairline) once scrolled. The state is written to a data attribute the
@@ -24,6 +26,9 @@ import { isVideoModelPage, pageLabel } from "@/landing-pages/shared";
 // (pages.ts USE_CASE_SLUGS). Every other /make page is still linked from the
 // footer's Tools column and from each page's related links. The image- and
 // video-model pages stay under "Models" (2026-10-05).
+//
+// "Resources" (Mike, 2026-10-23) is a third panel after Models: Phantra's
+// own social accounts, read off lib/socials.ts. Each opens in a new tab.
 const USE_CASES = menuUseCases();
 const AFTER = [
   // the MCP server and Claude plugin page (2026-10-12, Mike's call: "listed
@@ -66,7 +71,13 @@ export function SiteHeader() {
       className="glass-nav fixed inset-x-0 top-0 z-50 border-b border-transparent"
     >
       <div className="flex h-[60px] items-center justify-between gap-10 px-6 lg:px-10">
-        <Wordmark intro />
+        {/* the menu button on the LEFT of the logo on a phone (2026-10-26,
+            Mike: "move the dropdown to the left top side"); above md it is
+            not drawn and the logo stands alone */}
+        <div className="flex items-center gap-3">
+          <MobileMenu />
+          <Wordmark intro />
+        </div>
 
         <Menu.Root className="hidden md:block" aria-label="Site">
           <Menu.List className="flex items-center gap-1">
@@ -145,6 +156,41 @@ export function SiteHeader() {
               </Menu.Content>
             </Menu.Item>
 
+            <Menu.Item>
+              <Menu.Trigger className={`${ITEM} group/resources gap-1 data-popup-open:bg-secondary data-popup-open:text-foreground`}>
+                Resources
+                <ChevronDown
+                  aria-hidden
+                  strokeWidth={1.75}
+                  className="size-3.5 transition-transform duration-200 group-data-popup-open/resources:rotate-180"
+                />
+              </Menu.Trigger>
+              <Menu.Content className="w-[300px] p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200">
+                <span className="eyebrow block px-3 pt-1.5 pb-1">Follow Phantra</span>
+                <ul className="flex flex-col">
+                  {SOCIALS.map((social) => (
+                    <li key={social.href}>
+                      <Menu.Link
+                        href={social.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        closeOnClick
+                        className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                      >
+                        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-foreground">
+                          <SocialIcon kind={social.icon} />
+                        </span>
+                        <span>
+                          <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">{social.label}</span>
+                          <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">{social.handle}</span>
+                        </span>
+                      </Menu.Link>
+                    </li>
+                  ))}
+                </ul>
+              </Menu.Content>
+            </Menu.Item>
+
             {AFTER.map((link) => (
               <Menu.Item key={link.href}>
                 <Menu.Link render={<Link href={link.href} />} className={ITEM}>
@@ -181,7 +227,6 @@ export function SiteHeader() {
           <Button size="sm" onClick={() => goToSignIn("signup")}>
             Sign up
           </Button>
-          <MobileMenu />
         </div>
       </div>
     </header>
@@ -273,6 +318,32 @@ function MobileMenu() {
         </div>
       ),
     },
+    {
+      value: "resources",
+      label: "Resources",
+      body: (
+        <div className="pb-2">
+          <span className="eyebrow block px-3 pt-1.5 pb-1">Follow Phantra</span>
+          <ul className="flex flex-col">
+            {SOCIALS.map((social) => (
+              <li key={social.href}>
+                <a
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={close}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium tracking-[-0.005em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
+                >
+                  <SocialIcon kind={social.icon} className="size-[18px] shrink-0" />
+                  <span>{social.label}</span>
+                  <span className="text-[var(--ink-3)]">{social.handle}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -280,7 +351,7 @@ function MobileMenu() {
       <Dialog.Trigger
         ref={trigger}
         aria-label="Open menu"
-        className="inline-flex size-9 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+        className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
       >
         <MenuIcon aria-hidden className="size-5" strokeWidth={1.75} />
       </Dialog.Trigger>
@@ -289,17 +360,18 @@ function MobileMenu() {
           className={`fixed inset-0 z-[70] flex flex-col bg-background text-foreground outline-none transition-[opacity,transform] duration-200 data-ending-style:-translate-y-2 data-ending-style:opacity-0 data-starting-style:-translate-y-2 data-starting-style:opacity-0 motion-reduce:transition-none md:hidden`}
         >
           <Dialog.Title className="sr-only">Menu</Dialog.Title>
-          <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-border px-6">
+          {/* the close sits where the menu button was, left of the logo */}
+          <div className="flex h-[60px] shrink-0 items-center gap-3 border-b border-border px-6">
+            <Dialog.Close
+              aria-label="Close menu"
+              className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <X aria-hidden className="size-5" strokeWidth={1.75} />
+            </Dialog.Close>
             {/* the wordmark is a link home: following it closes the sheet */}
             <span onClick={close}>
               <Wordmark />
             </span>
-            <Dialog.Close
-              aria-label="Close menu"
-              className="inline-flex size-9 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <X aria-hidden className="size-5" strokeWidth={1.75} />
-            </Dialog.Close>
           </div>
 
           <nav aria-label="Site" className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">

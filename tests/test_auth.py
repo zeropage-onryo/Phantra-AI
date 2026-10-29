@@ -441,6 +441,24 @@ def test_signin_page_hides_oauth_when_supabase_is_not_configured(clean_slate, mo
     assert 'action="/auth/login"' in page.text
 
 
+def test_signin_with_a_provider_goes_straight_on_and_keeps_next(clean_slate, monkeypatch):
+    """The phone's sign-up sheet (2026-10-26): a tap on Google or Discord
+    lands on /signin?provider=, which stashes `next` and goes straight on to
+    that provider -- no second screen."""
+    monkeypatch.setenv("SUPABASE_PROVIDERS", "google")
+    client.cookies.clear()
+    response = client.get("/signin?next=https://web.example/studio/new&mode=signup&provider=google",
+                          follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/google/login"
+    # a provider that is not switched on shows the door as before
+    page = client.get("/signin?provider=discord", follow_redirects=False)
+    assert page.status_code == 200 and "Continue with Google" in page.text
+    # and an unknown one is ignored
+    page = client.get("/signin?provider=myspace", follow_redirects=False)
+    assert page.status_code == 200
+
+
 def test_api_without_session_is_401(clean_slate):
     assert client.get("/api/capabilities").status_code == 401
 

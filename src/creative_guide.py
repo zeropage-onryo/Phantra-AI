@@ -157,13 +157,34 @@ NO_PHOTO_NOTE = ("NO PHOTO IS BEHIND THIS YET: nothing is attached and nothing n
                  "and say in one line that it is a draft that needs a photo before it renders.")
 
 
-def photo_note(output, image_refs, grounding) -> str:
+def _last_user_text(conversation) -> str:
+    for message in reversed(getattr(conversation, "messages", None) or []):
+        if getattr(message, "role", "") == "user":
+            return message.content or ""
+    return ""
+
+
+def photo_note(output, image_refs, grounding, *, kit=None, text: str = "",
+               results=None) -> str:
     """NO_PHOTO_NOTE for a Video turn with nothing to hold a scene to, else
-    "". The rule's own switch (preprod.refs_required) turns it off too."""
+    "". The rule's own switch (preprod.refs_required) turns it off too.
+
+    Two more things hold a scene (2026-10-27): a product or character the
+    brand kit links, named in the person's words (api._kit_refs puts its
+    photo on the scene), and a numbered result the words point at (#3)."""
     if output != "video" or image_refs:
         return ""
     if isinstance(grounding, dict) and (grounding.get("cast") or grounding.get("locations")):
         return ""
+    if results and re.search(r"#\d", text or ""):
+        return ""
+    if kit and text:
+        try:
+            from . import brand_kits
+            if brand_kits.named(kit, text):
+                return ""
+        except Exception:
+            pass                          # the note is advice; a read error keeps it
     from . import preprod
     return NO_PHOTO_NOTE if preprod.refs_required() else ""
 
@@ -212,6 +233,22 @@ AUTONOMY_NOTES = {
 }
 
 
+CLIP_LABEL_MAX = 60
+
+
+def clip_model_note(label) -> str:
+    """The composer's video model, when the person picked one on its line
+    (2026-10-22) rather than leaving it on Auto: the pick is theirs, so the
+    brain proposes no other (the composer renders on the pick whatever a
+    proposal says). "" on Auto."""
+    label = " ".join(str(label or "").split())[:CLIP_LABEL_MAX]
+    if not label:
+        return ""
+    return (f"THE PERSON PICKED {label} FOR CLIPS on the composer's line: every scene "
+            f"renders on {label}. Do not propose another clip model (leave make_video's "
+            f"model out). If the idea needs what {label} cannot do, say so in one line.")
+
+
 def autonomy_note(setting) -> str:
     """The dial's line, "" for anything that is not a setting."""
     return AUTONOMY_NOTES.get(str(setting or "").strip().lower(), "")
@@ -256,6 +293,15 @@ def kit_instructions(brand_kit, project=None) -> str:
         return ""
 
 
+def lone_kit_instructions(name) -> str:
+    """The one-kit offer (prompts/creative_guide_lone_kit.txt), "" for none."""
+    name = " ".join(str(name or "").split())[:80]
+    if not name:
+        return ""
+    root = Path(__file__).resolve().parent.parent
+    return "\n\n" + (root / "prompts/creative_guide_lone_kit.txt").read_text().replace("{kit}", name)
+
+
 def _attach_kit(contents, brand_kit) -> None:
     """The kit's logo and look references, on the person's last message,
     AFTER their own pictures (which the reference count names)."""
@@ -271,8 +317,16 @@ def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
             on_text=None, skill=None, results=None, explore=False, brand_kit=None,
-            autonomy=None):
+            autonomy=None, clip_model=None, lone_kit=None, studio=None):
     """One Guide turn.
+
+    `lone_kit` (2026-10-25, the Vesper audit) is the name of the account's
+    ONLY brand kit when no kit is in play: the instructions then say to
+    offer it for an ad with no product named (lone_kit_instructions).
+
+    `clip_model` (2026-10-22) is the public name of the clip model the
+    person picked on the composer's Video line, or None for Auto: with one,
+    the last message says so (clip_model_note) and no other is proposed.
 
     `autonomy` (2026-10-22, vesper_v2) is the person's dial -- ask,
     checkpoints or autopilot -- said in one line on their last message
@@ -306,6 +360,11 @@ def respond(conversation, *, client, grounding, image_refs=(),
     handed in include load_skill, the instructions carry the shelf's index
     so the model can load one itself. A turn handed neither is the turn it
     was.
+
+    `studio` (2026-10-26, src/studios.py) is the Ad Studio's pick on the
+    conversation -- format, shape, length and the brief's answers -- already
+    cleaned and gated by the route; its note rides on the last message
+    beside the picked skill. None is the turn it was.
 
     `project` (2026-10-07) is the studio project the turn runs inside
     (src/projects.py's row), when it does: the last message carries one
@@ -360,7 +419,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    from . import assistant_brain, guide_tools, look_research, make_plan, model_menu, result_refs, skills
+    from . import assistant_brain, guide_tools, look_research, make_plan, model_menu, result_refs, skills, studios
 
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
@@ -373,8 +432,11 @@ def respond(conversation, *, client, grounding, image_refs=(),
         with_models=model_menu.TOOL in offered,
         with_explore=exploring,
         with_kit=guide_tools.KIT_TOOL in offered,
-        with_questions=guide_tools.ASK_TOOL in offered)
+        with_questions=guide_tools.ASK_TOOL in offered,
+        with_screens=guide_tools.SCREEN_TOOL in offered)
     config.system_instruction += kit_instructions(brand_kit, project)
+    if not brand_kit:
+        config.system_instruction += lone_kit_instructions(lone_kit)
     # the kit a propose_kit_change call is held to: the project's own
     kit = None
     if guide_tools.KIT_TOOL in offered:
@@ -389,10 +451,14 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 if exploring else OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
                                 "" if exploring or "make_video" not in offered
-                                else photo_note(output, image_refs, grounding),
+                                else photo_note(output, image_refs, grounding,
+                                                kit=brand_kit, results=results,
+                                                text=_last_user_text(conversation)),
                                 result_refs.note(named),
                                 skills.picked_note(picked),
-                                autonomy_note(autonomy)))
+                                studios.turn_note(studio),
+                                autonomy_note(autonomy),
+                                clip_model_note(clip_model) if "make_video" in offered else ""))
     _attach_kit(contents, brand_kit)
     if not tools:
         config.response_mime_type = "application/json"
@@ -404,7 +470,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
     else:
         reply = _respond_with_tools(client, brain, config, contents, tools, run_tool,
                                     account_id=account_id, on_retry=on_retry, feed=feed,
-                                    results=named, kit=kit)
+                                    results=named, kit=kit, brand_kit=brand_kit)
     if links:
         reply["sheet"] = assistant_brain.merge_sheets(links, reply.get("sheet"))
     if picked:
@@ -453,7 +519,8 @@ MAX_TOOL_CALLS = 6
 
 
 def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
-                        account_id=None, on_retry=None, feed=None, results=None, kit=None):
+                        account_id=None, on_retry=None, feed=None, results=None, kit=None,
+                        brand_kit=None):
     from . import guide_tools, make_plan
 
     # Gemini refuses a JSON response schema alongside function
@@ -487,6 +554,8 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     clean = guide_tools.check_args(name, args, results)
                     if name == guide_tools.KIT_TOOL:
                         clean = guide_tools.check_kit(clean, kit)
+                    if name == guide_tools.SCREEN_TOOL:
+                        clean = guide_tools.check_screen(clean, brand_kit)
                 except guide_tools.Refused as exc:
                     # An effect is held to a table of exact names, and the
                     # refusal lists the legal ones: the model gets it back
@@ -494,8 +563,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     # same read budget. Every other refused write still
                     # fails the turn -- a URL in a proposal is not a typo.
                     if (name not in (guide_tools.EFFECT_TOOL, guide_tools.TALK_TOOL,
+                                     guide_tools.DUB_TOOL,
                                      guide_tools.KIT_TOOL, guide_tools.AD_TOOL,
-                                     guide_tools.ASK_TOOL,
+                                     guide_tools.ASK_TOOL, guide_tools.SCREEN_TOOL,
                                      *guide_tools.QUICK_TOOLS)
                             or len(runs) >= MAX_TOOL_CALLS):
                         raise
@@ -544,6 +614,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         prompt = str(proposal["args"].get("prompt") or "").strip()
         if guide_tools.is_make(proposal["tool"]) and prompt:
             message = prompt if len(prompt) <= 1200 else prompt[:1200].rsplit(" ", 1)[0] + "…"
+            # what the brain decided when the person deferred, said first
+            if proposal["args"].get("locked"):
+                message = f"{proposal['args']['locked']}\n\n{message}"
         if proposal["tool"] == guide_tools.PLAN_TOOL:
             # the plan's card lists the steps; this is the line above it
             message = proposal["args"]["summary"]
@@ -556,6 +629,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.AD_TOOL:
             # the card writes the beats and waits for Build
             message = guide_tools.ad_line(proposal["args"])
+        if proposal["tool"] == guide_tools.DUB_TOOL:
+            # the card asks for the clip, the language and the consent
+            message = guide_tools.dub_line(proposal["args"])
         if guide_tools.is_quick(proposal["tool"]):
             # a free edit runs at once: the line says what and that it is free
             message = guide_tools.quick_line(proposal["tool"], proposal["args"])
@@ -574,6 +650,12 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
             fields = ", ".join(r["label"].lower() for r in proposal["args"].get("diff") or [])
             message = (f"Here is the change to {proposal['args'].get('kit_name') or 'the kit'}"
                        f" ({fields}). Apply it on the card, or tell me what to change.")
+        if proposal["tool"] == guide_tools.SCREEN_TOOL:
+            # the card draws the screen; this is the line above it
+            message = (f"Here is the {proposal['args'].get('summary') or 'screen'}, drawn "
+                       f"from {proposal['args'].get('kit_name') or 'the kit'} for free. Keep "
+                       "it on the card and it goes in the Library, ready to hold the shot "
+                       "that shows it.")
         if proposal["tool"] == guide_tools.SHEET_TOOL:
             # the step card's own words: who is saved, and what is drawn
             who = proposal["args"].get("name") or "this character"
@@ -697,7 +779,8 @@ def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
                  with_effects: bool = False, with_research: bool = False,
                  with_models: bool = False, with_explore: bool = False,
-                 with_kit: bool = False, with_questions: bool = False):
+                 with_kit: bool = False, with_questions: bool = False,
+                 with_screens: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
     # Vesper's voice (2026-10-19, the Vesper review): how every message
@@ -726,6 +809,10 @@ def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
     if with_kit:
         # only where propose_kit_change is offered (src/kit_changes.py)
         text += "\n\n" + (root / "prompts/creative_guide_kit.txt").read_text()
+    if with_screens:
+        # only where make_screen is offered: a maker turn with a kit in play
+        # (src/kit_screens.py)
+        text += "\n\n" + (root / "prompts/creative_guide_screens.txt").read_text()
     if with_questions:
         # only where ask_choice is offered (vesper_v2; guide_tools.ASK_SPEC)
         text += "\n\n" + (root / "prompts/creative_guide_questions.txt").read_text()
@@ -764,8 +851,9 @@ def _strict(schema: dict) -> dict:
 
 
 def respond_personal(conversation, *, provider, scope, model, grounding, image_refs=(),
-                     assistant=None, links=None, output=None, skill=None, brand_kit=None):
-    from . import assistant_brain, personal_models, skills
+                     assistant=None, links=None, output=None, skill=None, brand_kit=None,
+                     studio=None):
+    from . import assistant_brain, personal_models, skills, studios
 
     # no tools here, so the model cannot load a skill -- but one the person
     # picked rides in the prompt, exactly as it rides on a Gemini turn
@@ -778,7 +866,9 @@ def respond_personal(conversation, *, provider, scope, model, grounding, image_r
                          "reference_images_supplied": len(image_refs),
                          "pasted_links": assistant_brain.link_note(links),
                          "composer_output": OUTPUT_NOTES.get(output or "", ""),
-                         "picked_skill": skills.picked_note(picked)}, default=str)
+                         "picked_skill": skills.picked_note(picked),
+                         # the Ad Studio's brief (src/studios.py), "" outside one
+                         "studio": studios.turn_note(studio)}, default=str)
     schema = Answer.model_json_schema()
     if assistant is None:
         # The plain Guide on a personal plan answers the three fields it

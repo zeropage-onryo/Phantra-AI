@@ -1,417 +1,801 @@
-/* The Effects tab (effects-tab.tsx, /studio/effects): the drop zone, the
-   filters, the before / after cards, the open priced card and the results.
-   Prefixed fxt-; every colour is a studio token (studio.css :root). No
-   credit number is drawn by anything in this file. */
-.fxt {
+/* The Effects page (effects-tab.tsx, /studio/effects), Mike's "R2·04"
+   (2026-10-26): the panel (fxp-) on the left, the wall (fxw-) on the right.
+   Every colour is a studio token (studio.css :root); headlines are the
+   Create page's Anton (--font-anton, card-fonts.ts). Buttons are round
+   (Mike, 2026-10-26); tiles stay square-cornered pictures. */
+.fxw {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 12px 16px 0 !important;
+}
+.fxw .fxw-anton,
+.fxw .fxp-title,
+.fxw .fxw-feature-name,
+.fxw .fxw-name {
+  font-family: var(--font-anton), "Anton", var(--display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+/* ── the panel ── */
+.fxp {
+  position: sticky;
+  top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--r1);
+  background: var(--panel);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  min-height: 560px;
+  box-sizing: border-box;
 }
-.fxt-drop {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px 18px;
-  padding: 18px 20px;
-  border: 1px dashed var(--edge-hi);
-  border-radius: var(--r2);
+.fxw .fxp-cover {
+  position: relative;
+  aspect-ratio: 8 / 3;
+  border-radius: 12px;
+  overflow: hidden;
   background: var(--well);
+  flex: none;
+}
+.fxw .fxp-cover[data-result="1"] {
+  aspect-ratio: 4 / 5;
+}
+.fxw .fxp-cover > video,
+.fxw .fxp-cover > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0.72;
+}
+.fxw .fxp-cover[data-result="1"] > video,
+.fxw .fxp-cover[data-result="1"] > img {
+  opacity: 1;
+}
+.fxw .fxp-title {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  max-width: calc(100% - 24px);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--ground);
+  color: var(--signal-hi);
+  font-size: 30px;
+  line-height: 1.05;
+}
+.fxw .fxp-change {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ground);
+  color: var(--text);
+  font: 600 12px var(--body);
+  cursor: pointer;
+}
+.fxw .fxp-change:hover {
+  background: var(--raise);
+}
+.fxw .fxp-running {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--bone);
+}
+.fxw .fxp-spin {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid var(--edge-hi);
+  border-top-color: var(--signal);
+  animation: fxp-spin 0.9s linear infinite;
+}
+@keyframes fxp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fxw .fxp-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px dashed var(--edge-hi);
+  border-radius: 14px;
   transition: border-color var(--t), background var(--t);
 }
-.fxt-drop[data-over="1"] {
+.fxw .fxp-slot[data-filled="1"] {
+  border-style: solid;
+  border-color: var(--signal);
+}
+.fxw .fxp-slot[data-over="1"] {
   border-color: var(--signal);
   background: var(--signal-wash);
 }
-.fxt-drop[data-loaded="1"] {
-  border-style: solid;
-  border-color: var(--edge);
+.fxw .fxp-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--well);
 }
-.fxt-drop-what {
+.fxw .fxp-thumb-empty,
+.fxw .fxp-thumb-clip {
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  color: var(--bone-2);
+  font: 500 11px var(--mono);
+}
+.fxw .fxp-thumb-empty svg {
+  width: 20px;
+  height: 20px;
+}
+.fxw .fxp-slot-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
   min-width: 0;
 }
-.fxt-drop-what > svg {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  color: var(--bone-2);
-}
-.fxt-drop-what img,
-.fxt-drop-what video {
-  flex: none;
-  width: 72px;
-  height: 48px;
-  border-radius: 8px;
-  border: 1px solid var(--edge-lo);
-  object-fit: cover;
-  background: var(--slate);
-}
-.fxt-drop-what b {
-  display: block;
+.fxw .fxp-slot-words b {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
 }
-.fxt-drop-what span {
-  display: block;
-  font-size: 12.5px;
+.fxw .fxp-slot-words span {
+  font-size: 12px;
   color: var(--bone-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.fxt-drop-acts {
+.fxw .fxp-slot-acts {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
-.fxt-btn {
-  height: 32px;
-  padding: 0 12px;
+.fxw .fxp-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   border: 1px solid var(--edge);
   background: transparent;
   color: var(--bone);
-  font-family: var(--body);
-  font-size: 12.5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  text-decoration: none;
   cursor: pointer;
-  transition: border-color var(--t), background var(--t), color var(--t);
 }
-.fxt-btn:hover:not(:disabled) {
-  border-color: var(--line-hi);
+.fxw .fxp-icon:hover {
+  border-color: var(--edge-hi);
   color: var(--text);
 }
-.fxt-btn:disabled {
-  opacity: 0.45;
+.fxw .fxp-icon:disabled {
+  opacity: 0.5;
   cursor: default;
 }
-.fxt-btn.primary {
-  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
-  background: var(--signal-soft);
-  color: var(--text);
+.fxw .fxp-icon svg {
+  width: 15px;
+  height: 15px;
 }
-.fxt-btn svg {
-  width: 14px;
-  height: 14px;
-}
-.fxt-filters {
+
+.fxw .fxp-field {
   display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--bone-3);
 }
-.fxt-filters [role="group"] {
+.fxw .fxp-field select,
+.fxw .fxp-field textarea {
+  background: var(--well);
+  color: var(--text);
+  border: 1px solid var(--edge);
+  font: 14px var(--body);
+}
+.fxw .fxp-field select {
+  height: 42px;
+  border-radius: 999px;
+  padding: 0 16px;
+}
+.fxw .fxp-field textarea {
+  border-radius: 14px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+.fxw .fxp-seg {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
-.fxt-filters button {
-  height: 30px;
-  padding: 0 12px;
+.fxw .fxp-seg button {
+  flex: 1;
+  min-width: 56px;
+  height: 38px;
   border-radius: 999px;
   border: 1px solid var(--edge);
   background: transparent;
-  color: var(--bone-2);
-  font-family: var(--body);
-  font-size: 12.5px;
+  color: var(--bone);
+  font: 600 13px var(--body);
   cursor: pointer;
 }
-.fxt-filters button[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
-  background: var(--signal-soft);
-  color: var(--text);
+.fxw .fxp-seg button[aria-pressed="true"] {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
 }
-.fxt-filters .m {
-  margin-left: auto;
+.fxw .fxp-grow {
+  flex: 1;
 }
-.fxt-note {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--warn);
-}
-.fxt-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 14px;
-}
-.fxt-card {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0;
-  border: 1px solid var(--edge-lo);
-  border-radius: var(--r1);
-  background: var(--panel);
-  color: var(--text);
-  text-align: left;
-  overflow: hidden;
+.fxw .fxp-approve {
+  flex: none;
+  min-height: 54px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font: 700 16px var(--body);
   cursor: pointer;
-  font-family: var(--body);
-  transition: border-color var(--t), transform var(--t);
+  transition: background var(--t);
 }
-.fxt-card:hover:not(:disabled),
-.fxt-card:focus-visible {
-  border-color: var(--line-hi);
-  outline: none;
+.fxw .fxp-approve:hover:not(:disabled) {
+  background: var(--signal-deep);
 }
-.fxt-card:disabled {
+.fxw .fxp-approve:disabled {
+  background: var(--edge);
+  color: var(--bone-3);
   cursor: default;
 }
-.fxt-card:disabled .fxt-media {
-  opacity: 0.6;
+.fxw .fxp-model {
+  margin-top: -4px;
+  font: 500 11px var(--mono);
+  color: var(--bone-3);
 }
-.fxt-media {
-  position: relative;
+.fxw .fxp-small,
+.fxw .fxp-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bone-3);
+  text-align: center;
+}
+.fxw .fxp-note {
+  text-align: left;
+}
+.fxw .fxp-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fxw .fxp-result > video,
+.fxw .fxp-result > img {
   width: 100%;
-  aspect-ratio: 16 / 9;
-  background: var(--void);
-  overflow: hidden;
+  border-radius: 10px;
+  display: block;
 }
-.fxt-media img,
-.fxt-media video {
+.fxw .fxp-result-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fxw .fxp-pill {
+  height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--bone);
+  font: 500 12.5px var(--body);
+  text-decoration: none;
+  cursor: pointer;
+}
+.fxw .fxp-pill svg {
+  width: 14px;
+  height: 14px;
+}
+.fxw .fxp-pill.primary {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+  font-weight: 700;
+}
+.fxw .fxp-pill:disabled {
+  opacity: 0.5;
+}
+
+/* ── the wall ── */
+.fxw .fxw-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.fxw .fxw-strip {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+  height: 280px;
+}
+.fxw .fxw-strip[data-n="1"] {
+  grid-template-columns: 1fr;
+}
+.fxw .fxw-strip[data-n="2"] {
+  grid-template-columns: 2fr 1fr;
+}
+.fxw .fxw-feature {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.fxw .fxw-feature[data-chosen="1"],
+.fxw .fxw-tile[data-chosen="1"] {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+.fxw .fxw-feature > video,
+.fxw .fxw-feature > img,
+.fxw .fxw-tile > video,
+.fxw .fxw-tile > img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: opacity var(--t);
+  display: block;
 }
-.fxt-media[data-fit="contain"] img,
-.fxt-media[data-fit="contain"] video {
-  object-fit: contain;
-}
-/* the "after" sits over the resting frame and is shown on hover / focus */
-.fxt-media .after {
-  opacity: 0;
-}
-.fxt-card:hover .fxt-media .after,
-.fxt-card:focus-visible .fxt-media .after,
-.fxt-media[data-playing="1"] .after {
-  opacity: 1;
-}
-.fxt-media .lab {
+.fxw .fxw-feature-name {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: rgb(0 0 0 / 0.55);
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--bone);
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  font-size: 34px;
+  line-height: 0.92;
 }
-.fxt-badge {
+.fxw .fxw-feature[data-big="1"] .fxw-feature-name {
+  font-size: 64px;
+}
+.fxw .fxw-tag {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 3px 8px;
+  top: 12px;
+  left: 12px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-weight: 600;
+  background: var(--signal);
+  color: var(--on-signal);
+  font: 700 11px var(--body);
+  letter-spacing: 0.02em;
 }
-.fxt-badge[data-tier="free"] {
-  background: color-mix(in srgb, var(--ok) 22%, var(--void));
-  color: var(--ok);
-}
-.fxt-badge[data-tier="pro"] {
-  background: color-mix(in srgb, var(--signal) 22%, var(--void));
-  color: var(--signal);
-}
-.fxt-card-body {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px 12px;
-}
-.fxt-card-body b {
-  font-size: 13.5px;
-  font-weight: 600;
-}
-.fxt-card-body span {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--bone);
-}
-.fxt-card-body i {
-  font-style: normal;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--warn);
-}
-.fxt-card-body small {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  color: var(--bone-3);
-}
-/* the open priced card: the composer's effect-step, in a panel beside its result */
-.fxt-open {
-  display: grid;
-  grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
-  gap: 18px;
-  padding: 16px;
-  border: 1px solid var(--edge);
-  border-radius: var(--r2);
-  background: var(--well);
-}
-.fxt-open-head {
-  grid-column: 1 / -1;
+.fxw .fxw-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
-  color: var(--bone-2);
+  flex-wrap: wrap;
 }
-.fxt-open-head b {
-  color: var(--text);
-}
-.fxt-open-head .x {
-  margin-left: auto;
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--bone-2);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-.fxt-open-head .x:hover {
-  background: var(--raise);
-  color: var(--text);
-}
-.fxt-open-head .x svg {
-  width: 14px;
-  height: 14px;
-}
-.fxt-result {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-.fxt-result-media {
-  width: 100%;
-  max-height: 360px;
-  border-radius: var(--r1);
-  border: 1px solid var(--edge-lo);
-  background: var(--void);
-  object-fit: contain;
-}
-.fxt-result-empty {
-  display: grid;
-  place-items: center;
-  min-height: 160px;
-  border: 1px dashed var(--edge);
-  border-radius: var(--r1);
-  font-size: 12.5px;
-  color: var(--bone-3);
-  text-align: center;
-  padding: 16px;
-}
-.fxt-result-acts {
+.fxw .fxw-tabs {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  align-items: center;
+  flex: 1;
 }
-.fxt-result-acts .av-note {
-  flex-basis: 100%;
-  font-size: 12px;
-  color: var(--bone-2);
-}
-.fxt-results {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 14px;
-}
-.fxt-results li {
-  display: grid;
-  gap: 6px;
-}
-.fxt-results li > b {
-  font-size: 12.5px;
-  color: var(--bone);
-}
-/* the Library picker */
-.fxt-pick {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
+.fxw .fxw-tabs button {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
   border: 1px solid var(--edge);
-  border-radius: var(--r2);
-  background: var(--panel);
+  background: transparent;
+  color: var(--bone);
+  font: 600 13px var(--body);
+  cursor: pointer;
 }
-.fxt-pick-head {
+.fxw .fxw-tabs button[aria-pressed="true"] {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+}
+.fxw .fxw-search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--bone-2);
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  color: var(--bone-3);
+  width: 220px;
+  box-sizing: border-box;
 }
-.fxt-pick-grid {
+.fxw .fxw-search svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.fxw .fxw-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  font: 13px var(--body);
+}
+.fxw .fxw-grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
-  max-height: 320px;
-  overflow-y: auto;
 }
-.fxt-pick-grid button {
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  padding: 0;
-  border: 1px solid var(--edge-lo);
-  border-radius: 8px;
-  background: var(--slate);
-  overflow: hidden;
-  cursor: pointer;
+.fxw .fxw-tile {
   position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
 }
-.fxt-pick-grid button:hover,
-.fxt-pick-grid button:focus-visible {
-  border-color: var(--line-hi);
-  outline: none;
+.fxw .fxw-tile[data-dim="1"] {
+  opacity: 0.4;
 }
-.fxt-pick-grid img {
+.fxw .fxw-tile .fxw-tag {
+  top: 8px;
+  left: auto;
+  right: 8px;
+  padding: 3px 8px;
+  font-size: 10px;
+}
+.fxw .fxw-name {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  font-size: 20px;
+  line-height: 0.95;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.fxw .fxw-none {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  font: 500 11px var(--mono);
+  color: var(--bone-3);
+  border: 1px dashed var(--edge);
+  border-radius: 10px;
+}
+.fxw .fxw-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fxw .fxw-check svg {
+  width: 14px;
+  height: 14px;
+}
+.fxw .fxw-why {
+  position: absolute;
+  top: 38px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--ground);
+  font: 600 10px var(--body);
+  color: var(--bone);
+}
+.fxw .fxw-note,
+.fxw .fxw-more {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bone-3);
+}
+.fxw .fxw-more {
+  padding: 8px 0 24px;
+}
+.fxw .fxw-h {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.fxw .fxw-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.fxw .fxw-results li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--r1);
+  background: var(--panel);
+  font-size: 13px;
+}
+
+/* ── the phone: the panel over the wall ── */
+@media (max-width: 900px) {
+  .fxw {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px 16px 0 !important;
+  }
+  .fxp[data-idle="1"] {
+    display: none;
+  }
+  .fxp {
+    position: static;
+    max-height: none;
+    min-height: 0;
+  }
+  .fxw .fxw-strip {
+    grid-template-columns: 1fr 1fr;
+    height: auto;
+  }
+  .fxw .fxw-strip .fxw-feature {
+    aspect-ratio: 4 / 5;
+  }
+  .fxw .fxw-strip .fxw-feature[data-big="1"] {
+    grid-column: 1 / -1;
+    aspect-ratio: 16 / 9;
+  }
+  .fxw .fxw-feature[data-big="1"] .fxw-feature-name {
+    font-size: 40px;
+  }
+  .fxw .fxw-feature-name {
+    font-size: 24px;
+  }
+  .fxw .fxw-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fxw .fxw-search {
+    width: 100%;
+  }
+  .fxw .fxw-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .fxw .fxw-tabs button {
+    flex: none;
+  }
+}
+
+/* the Halloween Costumes section (2026-10-27): a row of costume tiles above
+   the featured strip; a tile with no example yet is a name on a plate */
+.fxw .fxw-season {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--edge-lo);
+  background: var(--panel);
+}
+.fxw .fxw-season-head h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+.fxw .fxw-season-head p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--bone-2);
+}
+.fxw .fxw-season-row {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 128px;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.fxw .fxw-season-row > li {
+  scroll-snap-align: start;
+}
+.fxw .fxw-costume {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border: 1px solid var(--edge-hi);
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+  background: radial-gradient(120% 90% at 30% 10%, color-mix(in srgb, var(--signal) 22%, transparent) 0%, var(--ground) 70%);
+}
+.fxw .fxw-costume > video,
+.fxw .fxw-costume > img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
-.fxt-pick-grid .k {
+.fxw .fxw-costume > span {
   position: absolute;
-  left: 6px;
-  bottom: 6px;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: rgb(0 0 0 / 0.55);
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.fxw .fxw-costume[data-chosen="1"] {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+
+/* ── the Halloween neon sign (2026-10-27, design 08) ──
+   Its own two seasonal colours, kept here rather than on :root because they
+   leave with the season; the button is the studio's signal. Motion stops
+   under prefers-reduced-motion. */
+.fxw .fxw-neon {
+  --neon: #ff7a1a;
+  --neon-2: #9b7bff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 34px 20px 26px;
+  border-radius: var(--r2, 20px);
+  border: 1px solid var(--edge-lo);
+  background: radial-gradient(60% 75% at 50% 42%, color-mix(in srgb, var(--neon) 14%, #0d0c10), #07070a 75%);
+  text-align: center;
+  overflow: hidden;
+}
+.fxw .fxw-neon-kicker {
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #f2ecff;
+  text-shadow: 0 0 3px #fff, 0 0 9px var(--neon-2), 0 0 20px var(--neon-2), 0 0 42px var(--neon-2);
+  animation: fxw-hum 0.18s infinite;
+}
+.fxw .fxw-neon-word {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(48px, 8vw, 88px);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff1e0;
+  text-shadow: 0 0 4px #fff, 0 0 10px var(--neon), 0 0 22px var(--neon), 0 0 48px var(--neon),
+    0 0 90px color-mix(in srgb, var(--neon) 60%, transparent);
+  animation: fxw-hum 0.18s infinite;
+}
+.fxw .fxw-neon-buzz {
+  animation: fxw-buzz 4s infinite;
+}
+.fxw .fxw-neon-fx {
+  font-family: var(--display);
+  font-size: 30px;
+  letter-spacing: 0.3em;
+  color: #fff1e0;
+  text-shadow: 0 0 4px #fff, 0 0 10px var(--neon), 0 0 24px var(--neon);
+}
+.fxw .fxw-neon-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+  margin-top: 14px;
   font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--bone);
 }
-@media (max-width: 760px) {
-  .fxt-drop {
-    grid-template-columns: 1fr;
+.fxw .fxw-neon-go {
+  height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.fxw .fxw-neon-go:hover {
+  background: var(--signal-deep);
+}
+@keyframes fxw-buzz {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.25; }
+}
+@keyframes fxw-hum {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.93; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fxw .fxw-neon-kicker,
+  .fxw .fxw-neon-word,
+  .fxw .fxw-neon-buzz {
+    animation: none;
   }
-  .fxt-open {
-    grid-template-columns: 1fr;
-  }
+}
+@media (max-width: 720px) {
+  .fxw .fxw-neon { padding: 24px 16px 20px; }
+  .fxw .fxw-neon-fx { font-size: 22px; }
+}
+
+/* before and after (before-after.tsx, 2026-10-27): a tile's pair fills it;
+   the panel's result fills the panel's frame, as a result does */
+.fxw .fxw-tile > .ba-alone,
+.fxw .fxw-feature > .ba-alone,
+.fxw .fxw-costume > .ba-alone,
+.fxw .fxw-tile > .ba,
+.fxw .fxw-feature > .ba,
+.fxw .fxw-costume > .ba {
+  position: absolute;
+  inset: 0;
+}
+.fxw .fxp-cover > .ba-alone,
+.fxw .fxp-cover > .ba {
+  position: absolute;
+  inset: 0;
+}
+.fxw .fxp-cover > .ba .ba-after {
+  height: 100%;
+  object-fit: cover;
 }

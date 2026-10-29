@@ -24,11 +24,13 @@ Three rules, all deliberate:
   anchored on a drawing drifting off the real face (likeness.md) --
   is accepted knowingly; Redraw is the fix for a bad sheet.
 - **It spends, so it is a job and it is opt-in per element.** Cents on
-  Nano Banana Pro under NANO_DAILY_CAP, through the same
-  `nano_banana.generate_from_prompt` every keyframe uses (caps, the
-  generations row, the meter, R2), with `literal=True` because a sheet
-  is not a video prompt and `bank=False` because a sheet lives with
-  its element, not on the Assets wall.
+  GPT Image 2.5 Sunburst (since 2026-10-26; Nano Banana Pro before,
+  still there via ELEMENT_SHEET_MODEL=gemini-3-pro-image) through
+  `fal.generate_image_from_prompt` (caps, the generations row, the
+  meter, the hold), or the Gemini lane's `nano_banana.generate_from_prompt`
+  with `literal=True` because a sheet is not a video prompt; either way
+  `bank=False` because a sheet lives with its element, not on the
+  Assets wall.
 - **It never raises.** A sheet that fails leaves the element exactly as
   it was saved, with a note; the photos and the row are the deliverable,
   the sheet is an enhancement.
@@ -54,8 +56,25 @@ PHOTO_BYTES_MAX = 15 * 1024 * 1024     # the same bound refbin puts on a fetch
 # for 10 credits, the outfit right and the face a stranger's. A sheet is
 # the frame every later scene is held to, so it gets the model that holds
 # a face (see the WHY PRO note in nano_banana), whatever the keyframes use.
-SHEET_MODEL = os.environ.get("ELEMENT_SHEET_MODEL", "gemini-3-pro-image")
-SHEET_SIZE = "2K"
+#
+# 2026-10-26 (Mike: "i want to change it to gpt image 2.5, its more
+# accurate"): the sheet is drawn on GPT Image 2.5 Sunburst, fal's precision
+# tier ("fine detail and identity kept across edits", up to 16 references),
+# through fal.generate_image_from_prompt -- the same hold, cap and ledger as
+# every other fal still. Flare is the faster sibling:
+# ELEMENT_SHEET_MODEL=gpt-image-2.5-flare. Any fal.IMAGE_MODELS id draws on
+# fal; any other value (gemini-3-pro-image) draws on Gemini as before, at
+# SHEET_SIZE. The sheet is never drawn from text alone: a model that cannot
+# take the photos, or photos that cannot be sent to it, is an error, not a
+# stranger's face.
+SHEET_MODEL = os.environ.get("ELEMENT_SHEET_MODEL", "gpt-image-2.5-sunburst")
+SHEET_SIZE = "2K"                # Gemini only; fal's frame comes off SHEET_ASPECT
+
+
+def on_fal(model: Optional[str] = None) -> bool:
+    """Whether the sheet is drawn on a fal image model (else Gemini)."""
+    from . import fal
+    return (model or SHEET_MODEL) in fal.IMAGE_MODELS
 
 
 def is_sheet(filename: str) -> bool:
@@ -81,6 +100,19 @@ def element_refs(photos: list) -> list:
     stay on the element (a redraw grounds on them) but stop riding on shots."""
     sheets = [p for p in photos if p and is_sheet(_name_of(p))]
     return sheets[:1] or list(photos)
+
+
+def element_photos(photos: list, n: int = 1) -> list:
+    """`n` photos that stand for an element in a shot. One is element_refs'
+    pick (the sheet when drawn). More than one (a brand kit link that asks
+    for them, 2026-10-25: an app is held to its real screens) puts the
+    person's own uploads first and the drawn sheet last -- a drawn sheet
+    cannot carry readable interface."""
+    if n <= 1:
+        return element_refs(photos)[:1]
+    uploads = [p for p in photos if p and not is_sheet(_name_of(p))]
+    sheets = [p for p in photos if p and is_sheet(_name_of(p))]
+    return (uploads + sheets[:1])[:n]
 
 
 def prompt_for(kind: str, name: str, detail: str = "", notes: str = "") -> str:
@@ -120,6 +152,9 @@ def _to_jpeg(data: bytes) -> bytes:
 
 def available(account_id: Optional[int] = None) -> bool:
     """Whether a sheet can be drawn here at all (the image key is set)."""
+    if on_fal():
+        from . import fal
+        return fal.has_key(account_id)
     from . import nano_banana
     return nano_banana.has_key(account_id)
 
@@ -128,12 +163,17 @@ def price_usd() -> float:
     """What one sheet costs: one still on the image model, at the meter's
     price -- the same number its credit hold is taken at."""
     from . import pricing
+    if on_fal():
+        from . import fal
+        return fal.image_usd(SHEET_MODEL, SHEET_ASPECT)
     return round(float(pricing.still_usd(SHEET_MODEL)), 4)
 
 
 def credits() -> int:
     """What one sheet costs in credits -- the label on every Draw sheet."""
     from . import pricing
+    if on_fal():
+        return pricing.credits_for(pricing.usd_micros(price_usd()))
     return pricing.still_credits(SHEET_MODEL)
 
 
@@ -222,6 +262,29 @@ def out_dir_for(folder: Path, files: list, tmp: Path,
     return folder
 
 
+def _draw_on_fal(prompt: str, refs: list, *, account_id=None, db_path=None,
+                 quote=None) -> dict:
+    """One sheet on a fal image model: every photo goes up public first
+    (fal's servers fetch them) and ALL must arrive -- a sheet drawn from
+    fewer photos than were chosen is a different face, so it is refused."""
+    from . import fal
+    urls = [fal.as_image_url(data, account_id=account_id) for _label, data in refs]
+    if not all(urls):
+        return {"ok": False,
+                "error": "the photos could not be sent to the image model "
+                         "(is the media bucket configured?); nothing was charged"}
+    result = fal.generate_image_from_prompt(
+        prompt, model=SHEET_MODEL, aspect=SHEET_ASPECT, reference_urls=urls,
+        approved=True, account_id=account_id, source="element_sheet",
+        bank=False, brand_kit=False, quote=quote,
+        **({"db_path": db_path} if db_path is not None else {}))
+    if result.get("ok") and result.get("references") != len(urls):
+        return {"ok": False,
+                "error": f"{SHEET_MODEL} took {result.get('references')} of "
+                         f"{len(urls)} photos; the sheet was not kept"}
+    return result
+
+
 def draw(kind: str, name: str, photos: list, out_dir: Path, *,
          detail: str = "", notes: str = "",
          account_id: Optional[int] = None, db_path=None, quote=None) -> dict:
@@ -245,12 +308,17 @@ def draw(kind: str, name: str, photos: list, out_dir: Path, *,
         if not refs:
             return {"ok": False, "path": None, "generation_id": None,
                     "error": "no photos to draw the sheet from"}
-        result = nano_banana.generate_from_prompt(
-            prompt_for(kind, name, detail, notes),
-            reference_image=refs, aspect_ratio=SHEET_ASPECT,
-            model=SHEET_MODEL, image_size=SHEET_SIZE,
-            account_id=account_id, db_path=db_path,
-            literal=True, bank=False, source="element_sheet", quote=quote)
+        if on_fal():
+            result = _draw_on_fal(prompt_for(kind, name, detail, notes), refs,
+                                  account_id=account_id, db_path=db_path,
+                                  quote=quote)
+        else:
+            result = nano_banana.generate_from_prompt(
+                prompt_for(kind, name, detail, notes),
+                reference_image=refs, aspect_ratio=SHEET_ASPECT,
+                model=SHEET_MODEL, image_size=SHEET_SIZE,
+                account_id=account_id, db_path=db_path,
+                literal=True, bank=False, source="element_sheet", quote=quote)
         if not result.get("ok"):
             return {"ok": False, "path": None, "generation_id": None,
                     "error": result.get("error") or "the sheet did not render"}

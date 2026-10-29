@@ -36,13 +36,18 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AudioLines,
   AtSign,
+  CalendarDays,
   ChevronsUpDown,
+  Clapperboard,
   Coins,
   FolderKanban,
   House,
+  ImageIcon,
   Layers,
   LogOut,
+  Megaphone,
   Palette,
   PanelLeft,
   Plug,
@@ -69,29 +74,44 @@ import { CreditPill } from "@/components/studio/credit-pill";
 import { CommandPalette } from "@/components/studio/command-palette";
 import { PluginsRailItem } from "@/components/studio/plugins-flyout";
 import { ActivityTray } from "@/components/studio/activity-tray";
+import { PhoneMenu, PhoneTabs, PhoneTop } from "@/components/studio/phone/phone-chrome";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
+import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
+import { halloweenOn } from "@/lib/effects-wall";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "settings";
+export type ViewId = "studio" | "image" | "video" | "ads" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "voice" | "renders" | "calendar" | "settings";
 
 type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
 const NAV: NavItem[] = [
   { id: "projects", label: "Projects", href: "/studio/projects", icon: FolderKanban },
   { id: "studio", label: "Create", href: "/studio", icon: House },
+  // the direct generators (2026-10-22): one model, one prompt, one priced button
+  { id: "image", label: "Image", href: "/studio/image", icon: ImageIcon },
+  { id: "video", label: "Video", href: "/studio/video", icon: Clapperboard },
+  // the Ad Studio (2026-10-26, components/studio/ads/): formats, product,
+  // brief and kit, handed to Create; a paid add-on, the page open to all
+  { id: "ads", label: "Ad Studio", href: "/studio/ads", icon: Megaphone },
   // the Effects tab (2026-10-22, docs/tasks/task-effects-tab.md): drawn
   // only while the `effects_tab` capability is on; the page itself 404s
   // without it, so an entry with the flag off would point at nothing
   { id: "effects", label: "Effects", href: "/studio/effects", icon: Sparkles, cap: "effects_tab" },
+  // the Voice section (2026-10-26, docs/tasks/task-voice-tab.md): every voice
+  // model on one page, behind `voice_tab` the same way
+  { id: "voice", label: "Voice", href: "/studio/voice", icon: AudioLines, cap: "voice_tab" },
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
   // brand kits (2026-10-20): one per client, picked per project
   { id: "brand", label: "Brand", href: "/studio/brand", icon: Palette },
+  // the calendar (2026-10-22, docs/tasks/task-calendar.md): what goes out,
+  // where and when; nothing on it spends
+  { id: "calendar", label: "Calendar", href: "/studio/calendar", icon: CalendarDays },
 ];
 
 /* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
@@ -102,6 +122,7 @@ const TABS: { label: string; href: string; view: ViewId }[] = [
   { label: "Create", href: "/studio", view: "studio" },
   { label: "Library", href: "/studio/assets", view: "assets" },
   { label: "Timeline", href: "/studio/cut", view: "cut" },
+  { label: "Calendar", href: "/studio/calendar", view: "calendar" },
 ];
 
 const VIEW_BY_PATH: [string, ViewId][] = [
@@ -115,8 +136,13 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/elements", "elements"],
   ["/studio/brand", "brand"],
   ["/studio/effects", "effects"],
+  ["/studio/voice", "voice"],
+  ["/studio/image", "image"],
+  ["/studio/video", "video"],
+  ["/studio/ads", "ads"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
+  ["/studio/calendar", "calendar"],
   ["/studio/queue", "renders"], // the old address redirects there
   ["/studio", "studio"],
 ];
@@ -232,6 +258,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the header's avatar menu (accounts, sign out) -- its own flag, so the
   // rail's account row and the avatar never open each other's
   const [hmenu, setHmenu] = useState(false);
+  // the phone's full-screen menu (phone-chrome.tsx)
+  const [pmenu, setPmenu] = useState(false);
+  const closePmenu = useCallback(() => setPmenu(false), []);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
   const [balanceRead, setBalanceRead] = useState<{ account: number; value: Balance | null } | null>(null);
@@ -240,6 +269,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the capability-gated rail entries (NavItem.cap): read once an account
   // is known; an entry whose flag is off, unknown or unread is not drawn
   const [caps, setCaps] = useState<Record<string, boolean>>({});
+  // What's new (2026-10-25): how many live announcements this person has not
+  // seen, a dot on Create; the wall clears it once it has drawn them
+  const [unseen, setUnseen] = useState(0);
   // per toast: its timer and its deferred half, outside React state so the
   // page-leave flush below can reach them synchronously
   const toastTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -322,6 +354,20 @@ export function StudioShell({ children }: { children: ReactNode }) {
       .catch(() => live && setCaps({}));
     return () => {
       live = false;
+    };
+  }, [accountId]);
+
+  useEffect(() => {
+    if (accountId === null) return;
+    let live = true;
+    whatsNew()
+      .then((r) => live && setUnseen(r.unread))
+      .catch(() => live && setUnseen(0));
+    const seen = () => setUnseen(0);
+    window.addEventListener(WHATS_NEW_SEEN, seen);
+    return () => {
+      live = false;
+      window.removeEventListener(WHATS_NEW_SEEN, seen);
     };
   }, [accountId]);
 
@@ -521,6 +567,16 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 <>
                   <Icon strokeWidth={1.35} />
                   <span className="rl">{label}</span>
+                  {id === "effects" && halloweenOn() ? (
+                    <span className="rl rneon" aria-label="Halloween effects">
+                      Halloween
+                    </span>
+                  ) : null}
+                  {id === "studio" && unseen > 0 ? (
+                    <span className="nbadge" aria-label={`${unseen} new`}>
+                      {unseen > 9 ? "9+" : unseen}
+                    </span>
+                  ) : null}
                 </>
               );
               // data-nav names the entry, so a size can drop one (Edit on a phone)
@@ -529,7 +585,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   {inner}
                 </a>
               ) : (
-                <Link key={id} href={href} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
+                <Link key={id} href={href} data-nav={id} data-neon={id === "effects" && halloweenOn() ? "1" : undefined} aria-current={current ? "page" : undefined} title={label}>
                   {inner}
                 </Link>
               );
@@ -590,6 +646,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="shell">
+          {/* THE PHONE (2026-10-26): under 720px these replace the rail and
+              the header below; above it they are not drawn (phone.css) */}
+          <PhoneTop onMenu={() => setPmenu(true)} />
           {/* THE HEADER (2026-10-02, the composer mock): the brand with its
               red dot, Create / Library / Timeline in the middle, and on the
               right the balance, New session and the account's avatar. Every
@@ -612,6 +671,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   className={t.view === "cut" ? "htab-cut" : t.view === "assets" ? "htab-lib" : undefined}
                 >
                   {t.label}
+                  {t.view === "studio" && unseen > 0 ? <span className="nbadge dot" aria-label={`${unseen} new`} /> : null}
                 </Link>
               ))}
             </nav>
@@ -677,6 +737,8 @@ export function StudioShell({ children }: { children: ReactNode }) {
           </header>
           {stage ? <div className="stage">{children}</div> : children}
         </div>
+        <PhoneTabs caps={caps} unseen={unseen} />
+        <PhoneMenu open={pmenu} onClose={closePmenu} />
 
         <CommandPalette
           me={me}

@@ -118,6 +118,8 @@ def _label(tool: str, model: str) -> str:
         return "Nano Banana Pro" if "pro" in model.lower() else "Nano Banana"
     if tool == "runway":
         return "Runway"
+    if tool == "kit":                  # an app screen drawn from a brand kit (src/kit_screens.py)
+        return "Kit screen"
     if tool == "cut":                  # clips joined in the studio (src/cut/join.py)
         # a scene's own assembled cut (src/cut/assemble.file_on_wall)
         return "Final cut" if (model or "").lower() == "final cut" else "Joined clips"

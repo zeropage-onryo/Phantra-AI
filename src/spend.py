@@ -64,6 +64,7 @@ STAGES = (
     "shot_prompt",     # promptgen: structure a Shot, refine a tool prompt
     "timeline",        # timeline.plan: a scene's timed windows -> its shots
     "shot_log",        # src/cut/index: Gemini logs each shot of a clip
+    "render_qc",       # src/render_qc: Gemini watches a landed clip once against its ask
     "transcribe",      # src/cut/index: fal Whisper, word level (priced per audio minute,
                        # cut/index.WHISPER_USD_PER_MIN -- fal's page states no rate)
     "cut_agent",       # src/cut/agent_tools: the editor's agent turn (proposes ops, never edits)

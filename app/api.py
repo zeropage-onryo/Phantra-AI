@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from src import (
@@ -37,6 +37,7 @@ from src import (
     crag,
     db,
     edit_teach,
+    effect_recipes,
     element_sheet,
     entities,
     evalstore,
@@ -66,7 +67,17 @@ from src import free_looks as looks
 from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
-from . import auth, jobs, mcp_auth, model_connections, publish_routes, workflow_runner
+from . import (
+    auth,
+    jobs,
+    mcp_auth,
+    model_connections,
+    post_routes,
+    publish_routes,
+    social_routes,
+    whats_new_routes,
+    workflow_runner,
+)
 from . import creative_projects as creative_projects_routes
 
 router = APIRouter(prefix="/api")
@@ -79,6 +90,9 @@ router = APIRouter(prefix="/api")
 router.include_router(creative_projects_routes.router)
 router.include_router(model_connections.router)
 router.include_router(publish_routes.router)
+router.include_router(social_routes.api_router)
+router.include_router(post_routes.router)
+router.include_router(whats_new_routes.router)
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
@@ -282,6 +296,11 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # turns it on for the installation. With it off the page is a 404
         # and the rail has no entry, so production is unchanged.
         "effects_tab": os.environ.get("PHANTRA_EFFECTS_TAB", "").strip() == "1",
+        # The Voice section (/studio/voice, 2026-10-26, docs/tasks/task-voice-tab.md):
+        # every voice model on one page -- text to speech and dubbing so far.
+        # OFF by default; PHANTRA_VOICE_TAB=1 turns it on for the installation.
+        # With it off the page is a 404 and the rail has no entry.
+        "voice_tab": os.environ.get("PHANTRA_VOICE_TAB", "").strip() == "1",
         # The Create page's v2 layout (docs/tasks/task-create-page-v2.md,
         # 2026-10-22): the Runway / Higgsfield-shaped sections under the
         # composer, every card a showcase render. ON by default since the
@@ -350,6 +369,19 @@ def skills_list(account_id: int = Depends(auth.current_account_id)):
     brains below -- never the recipes themselves, which only the brain reads."""
     from src import skills
     return {"items": skills.catalogue()}
+
+
+@router.get("/studios/{studio_id}")
+def studio_page(studio_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What a studio's page draws (src/studios.py public): its formats, its
+    intake, whether this account has the add-on and whether it is on sale.
+    Open to every account -- a locked page shows the upgrade, never a 403.
+    The prompt notes stay server-side; only the brain reads them."""
+    from src import studios
+    page = studios.public(studio_id, account_id=account_id)
+    if page is None:
+        return _error(404, "no_studio", f"no studio {studio_id!r}")
+    return page
 
 
 @router.get("/brains")
@@ -840,6 +872,12 @@ async def creative_guide_reply(request: Request,
     # menu is drawn off GET /api/skills, and a stale tab must still send.
     from src import skills
     skill = skills.clean_name(form.get("skill"))
+    # THE AD STUDIO (2026-10-26, src/studios.py): the studio pick the
+    # conversation's draft carries (format, shape, length, the brief's
+    # answers), cleaned, and only for an account with the add-on -- without
+    # it the turn is the plain composer's, never a refusal
+    from src import studios
+    studio = studios.for_account(form.get("studio"), account_id)
     # What this conversation has made, by the numbers the person sees on it
     # (2026-10-11, src/result_refs.py): the model is told the list, and a
     # number its tools name is held to it. Cleaned here like any form field;
@@ -896,6 +934,12 @@ async def creative_guide_reply(request: Request,
     if refused is not None:
         return refused
     kit = _guide_kit(project, conversation, account_id, picked=picked)
+    # THE CLIP MODEL THE PERSON PICKED (2026-10-22): the composer's Video line
+    # is Auto (the brain may propose) or one model, which is then theirs. A
+    # name the table does not have is Auto, never an error.
+    from src import direct, model_menu
+    clip_pick = model_menu.video_id(form.get("clip_model"))
+    clip_label = direct.video_label(clip_pick) if clip_pick else None
 
     def work(job):
         result = _guide_turn(job)
@@ -918,6 +962,15 @@ async def creative_guide_reply(request: Request,
         kept = outcomes.taste(account_id=account_id)
         if kept and isinstance(grounding, dict):
             grounding = {"what_you_keep": kept, **grounding}
+        # What they have been working on (2026-10-27, src/recent_work.py,
+        # Mike: Vesper "holds memory on your projects, last few assets
+        # rendered"): newest projects and renders, near the front so the
+        # grounding's cut never drops it. Empty when nothing can be read.
+        from src import recent_work
+        recent = recent_work.for_grounding(account_id)
+        if recent and isinstance(grounding, dict):
+            kept_first = {"what_you_keep": grounding.pop("what_you_keep")} if "what_you_keep" in grounding else {}
+            grounding = {**kept_first, "your_recent_work": recent, **grounding}
 
         # What the assistant's face reads off the job while the turn runs
         # (2026-10-08, docs/ASSISTANT_AVATARS.md): `detail` is the line under
@@ -950,7 +1003,8 @@ async def creative_guide_reply(request: Request,
                 conversation, provider=provider, scope=scope, model=model, grounding=grounding, image_refs=image_refs,
                 assistant=assistant, links=links,
                 # no "a make it means..." line for a project that is exploring
-                output=None if exploring else output, skill=skill, brand_kit=kit)
+                output=None if exploring else output, skill=skill, brand_kit=kit,
+                studio=studio)
         else:
             from google import genai
             # The Guide's tools (src/guide_tools.py): READ tools run
@@ -972,7 +1026,10 @@ async def creative_guide_reply(request: Request,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
-                explore=exploring, brand_kit=kit, autonomy=autonomy)
+                explore=exploring, brand_kit=kit, autonomy=autonomy,
+                clip_model=clip_label,
+                lone_kit=_lone_kit(account_id) if kit is None and project is None else None,
+                studio=studio)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -983,6 +1040,8 @@ async def creative_guide_reply(request: Request,
                 # what the turn ran as: a page holding an older copy of the
                 # project learns here that it is exploring
                 "explore": exploring,
+                # the studio pick the turn ran with (None: none, or no add-on)
+                "studio": studio,
                 "detail": "ready", "steps": None, "partial": None}
 
     job = jobs.start("guide", "creative guide", _in_project(project, work),
@@ -1026,6 +1085,18 @@ def _guide_kit(project, conversation, account_id: int, picked=None):
         return picked
     said = [m.content for m in conversation.messages if m.role == "user"]
     return brand_kits.named_in(said, account_id=account_id)
+
+
+def _lone_kit(account_id: int) -> Optional[str]:
+    """The name of the account's ONLY brand kit, else None (none, or a
+    choice of several). Never raises: the offer is an addition."""
+    from src import brand_kits
+    try:
+        kits = brand_kits.list_kits(account_id=account_id)
+    except Exception as exc:
+        print(f"  kits not read for the offer: {exc}", file=sys.stderr)
+        return None
+    return kits[0].get("name") if len(kits) == 1 else None
 
 
 def _guide_tools(account_id: int, *, local: bool = False,
@@ -2805,7 +2876,10 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None) -> dict:
         "status": status,
         "shot_count": len(c.get("shots") or []),
         "ai_shot_count": len(c.get("ai_shots") or []),
-        "warnings": c.get("warnings") or [],
+        # the scene's own (validate_concept, shot_count_warnings) and then the
+        # shot planner's (timeline.keep): what it put back and what will not
+        # fit, read off a current timeline, so a stale one says nothing
+        "warnings": (c.get("warnings") or []) + timeline.warnings_of((c.get("shots") or [{}])[0]),
         "grounded": grounded,
         "judge_overall": c.get("judge_overall"),
         "created_at": c.get("created_at"),
@@ -2908,6 +2982,7 @@ def _timeline_card(shot: dict, account_id: Optional[int] = None) -> Optional[dic
         tl = shot["timeline"]
         return {"planned": True, "seconds": tl.get("seconds"),
                 "planner": tl.get("planner"), "continuity": tl.get("continuity") or "",
+                "warnings": timeline.warnings_of(shot),
                 "parts": [{**{k: p.get(k) for k in ("n", "start", "end", "seconds", "text",
                                                      "prompt", "refs", "reference_image",
                                                      "media_url")},
@@ -2918,7 +2993,7 @@ def _timeline_card(shot: dict, account_id: Optional[int] = None) -> Optional[dic
     if not windows:
         return None
     return {"planned": False, "seconds": sum(w["seconds"] for w in windows),
-            "planner": None, "continuity": "",
+            "planner": None, "continuity": "", "warnings": [],
             "parts": [{"n": i, "start": w["start"], "end": w["end"],
                        "seconds": w["seconds"], "text": w["text"], "prompt": "",
                        "refs": [], "reference_image": None, "media_url": None}
@@ -3267,6 +3342,57 @@ def _asset_photos(photos: list, limit: int) -> list:
     return (native + other)[:max(0, limit)]
 
 
+_KIND_RANK = {"character": 0, "prop": 1, "location": 2}
+
+
+def _kit_refs(concept_id: int, refs: list, manual: int, text: str,
+              roles: Optional[dict], account_id: Optional[int]) -> tuple[list, Optional[dict]]:
+    """The scene's refs with the photo of every product and character its
+    brand kit links and its words name (2026-10-22, docs/tasks/
+    task-kit-products-and-screens.md Part B), each with the role it plays
+    (a product is `product`, a person `subject`; brand_kits.LINK_ROLE).
+
+    The person's own picks stay first and in their order; the inferred
+    refs behind them, with the kit's added, keep the one order every
+    scene keeps -- character, then prop, then location. No kit, no linked
+    element named, or every named one already on the scene: the refs and
+    roles come back exactly as they were."""
+    try:
+        from src import brand_kits, element_sheet, project_context
+        kit = (project_context.kit()
+               or brand_kits.for_concept(concept_id, account_id=account_id))
+        hits = brand_kits.named(kit, text)
+        if not hits:
+            return refs, roles
+        assets = {a["id"]: a for a in _assets_all(account_id)}
+        added, said = [], {}
+        held = {str(r).split("?")[0] for r in refs}
+        for e in hits:
+            photos = (assets.get(f"{e['kind']}-{e['id']}") or {}).get("photos") or []
+            # one photo (the sheet when drawn), or as many of the person's
+            # uploads as the link asks for -- an app's real screens
+            picks = [p.split("?")[0]
+                     for p in element_sheet.element_photos(photos, int(e.get("photos") or 1))]
+            for pick in picks:
+                said[pick] = e["role"]
+                if pick not in held:
+                    added.append(pick)
+                    held.add(pick)
+        if not said:
+            return refs, roles
+        if added:
+            def rank(r):
+                parsed = asset_shelf.parse_ref(r)
+                return _KIND_RANK.get(parsed["kind"], 1) if parsed else 1
+            inferred = sorted([*refs[manual:], *added], key=rank)
+            refs = [*refs[:manual], *inferred][:MAX_IMAGE_REFS]
+        # a role the person gave outranks the kit's
+        return refs, {**said, **(roles or {})}
+    except Exception as e:                       # a kit is an addition, never a gate
+        print(f"note: kit products not attached: {type(e).__name__}: {e}", file=sys.stderr)
+        return refs, roles
+
+
 def _attach_scene_refs(concept_id: int, manual: list,
                        account_id: Optional[int] = None, *,
                        idea: Optional[str] = None,
@@ -3285,6 +3411,8 @@ def _attach_scene_refs(concept_id: int, manual: list,
     text = " ".join(str(shots[0].get(k) or "")
                     for k in ("desc", "prompt", "location"))
     refs = _auto_refs(text, manual, account_id, idea=idea)[:MAX_IMAGE_REFS]
+    refs, roles = _kit_refs(concept_id, refs, len(manual), f"{idea or ''} {text}",
+                            roles, account_id)
     refs = [asset_shelf.storable_ref(r) for r in refs]
     if not refs:
         return []
@@ -4098,7 +4226,8 @@ def _render_state(account_id: Optional[int] = None) -> dict:
     # what the studio shows: credits, never the provider's dollars
     # (2026-10-08) -- the same conversion pricing.display makes per render
     try:
-        credits = pricing.credits_for(pricing.usd_micros(pick["estimate_usd"]))
+        credits = pricing.credits_for(pricing.usd_micros(pick["estimate_usd"]),
+                                      model=pick.get("model"))
     except pricing.PricingRefused:
         credits = None
     return {"label": providers.RENDER_LABELS.get(pick["provider"], pick["provider"]),
@@ -4736,6 +4865,9 @@ def scene_render_state(concept_id: int, account_id: int = Depends(auth.current_a
     card["render_default"] = providers.render_default(card.get("tool"), account_id, ctx,
                                                       model=card.get("render_model"))
     card["quote"] = _card_quote(concept, account_id, ctx=ctx)
+    # what a look at each landed clip saw (src/render_qc.py), by shot
+    from src import render_qc
+    card["checks"] = render_qc.for_concept(concept_id, account_id=account_id)
     return {"scene": card,
             "renderer": _render_state(account_id),
             "renderers": _renderers_state(account_id, ctx)}
@@ -4906,11 +5038,18 @@ def approve_render(concept_id: int, account_id: Optional[int],
         except (pricing.QuoteRefused, pricing.SigningUnconfigured) as e:
             raise _quote_refused(e, account_id)
     timed = priced["timed"]
+    # ONE CLIP, CUTS INSIDE (2026-10-26, timeline.renders_as_one): a timed
+    # scene that fits the model's longest render is ONE generation, priced
+    # as one; `timed` is then False and the shots ride inside the prompt
+    one_clip = bool(priced.get("one_clip"))
     choice = {"provider": priced["provider"], "model": priced["model"],
               "duration": None if timed else priced["durations"][0],
               "frame": priced["frame"], "estimate_usd": priced["estimate_usd"]}
     if timed:
         choice["durations"] = priced["durations"]
+    if one_clip:
+        choice["one_clip"] = True
+        choice["references"] = priced.get("references") or 0
 
     module = providers.VIDEO_PROVIDERS[choice["provider"]]
     label = providers.RENDER_LABELS.get(choice["provider"], choice["provider"])
@@ -4938,7 +5077,16 @@ def approve_render(concept_id: int, account_id: Optional[int],
         if timed:
             return _render_timeline(job, concept_id, shot_n, module, label, choice,
                                     frame_kw, account_id, quotes=quotes)
-        jobs.progress(job, 0.2, f"rendering via {label} ({choice['model']})")
+        if one_clip:
+            # the shots are planned first (free), so the one prompt carries
+            # each shot's own words, its window and the photos it shows; a
+            # plan that fails leaves the scene's own prompt, which already
+            # carries its windows
+            jobs.progress(job, 0.05, "planning the shots")
+            timeline.ensure(concept_id, shot_n, resolve_photo=_resolver(account_id),
+                            account_id=account_id)
+        jobs.progress(job, 0.2, f"rendering via {label} ({choice['model']})"
+                                + (" · the whole scene as one clip" if one_clip else ""))
         result = module.generate_for_shot(
             concept_id, shot_n, db_path=None,
             resolve_photo=_resolver(account_id),
@@ -4948,9 +5096,12 @@ def approve_render(concept_id: int, account_id: Optional[int],
             account_id=account_id,
             # the price this click was shown, when it was shown one
             **_quote_kw(quotes.get(None)),
+            **({"one_clip": True} if one_clip else {}),
             **render_kwargs)
         if not result.get("ok"):
             raise RuntimeError(result.get("error") or "render failed")
+        _check_clip(job, concept_id, None, result, concept["shots"][0].get("prompt") or "",
+                    account_id)
         return {"ref_id": concept_id, "detail": "clip attached"}
 
     job = jobs.start("render",
@@ -5010,7 +5161,26 @@ def _render_timeline(job, concept_id: int, shot_n, module, label: str, choice: d
                 f"{result.get('error') or 'render failed'} -- {done} of {len(parts)} "
                 f"rendered; approve again to render the rest")
         done += 1
+        _check_clip(job, concept_id, part["n"], result,
+                    part.get("prompt") or part.get("text") or "", account_id)
     return {"ref_id": concept_id, "detail": f"{done} of {len(parts)} shots rendered"}
+
+
+def _check_clip(job, concept_id: int, part, result: dict, prompt: str,
+                account_id: Optional[int]) -> None:
+    """Watch a clip that just landed against its ask (src/render_qc.py):
+    free, advice only, never raises, and the job's line says so while it
+    looks. PHANTRA_RENDER_QC=0 skips it."""
+    from src import brand_kits, render_qc
+    if account_id is None or not render_qc.enabled():
+        return
+    try:
+        jobs.update(job["id"], detail=f"checking shot {part}" if part else "checking the clip")
+        kit = brand_kits.for_concept(concept_id, account_id=account_id)
+        render_qc.check_shot(concept_id, part, result, prompt=prompt,
+                             account_id=account_id, kit=kit)
+    except Exception as e:                       # advice, never the render's failure
+        print(f"  render check skipped: {type(e).__name__}: {e}", file=sys.stderr)
 
 
 @router.post("/queue/{concept_id}/reject")
@@ -5596,6 +5766,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
 # page, no dollars (the table's own `note` and `pricing` are the operator's).
 EFFECT_BLURBS = {
     "nano-banana-edit": "Change an image by describing the change. Keeps faces and identity.",
+    "costume-preview": "You in a Halloween costume: pick one and see it on your own photo, face kept.",
     "flux-kontext-pro": "Precise local edits: swap an object, change text, restyle one area.",
     "seedream-edit": "Combine up to four images into one, or restyle one.",
     "remove-background": "Cut the subject out on a transparent background.",
@@ -5610,6 +5781,8 @@ EFFECT_BLURBS = {
     "remove-video-background-pro": "Remove or replace a clip's background, sound kept.",
     # the free looks (src/free_looks.py, 2026-10-22): their own words, from the table
     **{name: look["blurb"] for name, look in looks.LOOKS.items()},
+    # the recipe effects (src/effect_recipes.py, 2026-10-26): their own words
+    **{name: r["blurb"] for name, r in effect_recipes.RECIPES.items()},
 }
 EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
                           "camera": "Camera moves", "finish": "Finish a clip",
@@ -5680,7 +5853,12 @@ def _effect_view(name: str) -> dict:
             "credits": credits,
             # the Effects tab's Free / Pro badge and its filters (2026-10-22,
             # docs/tasks/task-effects-tab.md)
-            "free": free, "tags": list(tags)}
+            "free": free, "tags": list(tags),
+            # a recipe (src/effect_recipes.py): a written prompt, and what its
+            # one optional box is for
+            "recipe": bool(row.get("recipe") or spec.get("recipe")),
+            "hint": spec.get("hint") or "",
+            "made_with": spec.get("model_label") or ""}
 
 
 @router.get("/effects")
@@ -5760,6 +5938,44 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
     return urls
 
 
+def _picture_bytes(ref: str, account_id: int) -> Optional[bytes]:
+    """One picture the caller holds, as bytes, read the way an effect reads
+    its source (_effect_urls): a render or an asset by id through
+    resolve_references (the caller's own, or refused), anything else
+    through _photo_bytes as that account. None when it cannot be read."""
+    from src import mcp_server
+    kind, _, rest = (ref or "").partition(":")
+    if kind in ("gen", "asset") and rest.isdigit():
+        try:
+            urls = mcp_server.resolve_references([ref], limit=1, who="Side by side",
+                                                 account_id=account_id)
+        except ValueError:
+            return None
+        return _photo_bytes(urls[0], account_id) if urls else None
+    return _photo_bytes(ref.split("?")[0], account_id)
+
+
+@router.get("/side-by-side")
+def side_by_side(before: str, after: str, account_id: int = Depends(auth.current_account_id)):
+    """Before and after as ONE JPEG to download (2026-10-27, src/side_by_side.py):
+    `before` is the photo an effect started from, `after` the render it made,
+    named by its id (`gen:<id>`, the caller's own). Free, nothing stored."""
+    from src import outcomes
+    from src import side_by_side as sbs
+    if not re.fullmatch(r"gen:\d+", after or ""):
+        return _error(400, "bad_after", "after is a render of yours, by its id (gen:<id>)")
+    a, b = _picture_bytes(before, account_id), _picture_bytes(after, account_id)
+    if not a or not b:
+        return _error(404, "not_found", "One of the two pictures could not be read.")
+    jpeg = sbs.compose(a, b)
+    if not jpeg:
+        return _error(422, "unreadable", "One of the two pictures is not an image.")
+    outcomes.record_ref("download", after, account_id=account_id, source="side_by_side")
+    return Response(content=jpeg, media_type="image/jpeg",
+                    headers={"Content-Disposition": 'attachment; filename="before-after.jpg"',
+                             "Cache-Control": "private, no-store"})
+
+
 @router.post("/effects/quote")
 def effects_quote(body: EffectBody, account_id: int = Depends(auth.current_account_id)):
     """What this effect, with these options, on these sources, costs --
@@ -5785,7 +6001,7 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
     request whose price is no longer that one is refused (409), never run
     at another number. The hold, the cap, the generations row and the
     Assets wall are effects.run's, exactly as for the connector."""
-    from src import effects, failures, fal
+    from src import fal
     try:
         req = _effect_request(account_id, body)
     except ValueError as e:
@@ -5797,9 +6013,18 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
             "error": {"code": "price_changed",
                       "message": f"this costs {req['credits']} credits now"},
             "credits": req["credits"]})
-    row = req["row"]
     if not req["free"] and not fal.has_key(account_id):
         return _error(503, "effects_unavailable", "effects are not set up on this server")
+    return start_effect_job(req, account_id)
+
+
+def start_effect_job(req: dict, account_id: int) -> dict:
+    """Start one CHECKED effect request (`_effect_request`) as a job and say
+    its id. The one body behind both doors that run an effect as a job: the
+    studio's card (`effects_run`, after its price check) and the Discord
+    bot's free looks (app/plugin_api.py `looks_run`, free rows only)."""
+    from src import effects, failures
+    row = req["row"]
 
     def work(job):
         jobs.progress(job, 0.1, "getting the source ready")
@@ -6046,6 +6271,353 @@ def talking_photo_run(body: TalkingPhotoBody,
     return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
 
 
+# --- dubbing (2026-10-26, src/dubbing.py) -------------------------------------
+# A clip's dialogue spoken again in another language, in the same voices. The
+# studio's door onto src/dubbing.py, which the connector reached first
+# (mcp_server.run_dub_clip). One spend: the checks, the price and the runner are
+# dubbing's -- shared with the connector -- and only the gate differs: here the
+# person's click on the card is the approval and `expect_credits` holds the run
+# to the price the card showed (409 if not).
+
+class DubbingBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # gen:<id> (a clip on the Assets wall) or asset:<id> (an imported clip)
+    source: str
+    target_language: str
+    source_language: str = ""
+    speakers: Optional[int] = None
+    consent: bool = False
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+@router.get("/dubbing")
+def dubbing_menu(account_id: int = Depends(auth.current_account_id)):
+    """What the card offers: the languages and the length limit. Browsing it
+    runs nothing and costs nothing."""
+    from src import dubbing, fal, ledger
+    return {**dubbing.menu(), "ready": fal.has_key(account_id),
+            "exempt": ledger.credit_exempt(account_id)}
+
+
+def _dub_request(body: DubbingBody, account_id: int) -> dict:
+    """A dub checked and PRICED, nothing spent. Raises ValueError with what
+    is wrong."""
+    from src import dubbing, ledger, mcp_server
+    req = dubbing.request(body.source, body.target_language,
+                          source_lang=body.source_language, speakers=body.speakers,
+                          account_id=account_id)
+    filed = mcp_server._filed_under(body.project_id, None, account_id)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id), **filed}
+
+
+@router.post("/dubbing/quote")
+def dubbing_quote(body: DubbingBody, account_id: int = Depends(auth.current_account_id)):
+    """What dubbing this clip costs, in credits: its length in whole minutes.
+    Spends nothing; the consent box is asked at the run, so the price shows
+    before it is ticked."""
+    try:
+        req = _dub_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_dubbing", str(e))
+    return {"credits": req["credits"], "charged": req["charged"],
+            "language": req["language"], "clip_seconds": round(req["seconds"], 2),
+            "billed_minutes": req["billed_minutes"]}
+
+
+@router.post("/dubbing/run")
+def dubbing_run(body: DubbingBody, account_id: int = Depends(auth.current_account_id)):
+    """Dub the clip, as a job, at the price the card showed. The dubbed clip
+    lands in the Library like an effect's (`asset`: gen:<id>)."""
+    from src import dubbing, failures, fal
+    try:
+        dubbing.check_consent(body.consent)
+        req = _dub_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_dubbing", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "dubbing is not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"{dubbing.DUB['label']} · {req['language']}")
+        res = dubbing.run(req, account_id=account_id, source="composer",
+                          project_id=body.project_id)
+        if not res.get("ok"):
+            print(f"  dub was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The dub"))
+        return {"detail": f"Dubbed into {req['language']} · {req['billed_minutes']} min billed",
+                "output": res.get("media_url"), "media": "video",
+                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None}
+
+    job = jobs.start("effect", f"dub · {req['language']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+# --- the Voice section (2026-10-26, src/voice_studio.py) ----------------------
+# One page for every voice model. The menu lists the models (no dollars); a
+# read ("speak") is the voiceover's body with no project kit, priced per
+# character, run at the price the card showed and filed in the editor's bin.
+# Dubbing keeps its own routes above.
+
+class VoiceSpeakBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    script: str = Field(default="", max_length=5000)
+    voice: str = Field(default="", max_length=40)
+    language: str = Field(default="", max_length=8)
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+@router.get("/voice")
+def voice_menu(account_id: int = Depends(auth.current_account_id)):
+    """What the Voice page offers: every voice model, the voices, the dub's
+    languages. Browsing it runs nothing and costs nothing."""
+    from src import fal, ledger, voice_studio
+    return voice_studio.menu(ready=fal.has_key(account_id),
+                             exempt=ledger.credit_exempt(account_id), account_id=account_id)
+
+
+def _speak_request(body: VoiceSpeakBody, account_id: int) -> dict:
+    from src import ledger, mcp_server, voice_studio
+    req = voice_studio.speak_request(body.script, body.voice, body.language)
+    filed = mcp_server._filed_under(body.project_id, None, account_id)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id), **filed}
+
+
+@router.post("/voice/speak/quote")
+def voice_speak_quote(body: VoiceSpeakBody, account_id: int = Depends(auth.current_account_id)):
+    """What reading this script costs, in credits. Spends nothing."""
+    try:
+        req = _speak_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"voice": req["voice"], "language": req["language"],
+            "characters": req["characters"], "credits": req["credits"],
+            "charged": req["charged"]}
+
+
+@router.post("/voice/speak/run")
+def voice_speak_run(body: VoiceSpeakBody, account_id: int = Depends(auth.current_account_id)):
+    """Read the script, as a job, at the price the card showed. The job's
+    result names the read (`audio`, an asset:<id> in the editor's bin), its
+    measured `seconds` and an address to play it (`output`)."""
+    from src import failures, fal, media, voice_studio
+    try:
+        req = _speak_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"reading it as {req['voice']}")
+        res = voice_studio.speak(req, account_id=account_id, source="composer",
+                                 project_id=body.project_id)
+        if not res.get("ok"):
+            print(f"  voice read was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The voice"))
+        seconds = res.get("seconds")
+        return {"detail": f"{req['voice']} · {seconds:.1f}s" if seconds else req["voice"],
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds}
+
+    job = jobs.start("effect", f"voice · {req['voice']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+class VoiceLibraryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    script: str = Field(default="", max_length=5000)
+    voice: str = Field(default="", max_length=120)
+    emotion: str = Field(default="", max_length=20)
+    speed: Optional[float] = None
+    pitch: Optional[int] = None
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+class DialogueLine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    speaker: int
+    text: str = Field(default="", max_length=5000)
+
+
+class VoiceDialogueBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    speakers: list[str] = Field(default_factory=list, max_length=8)
+    lines: list[DialogueLine] = Field(default_factory=list, max_length=400)
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+def _voice_priced(req: dict, project_id: Optional[int], account_id: int) -> dict:
+    from src import ledger, mcp_server
+    filed = mcp_server._filed_under(project_id, None, account_id)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id), **filed}
+
+
+def _voice_job(req: dict, body, account_id: int, *, title: str, run):
+    """The run half shared by the library and the dialogue: held to the price
+    the panel showed, a job whose result names the read in the editor's bin."""
+    from src import failures, fal, media
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, title)
+        res = run(req, account_id=account_id, source="composer", project_id=body.project_id)
+        if not res.get("ok"):
+            print(f"  voice was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The voice"))
+        seconds = res.get("seconds")
+        return {"detail": f"{title} · {seconds:.1f}s" if seconds else title,
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds}
+
+    job = jobs.start("effect", f"voice · {title}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/library/quote")
+def voice_library_quote(body: VoiceLibraryBody, account_id: int = Depends(auth.current_account_id)):
+    """What reading this script in a library voice costs, in credits. Spends nothing."""
+    from src import voice_clone, voice_models
+    try:
+        req = _voice_priced(voice_models.library_request(
+            body.script, body.voice, body.emotion, body.speed, body.pitch,
+            clones=voice_clone.names(account_id=account_id)), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"voice": req["voice"], "language": req["language"], "characters": req["characters"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/library/run")
+def voice_library_run(body: VoiceLibraryBody, account_id: int = Depends(auth.current_account_id)):
+    """Read it in the library voice, as a job, at the price the panel showed."""
+    from src import voice_clone, voice_models
+    try:
+        req = _voice_priced(voice_models.library_request(
+            body.script, body.voice, body.emotion, body.speed, body.pitch,
+            clones=voice_clone.names(account_id=account_id)), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    name = req.get("name") or dict(
+        v for vs in voice_models.LIBRARY_VOICES.values() for v in vs).get(req["voice"], req["voice"])
+    return _voice_job(req, body, account_id, title=name, run=voice_models.run_library)
+
+
+@router.post("/voice/dialogue/quote")
+def voice_dialogue_quote(body: VoiceDialogueBody, account_id: int = Depends(auth.current_account_id)):
+    """What this dialogue costs at most, in credits: its words at a slow pace,
+    rounded up to the model's 15-second step. Spends nothing."""
+    from src import voice_models
+    try:
+        req = _voice_priced(voice_models.dialogue_request(
+            body.speakers, [ln.model_dump() for ln in body.lines]), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"speakers": len(req["speakers"]), "lines": len(req["lines"]),
+            "characters": req["characters"], "estimate_seconds": req["estimate_seconds"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/dialogue/run")
+def voice_dialogue_run(body: VoiceDialogueBody, account_id: int = Depends(auth.current_account_id)):
+    """Make the dialogue, as a job, at the price the panel showed."""
+    from src import voice_models
+    try:
+        req = _voice_priced(voice_models.dialogue_request(
+            body.speakers, [ln.model_dump() for ln in body.lines]), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return _voice_job(req, body, account_id, title=f"dialogue · {len(req['speakers'])} voices",
+                      run=voice_models.run_dialogue)
+
+
+class VoiceCloneBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # asset:<id>: the sample, uploaded to the editor's bin, that STARTS with
+    # the person reading the consent line (src/voice_clone.CONSENT_LINE)
+    sample: str = Field(default="", max_length=40)
+    name: str = Field(default="", max_length=80)
+    expect_credits: Optional[int] = None
+
+
+@router.post("/voice/clone/quote")
+def voice_clone_quote(body: VoiceCloneBody, account_id: int = Depends(auth.current_account_id)):
+    """What cloning this voice costs, in credits. Spends nothing; the consent
+    line is listened for at the run, before anything is paid for."""
+    from src import voice_clone
+    try:
+        req = _voice_priced(voice_clone.request(body.sample, body.name, account_id=account_id),
+                            None, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"name": req["name"], "sample_seconds": round(req["seconds"], 2),
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/clone/run")
+def voice_clone_run(body: VoiceCloneBody, account_id: int = Depends(auth.current_account_id)):
+    """Clone the voice, as a job, at the price the panel showed: the consent
+    line is heard first (no line, no clone, nothing charged), then the clone.
+    The job's result names the new voice (`voice_id`, `name`) and its
+    preview (`audio`, `output`)."""
+    from src import failures, fal, media, voice_clone
+    try:
+        req = _voice_priced(voice_clone.request(body.sample, body.name, account_id=account_id),
+                            None, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.15, "listening for the consent line")
+        res = voice_clone.run(req, account_id=account_id, source="composer")
+        if not res.get("ok"):
+            print(f"  voice clone was not made: {res.get('error')}", file=sys.stderr)
+            if "consent_score" in res:
+                raise RuntimeError(res["error"])
+            raise RuntimeError(failures.plain(res.get("error"), "The voice clone"))
+        return {"detail": f"{res['name']} · cloned", "voice_id": res["voice_id"],
+                "name": res["name"], "media": "audio", "audio": res.get("audio"),
+                "seconds": res.get("seconds"),
+                "output": media.url_for(res["stored"], account_id) if res.get("stored") else None}
+
+    job = jobs.start("effect", f"voice clone · {req['name']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.delete("/voice/clones/{voice_id}")
+def voice_clone_remove(voice_id: str, account_id: int = Depends(auth.current_account_id)):
+    """Take a cloned voice off this account's library. Nothing is charged."""
+    from src import voice_clone
+    if not voice_clone.remove(voice_id, account_id=account_id):
+        return _error(404, "not_found", "no such voice on this account")
+    return {"removed": voice_id}
+
+
 class QuickEditBody(BaseModel):
     """A free edit the brain proposed (src/guide_tools.py QUICK_TOOLS), as the
     studio runs it: the tool, the source the page bound (gen:<id> or
@@ -6218,6 +6790,54 @@ def _generate_title(prompt: str) -> str:
     return title + ("…" if len(words) > 8 else "")
 
 
+CREATE_AUTONOMY = ("ask", "checkpoints", "autopilot")      # web/src/lib/autonomy.ts
+CREATE_PICKERS = ("person", "vesper", "default")
+
+
+def _prompt_hash(text: str) -> str:
+    import hashlib
+    return hashlib.sha256((text or "").strip().encode()).hexdigest()[:16]
+
+
+def _create_provenance(form, output: str, account_id: Optional[int] = None) -> dict:
+    """What the Create box knew when it posted (2026-10-24, the Vesper audit):
+    the fields its keep rate is read by, per model, picker, autonomy and
+    brain. Anything off its list is dropped, never stored as sent. The
+    conversation and how far into it are read here, from the open thread
+    (src/assistant_store.py), not taken from the form; best-effort."""
+    from src.gemini_utils import BRAINS
+
+    def pick(name, allowed):
+        v = (form.get(name) or "").strip().lower()
+        return v if v in allowed else None
+
+    told = {"door": "create", "output": output,
+            "autonomy": pick("autonomy", CREATE_AUTONOMY),
+            "brain": pick("brain", tuple(BRAINS)),
+            "model_picked_by": pick("model_picked_by", CREATE_PICKERS)}
+    if account_id is not None:
+        try:
+            from src import assistant_store
+            thread = assistant_store.open_project(account_id=account_id)
+            if thread:
+                told.update(thread_id=thread["id"], turn_n=len(thread.get("turns") or []))
+        except Exception:                               # noqa: BLE001
+            pass
+    return {k: v for k, v in told.items() if v is not None}
+
+
+def _sent_provenance(told: dict, shown: str, sent: str, kit, said: str,
+                     preset=None) -> dict:
+    """The record that "sent as shown" is checked by on live rows: the hash
+    of the prompt the card showed beside the hash of what the model got, and
+    the lines added between them, each one the card shows on its own."""
+    added = [name for name, on in (("camera_preset", bool(preset)),
+                                   ("brand_kit", bool(brand_kits.look_suffix(kit))),
+                                   ("reference_roles", bool(said))) if on]
+    return {**told, "shown_prompt_hash": _prompt_hash(shown),
+            "sent_prompt_hash": _prompt_hash(sent), "sent_additions": added}
+
+
 @router.post("/generate/run")
 async def generate_run(request: Request, account_id: int = Depends(auth.current_account_id)):
     """The Generate button: preset + prompt (+ attached image/video
@@ -6294,6 +6914,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     continued = (form.get("continued_from") or "").strip()
     if continued:
         outcomes.record_ref("continued", continued, account_id=account_id, source="variation")
+    told = _create_provenance(form, output, account_id)
 
     def work(job):
         # NOT `def work(job, account_id=None)` (2026-09-02): jobs.start
@@ -6306,18 +6927,27 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         from src import nano_banana, shootgen
         gemini_client = genai.Client(api_key=api_key)
 
-        jobs.progress(job, 0.1, "grounding in references")
-        references = shootgen.reference_block(spark=prompt, db_path=None)
+        if output == "image":
+            # A still is sent AS APPROVED (2026-10-24, the Vesper audit): the
+            # prompt on the step card, or typed into the box, IS the brief.
+            # The enhancer is a video shot editor -- it gave every still a
+            # (0-5s) window, camera moves and music -- and its RAG block was
+            # words nobody saw. Only a picked camera preset is added, as the
+            # one line the person chose (the scene writer's own shape).
+            enhanced = f"{prompt}\n\nCamera: {preset['how']}" if preset else prompt
+        else:
+            jobs.progress(job, 0.1, "grounding in references")
+            references = shootgen.reference_block(spark=prompt, db_path=None)
 
-        refs_note = ""
-        if image_refs or video_refs:
-            refs_note = f" · {len(image_refs) + len(video_refs)} ref(s)"
-        jobs.progress(job, 0.3, "enhancing prompt" + refs_note)
-        enhanced = _enhance_generate_prompt(
-            gemini_client, prompt, preset=preset, references=references,
-            image_refs=image_refs, video_refs=video_refs)
-        if not enhanced:
-            raise RuntimeError("enhancement came back empty")
+            refs_note = ""
+            if image_refs or video_refs:
+                refs_note = f" · {len(image_refs) + len(video_refs)} ref(s)"
+            jobs.progress(job, 0.3, "enhancing prompt" + refs_note)
+            enhanced = _enhance_generate_prompt(
+                gemini_client, prompt, preset=preset, references=references,
+                image_refs=image_refs, video_refs=video_refs)
+            if not enhanced:
+                raise RuntimeError("enhancement came back empty")
 
         jobs.progress(job, 0.55, "saving concept")
         shot = {"n": 1, "type": "BROLL", "source": "AI",
@@ -6355,16 +6985,19 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             except Exception:
                 pass
 
-        # A still whose prompt NAMES one of the account's brand kits
-        # (2026-10-21, Vesper outside a project): its look and palette ride in
-        # words, as a project's pick does. Not when the kit chip is off, and
-        # not when a project (the thread's or the scene's) already dresses it
-        # downstream, so nothing is said twice.
-        if (output == "image" and kit_on
-                and not brand_kits.for_project_id(project_id, account_id=account_id)
-                and not brand_kits.for_concept(concept_id, account_id=account_id)):
-            enhanced = brand_kits.dress(
-                enhanced, picked_kit or brand_kits.named_in([prompt], account_id=account_id))
+        # The brand kit dresses a still ONCE, here (2026-10-24; it used to be
+        # here AND in the renderer, so the look landed twice): the project's
+        # pick, the scene's, the conversation's, or a kit the prompt NAMES
+        # (Vesper outside a project). Not when the kit chip is off. The
+        # renderer is handed the kit to record, never to add again.
+        kit = None
+        sent = enhanced
+        if output == "image" and kit_on:
+            kit = (brand_kits.for_project_id(project_id, account_id=account_id)
+                   or brand_kits.for_concept(concept_id, account_id=account_id)
+                   or picked_kit
+                   or brand_kits.named_in([prompt], account_id=account_id))
+            sent = brand_kits.dress(enhanced, kit)
 
         notes = []
         # the still's id on the Assets wall, when it was banked there: how
@@ -6383,13 +7016,15 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             # one is FOR rides in the prompt, named by position
             from src import ref_roles
             said = ref_roles.prompt_note(ref_urls, roles)
+            sent = f"{sent}\n\n{said}" if said else sent
             result = fal.generate_image_from_prompt(
-                f"{enhanced}\n\n{said}" if said else enhanced,
+                sent,
                 model=image_model, aspect=aspect,
                 reference_urls=urls, concept_id=concept_id,
                 # a person asked for this still from the composer
                 approved=True, db_path=None, account_id=account_id,
-                project_id=project_id, brand_kit=kit_on)
+                project_id=project_id, brand_kit=False, dressed_kit=kit,
+                provenance=_sent_provenance(told, prompt, sent, kit, said, preset))
             if result.get("ok"):
                 asset = result.get("asset_id")
                 preprod.set_shot_reference_image(
@@ -6405,12 +7040,16 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             # EVERY attached reference, each under its caption (2026-10-11).
             # Only the first one used to be sent, bare: a product photo and
             # a frame attached for its light arrived as one unnamed picture.
+            # LITERAL (2026-10-24): as_still_frame un-videos a video prompt,
+            # and this one is a still brief already. The captions still name
+            # each picture (they are about the pictures, not the words).
             result = nano_banana.generate_from_prompt(
-                enhanced,
+                sent,
                 reference_image=([(label, data) for data, _mime, label in image_refs]
                                  if image_refs else None),
-                db_path=None, account_id=account_id,
-                project_id=project_id, brand_kit=kit_on,
+                db_path=None, account_id=account_id, literal=True,
+                project_id=project_id, brand_kit=False, dressed_kit=kit,
+                provenance=_sent_provenance(told, prompt, sent, kit, "", preset),
                 **({"aspect_ratio": aspect} if aspect else {}))
             if result.get("ok"):
                 asset = result.get("asset_id")
@@ -6456,6 +7095,208 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     job = jobs.start("generate", f"generate · {prompt[:60]}", work, account_id=account_id)
     return {"job_id": job["id"],
             "image_refs": len(image_refs), "video_refs": len(video_refs)}
+
+
+# --- the direct generators (2026-10-22, docs/tasks/task-direct-generators.md)
+# /studio/image and /studio/video: one prompt, one model the person picked,
+# one priced button. The menus and prices are src/direct.py's projections
+# of the tables every other door prices with; here is only the gate. The
+# person's click on the priced button is the approval and `expect_credits`
+# holds the run to the number the button showed (409 if it moved), exactly
+# as an effect's card. The prompt goes to the model AS TYPED: no enhance,
+# no brain turn, no scene written. A result lands on the Library wall.
+
+class DirectVideoQuote(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str
+    seconds: Optional[int] = None
+    resolution: Optional[str] = None
+    aspect: Optional[str] = None
+    start_frame: bool = False
+    references: int = 0
+
+
+class DirectImageQuote(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str
+    aspect: Optional[str] = None
+    references: int = 0
+
+
+@router.get("/direct/video")
+def direct_video_menu(account_id: int = Depends(auth.current_account_id)):
+    """Every clip model the Video page offers, with what each can be asked
+    for and its opening price. Reading it costs nothing."""
+    from src import direct
+    return direct.video_menu(account_id)
+
+
+@router.post("/direct/video/quote")
+def direct_video_quote(body: DirectVideoQuote, account_id: int = Depends(auth.current_account_id)):
+    """The price of exactly this pick, or 400 naming what the model does
+    not take. Spends nothing."""
+    from src import direct
+    try:
+        q = direct.video_quote(account_id, model=body.model, seconds=body.seconds,
+                               resolution=body.resolution, aspect=body.aspect,
+                               start_frame=body.start_frame,
+                               references=body.references)
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    return direct.public(q)
+
+
+@router.get("/direct/image")
+def direct_image_menu(account_id: int = Depends(auth.current_account_id)):
+    """Every model the Image page offers (the composer's own picker), with
+    the frames and how many pictures reach each one."""
+    from src import direct
+    return direct.image_menu(account_id)
+
+
+@router.post("/direct/image/quote")
+def direct_image_quote(body: DirectImageQuote, account_id: int = Depends(auth.current_account_id)):
+    from src import direct
+    try:
+        q = direct.image_quote(account_id, model=body.model, aspect=body.aspect,
+                               references=body.references)
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    return direct.public(q)
+
+
+def _expected_credits(form) -> Optional[int]:
+    raw = str(form.get("expect_credits") or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def _form_int(form, name: str) -> Optional[int]:
+    raw = str(form.get(name) or "").strip()
+    return int(raw) if raw.lstrip("-").isdigit() else None
+
+
+@router.post("/direct/video/run")
+async def direct_video_run(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """One clip on the model the person picked, as a job. Multipart: the
+    prompt, model, seconds, resolution, aspect and `expect_credits`, plus an
+    optional start frame as `files` (an upload) or `asset_photos` (a picked
+    picture). With `ref_mode=references` (2026-10-25) those pictures are
+    instead ALL held as references on the model's reference endpoint
+    (fal.REF2V), named in the prompt by their tags. No photograph is
+    required (Mike's call): this writes no scene, so the reference gate --
+    which guards scenes -- has nothing to guard here."""
+    from src import direct, fal
+    form = await request.form()
+    model = str(form.get("model") or "")
+    try:
+        prompt = direct.clean_prompt(form.get("prompt"),
+                                     video_model=model if model in fal.VIDEO_MODELS else None)
+    except ValueError as e:
+        return _error(400, "empty_prompt", str(e))
+    expected = _expected_credits(form)
+    if expected is None:
+        return _error(400, "missing_price", "say what the button showed: expect_credits")
+    if not fal.has_key(account_id):
+        return _error(503, "generation_unavailable", "video is not set up on this server")
+    image_refs, ref_urls, _videos = await _collect_refs(form, account_id=account_id)
+    held = str(form.get("ref_mode") or "") == "references"
+    pictures = [r[0] for r in image_refs] if held else []
+    start = image_refs[0][0] if image_refs and not held else None
+    try:
+        q = direct.video_quote(account_id, model=model,
+                               seconds=_form_int(form, "seconds"),
+                               resolution=str(form.get("resolution") or ""),
+                               aspect=str(form.get("aspect") or ""),
+                               start_frame=start is not None,
+                               references=len(pictures))
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    if q["credits"] != expected:
+        return _price_moved(q["credits"])
+    if ref_urls:
+        outcomes.record_refs("ref_reuse", ref_urls if held else ref_urls[:1],
+                             account_id=account_id, source="direct")
+    label = q["label"]
+
+    def work(job):
+        jobs.progress(job, 0.1, f"rendering on {label}")
+        res = fal.generate_from_prompt(
+            prompt, reference_image=start, model=q["model"],
+            duration=q["seconds"], resolution=q["resolution"],
+            aspect_ratio=q["aspect"],
+            # the person pressed the priced button on the Video page
+            approved=True, account_id=account_id, source="direct", bank=True,
+            **({"references": pictures} if pictures else {}))
+        if not res.get("ok"):
+            raise RuntimeError(_render_failed(res.get("error"), "The clip"))
+        asset = res.get("asset_id")
+        return {"detail": f"{label} · {q['seconds']}s · done",
+                "output": res.get("media_url"), "media": "video",
+                "asset": f"gen:{asset}" if asset else None}
+
+    job = jobs.start("make", f"video · {label} · {prompt[:50]}", work,
+                     cancellable=True, account_id=account_id)
+    return {"job_id": job["id"], "credits": q["credits"], "charged": q["charged"]}
+
+
+@router.post("/direct/image/run")
+async def direct_image_run(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """One still on the model the person picked, as a job. Multipart: the
+    prompt, model, aspect and `expect_credits`, with references as `files`
+    and `asset_photos` (as the composer sends them)."""
+    from src import direct, fal, model_menu, nano_banana
+    form = await request.form()
+    try:
+        prompt = direct.clean_prompt(form.get("prompt"))
+    except ValueError as e:
+        return _error(400, "empty_prompt", str(e))
+    expected = _expected_credits(form)
+    if expected is None:
+        return _error(400, "missing_price", "say what the button showed: expect_credits")
+    model = str(form.get("model") or "").strip()
+    image_refs, ref_urls, _videos = await _collect_refs(form, account_id=account_id)
+    try:
+        q = direct.image_quote(account_id, model=model, aspect=str(form.get("aspect") or ""),
+                               references=len(image_refs))
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    nano = q["model"] == model_menu.NANO_ID
+    if nano and not nano_banana.has_key(account_id):
+        return _error(503, "generation_unavailable", "Nano Banana is not set up on this server")
+    if not nano and not fal.has_key(account_id):
+        return _error(503, "generation_unavailable", "image models are not set up on this server")
+    if q["credits"] != expected:
+        return _price_moved(q["credits"])
+    if ref_urls:
+        outcomes.record_refs("ref_reuse", ref_urls, account_id=account_id, source="direct")
+    label = q["label"]
+    refs = image_refs[:direct.image_max_refs(q["model"])]
+
+    def work(job):
+        jobs.progress(job, 0.1, f"drawing on {label}")
+        if nano:
+            res = nano_banana.generate_from_prompt(
+                prompt, reference_image=[(lab, data) for data, _mime, lab in refs] or None,
+                aspect_ratio=q["aspect"], literal=True, bank=True, source="direct",
+                db_path=None, account_id=account_id, brand_kit=False)
+        else:
+            urls = [u for u in (fal.as_image_url(raw, account_id=account_id)
+                                for raw, _mime, _lab in refs) if u]
+            res = fal.generate_image_from_prompt(
+                prompt, model=q["model"], aspect=q["aspect"], reference_urls=urls,
+                approved=True, db_path=None, account_id=account_id,
+                source="direct", bank=True, brand_kit=False)
+        if not res.get("ok"):
+            raise RuntimeError(_render_failed(res.get("error"), "The still"))
+        asset = res.get("asset_id")
+        note = ""
+        if image_refs and not nano and not res.get("references"):
+            note = f" · {label} takes no reference images, drawn from the prompt"
+        return {"detail": f"{label} · done{note}", "output": res.get("media_url"),
+                "media": "image", "asset": f"gen:{asset}" if asset else None}
+
+    job = jobs.start("make", f"image · {label} · {prompt[:50]}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": q["credits"], "charged": q["charged"]}
 
 
 # --- director mode: per-shot save-back --------------------------------------
@@ -7482,3 +8323,12 @@ router.include_router(_cut_routes.router)
 from . import brand_routes as _brand_routes  # noqa: E402
 
 router.include_router(_brand_routes.router)
+
+
+# --- editing-app panels (2026-10-22, docs/tasks/task-premiere-plugin.md) ----
+# The studio's half of a Premiere panel's sign-in: approving its code, and
+# the list of connected panels with Disconnect. The panel's own door
+# (/plugin/v1, a bearer token) is app/plugin_api.router, mounted in main.
+from . import plugin_api as _plugin_api  # noqa: E402
+
+router.include_router(_plugin_api.studio_router)

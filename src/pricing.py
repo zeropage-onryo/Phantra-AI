@@ -87,7 +87,11 @@ from . import ledger, providers, timeline
 # $0.682/s at 1080p). Every v2 token was minted for a renderer or a band
 # that no longer exists, so v2 is retired, not carried: an old signed
 # quote refuses as `retired_pricing` and the card re-quotes.
-PRICING_VERSION = "2026-09-26-fal-v3"
+#
+# v4 (2026-10-27): video is marked up PER MODEL (MARKUP_BY_MODEL below), so
+# a v3 token for a clip carries a price this version would not show; v3 is
+# retired the same way, and every open card re-quotes once.
+PRICING_VERSION = "2026-10-27-fal-v4"
 # A token minted under a version not listed here is refused as
 # `retired_pricing`: prices changed, re-quote. Retire a version by removing
 # it, never by changing what it means.
@@ -102,6 +106,38 @@ CREDIT_CENTS = 1
 MARKUP = "2.4"
 # per render, per part: the least any billable render costs
 CREDIT_FLOOR = 10
+
+# THE MARKUP PER VIDEO MODEL (2026-10-27, Mike: "for video models it's way
+# too expensive at the current rates"; docs/tasks/task-video-markup.md).
+# Video at 2.4x put Seedance 2.5 at about 4x Higgsfield's on-screen price
+# for the same clip, read off their Generate button 2026-10-27. Each model
+# here is priced at no more than 1.3x Higgsfield's list price where that
+# still leaves MIN_MARKUP over fal's rate card, else at MIN_MARKUP; a model
+# not listed (LTX, images, effects, stills) keeps MARKUP. Strings, through
+# Fraction, for MARKUP's reason. Keyed by fal.VIDEO_MODELS' ids.
+MARKUP_BY_MODEL: dict[str, str] = {
+    "seedance2.5": "1.5",
+    "seedance2": "1.5",
+    "seedance2-fast": "1.5",
+    "kling3-turbo-pro": "1.5",
+    "kling4": "1.5",
+    "veo3.1": "1.5",
+    "wan3": "1.5",
+    "grok1.5": "1.64",
+    "grok1.5-lite": "1.73",
+}
+# The least any model may be marked up: below it a yearly subscriber who
+# spends every credit leaves under 10% after Stripe and the assistant
+# (the margin model in Claude outputs/Phantra_video_pricing_2026-10-27.xlsx).
+# tests/test_pricing.py fails a table entry under it.
+MIN_MARKUP = "1.5"
+
+
+def markup_for(model: Optional[str] = None) -> str:
+    """The markup a render on `model` is priced at: its MARKUP_BY_MODEL
+    entry, else MARKUP. None (a still, an effect, an unnamed render) is
+    MARKUP, so every caller that never names a model is unchanged."""
+    return MARKUP_BY_MODEL.get(model or "", MARKUP)
 
 
 # --- the studio actions that are not renders ----------------------------
@@ -276,6 +312,28 @@ class Pack:
 TOPUP = Pack("topup", "750 credits", 10, 750, "STRIPE_PRICE_TOPUP")
 
 
+@dataclass(frozen=True)
+class Addon:
+    """A flat monthly add-on beside a plan (2026-10-26, Mike: studios are
+    a priced tier, a flat add-on on any plan). It grants NO credits -- it
+    opens a way of working (src/addons.py, src/studios.py) -- so it is not
+    a Plan and never touches `accounts.plan`. Its price lives on the Stripe
+    Price its env names; `monthly_usd` is what a page prints, and None
+    until Mike sets it, so no page shows a made-up number."""
+    key: str
+    name: str
+    blurb: str
+    price_env: str
+    monthly_usd: Optional[int] = None
+
+
+ADDONS: dict[str, Addon] = {
+    "studios": Addon("studios", "Studios",
+                     "Ad Studio: ad formats, a guided brief and variants, on top of any plan.",
+                     "STRIPE_PRICE_STUDIOS"),
+}
+
+
 def plan_for_tier(tier: str) -> Optional[Plan]:
     return next((p for p in PLANS.values() if p.tier == tier), None)
 
@@ -365,6 +423,10 @@ class Estimate:
     frame: str
     part: Optional[int]
     provider_usd_micros: int
+    # a timed scene rendered as ONE clip with its cuts in the prompt
+    # (timeline.renders_as_one), and how many of its photos go out with it
+    one_clip: bool = False
+    references: int = 0
 
     @property
     def usd(self) -> float:
@@ -408,10 +470,12 @@ def usd_micros(usd) -> int:
     return int(micros)
 
 
-def credits_for(provider_usd_micros: int) -> int:
-    """Micro-dollars of provider cost -> credits: marked up, rounded UP to
-    the cent, never under the floor. Integer arithmetic throughout."""
-    scaled = Fraction(int(provider_usd_micros)) * Fraction(str(MARKUP)) * CREDIT_CENTS
+def credits_for(provider_usd_micros: int, model: Optional[str] = None) -> int:
+    """Micro-dollars of provider cost -> credits: marked up (by `model`'s
+    markup, markup_for), rounded UP to the cent, never under the floor.
+    Integer arithmetic throughout. A video door passes its model; a door
+    that passes none is priced at MARKUP, as before 2026-10-27."""
+    scaled = Fraction(int(provider_usd_micros)) * Fraction(str(markup_for(model))) * CREDIT_CENTS
     cents = -((-scaled.numerator) // (scaled.denominator * _MICROS_PER_CENT))
     return max(int(cents), CREDIT_FLOOR)
 
@@ -549,6 +613,59 @@ def estimate(*, account_id: Optional[int], shot: dict, part: Optional[int] = Non
                     part=part, provider_usd_micros=usd_micros(choice["estimate_usd"]))
 
 
+def one_clip_references(shot: dict, provider: str, model: str) -> int:
+    """How many of the scene's photos a one-clip render sends: all of them
+    up to the model's cap on its reference-to-video endpoint, none for a
+    model that has no such endpoint (it is anchored on a still instead)."""
+    if provider != "fal":
+        return 0
+    from . import fal
+    return min(len(timeline.one_clip_refs(shot)), fal.ref_max(model))
+
+
+def _one_clip(*, account_id, shot, provider, model, frame, tier, ctx) -> Optional[Estimate]:
+    """The single estimate for a timed scene that renders as one clip, or
+    None when it splits (timeline.renders_as_one). Its length is the
+    scene's, fitted UP to the model; a model that holds the clip to
+    references at only some resolutions (Grok: 480p and 720p) is REFUSED
+    at any other, never quietly rendered without the photos."""
+    name, wanted = _resolve(account_id, shot, provider, model, ctx)
+    base = providers.check_render_choice(name, wanted, None, frame)
+    axis = providers.model_options(base["provider"], base["model"])["duration"]
+    if not timeline.renders_as_one(shot, axis):
+        return None
+    seconds = timeline.fit_seconds(axis, timeline.total_seconds(shot))
+    choice = providers.check_render_choice(name, wanted, seconds, frame)
+    _check_band(choice["provider"], choice["model"], int(choice["duration"]), tier,
+                choice["frame"])
+    refs = one_clip_references(shot, choice["provider"], choice["model"])
+    if choice["provider"] == "fal":
+        # every shot in one prompt must fit the model's own cap, else the
+        # scene splits (2026-10-27: 1 in 23 real scenes was over Kling 3's
+        # 3,072 before the kit was added)
+        from . import fal
+        pictures = timeline.one_clip_refs(shot)[:refs]
+        target = timeline.one_clip_target(
+            shot, dict(zip(pictures, fal.ref_tags(choice["model"], len(pictures)))))
+        if target and len(target["prompt"]) > fal.prompt_max(choice["model"]):
+            return None
+    usd = float(choice["estimate_usd"])
+    if refs:
+        from . import fal
+        spec = fal.ref_spec(choice["model"]) or {}
+        allowed = spec.get("resolutions")
+        if allowed and str(choice["frame"]) not in allowed:
+            raise PricingRefused(
+                "references_resolution",
+                f"{choice['model']} renders with reference photos at "
+                f"{' or '.join(allowed)} only, not {choice['frame']}")
+        usd += float(spec.get("per_image_usd", 0)) * refs
+    return Estimate(provider=choice["provider"], model=choice["model"],
+                    seconds=int(choice["duration"]), frame=str(choice["frame"]),
+                    part=None, provider_usd_micros=usd_micros(usd),
+                    one_clip=True, references=refs)
+
+
 def estimate_scene(*, account_id: Optional[int], shot: dict,
                    provider: Optional[str] = None, model: Optional[str] = None,
                    seconds=None, frame=None, tier: Optional[str] = None,
@@ -564,6 +681,12 @@ def estimate_scene(*, account_id: Optional[int], shot: dict,
     priced as one."""
     todo = None if whole else windows_to_render(shot)
     if todo is not None:
+        if tier is None:
+            tier = tier_for(account_id, ctx=ctx)
+        one = _one_clip(account_id=account_id, shot=shot, provider=provider, model=model,
+                        frame=frame, tier=tier, ctx=ctx)
+        if one is not None:
+            return [one]
         return [estimate(account_id=account_id, shot=shot, part=w["n"],
                          provider=provider, model=model, frame=frame, tier=tier,
                          ctx=ctx)
@@ -598,7 +721,7 @@ def quote(*, account_id: Optional[int], shot: dict, shot_id: int,
     # of a vendor, and with no provider named there is not one yet
     if not billable(account_id, priced.provider):
         return None
-    credits = credits_for(priced.provider_usd_micros)
+    credits = credits_for(priced.provider_usd_micros, model=priced.model)
     return Quote(pricing_version=PRICING_VERSION, account_id=account_id,
                  shot_id=int(shot_id), part=part, provider=priced.provider,
                  model=priced.model, seconds=priced.seconds, frame=priced.frame,
@@ -772,7 +895,8 @@ def args_hash(tool: str, args: dict) -> str:
 
 
 def studio_quote(*, account_id: Optional[int], tool: str, provider: str, args: dict,
-                 usd, now: Optional[int] = None, ttl: int = QUOTE_TTL) -> StudioQuote:
+                 usd, now: Optional[int] = None, ttl: int = QUOTE_TTL,
+                 model: Optional[str] = None) -> StudioQuote:
     """Price one studio render: the provider's USD -> credits through the
     one conversion every hold uses, bound to the tool and its arguments,
     with a fresh token id."""
@@ -781,7 +905,7 @@ def studio_quote(*, account_id: Optional[int], tool: str, provider: str, args: d
     iat = int(now if now is not None else time.time())
     return StudioQuote(pricing_version=PRICING_VERSION, account_id=account_id, tool=tool,
                        provider=provider, args_hash=args_hash(tool, args),
-                       provider_usd_micros=micros, credits=credits_for(micros),
+                       provider_usd_micros=micros, credits=credits_for(micros, model=model),
                        token_id=secrets.token_urlsafe(12), issued_at=iat,
                        expires_at=iat + int(ttl))
 
@@ -1047,7 +1171,7 @@ def display(*, account_id: Optional[int], shot: dict, shot_id: int,
     signed = charged and configured()
     renders = []
     for p in parts:
-        credits = credits_for(p.provider_usd_micros) if charged else None
+        credits = credits_for(p.provider_usd_micros, model=p.model) if charged else None
         token = None
         if signed:
             # one token per render, never one per scene: the render loop
@@ -1068,6 +1192,11 @@ def display(*, account_id: Optional[int], shot: dict, shot_id: int,
             "shot_id": int(shot_id),
             "provider": head.provider, "model": head.model, "frame": head.frame,
             "timed": head.part is not None,
+            # a timed scene rendered as ONE clip, its cuts in the prompt:
+            # `timed` is False (one render, one token) and the shots are
+            # inside it; `references` is how many photos go with it
+            "one_clip": head.one_clip,
+            "references": head.references,
             "durations": [p.seconds for p in parts],
             "estimate_usd": round(micros / _MICROS, 4),
             # tokens ride only when there is something to charge AND a
@@ -1109,9 +1238,11 @@ CATALOG_MODELS: tuple[tuple[str, str, str, str], ...] = (
     ("fal", "wan3", "Wan 3.0", "Open-weight realism up to 1080p."),
     ("fal", "kling3-turbo-pro", "Kling 3 Turbo Pro", "Cinematic motion, strong on people."),
     ("fal", "seedance2-fast", "Seedance 2.0 Fast", "ByteDance's quick tier, up to 720p."),
-    ("fal", "seedance2", "Seedance 2.0", "Seedance at full quality; 1080p is premium."),
-    ("fal", "seedance2.5", "Seedance 2.5", "ByteDance's newest, with sound, up to 30 seconds; 1080p is premium."),
-    ("fal", "veo3.1", "Veo 3.1", "Google's top model, with sound. Premium only."),
+    ("fal", "seedance2", "Seedance 2.0", "Seedance at full quality, up to 1080p."),
+    ("fal", "seedance2.5", "Seedance 2.5", "ByteDance's newest, with sound, up to 30 seconds and 1080p."),
+    ("fal", "veo3.1", "Veo 3.1", "Google's top model, with sound."),
+    ("fal", "grok1.5", "Grok Imagine 1.5", "xAI's video model, with sound, 1 to 15 seconds, seven frame shapes."),
+    ("fal", "grok1.5-lite", "Grok Imagine 1.5 Lite", "Grok's quick tier, with sound, up to 1080p."),
 )
 
 
@@ -1147,7 +1278,7 @@ def catalog_models() -> list[dict]:
             seconds = int(choice["duration"])
         out.append({"provider": provider, "model": model, "name": name, "blurb": blurb,
                     "tier": band.tier, "max_seconds": band.max_seconds,
-                    "seconds": seconds, "credits": credits_for(micros),
+                    "seconds": seconds, "credits": credits_for(micros, model=model),
                     "frame": str(choice["frame"])})
     return out
 
@@ -1161,6 +1292,7 @@ def public_catalog() -> dict:
         "pricing_version": PRICING_VERSION,
         "credit_cents": CREDIT_CENTS,
         "markup": MARKUP,
+        "markup_by_model": dict(MARKUP_BY_MODEL),
         "credit_floor": CREDIT_FLOOR,
         "expiry_months": ledger.EXPIRY_MONTHS,
         "clip_seconds": CATALOG_CLIP_SECONDS,

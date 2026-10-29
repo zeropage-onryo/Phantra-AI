@@ -86,6 +86,10 @@ Write the "brief" as a single cohesive prompt with these five parts, in order:
    what you would hear in that scene.
 5. AVOID: no plastic AI sheen, no CGI-looking skin or fabric, no cartoon
    reactions, no dramatic slow motion, no named film/brand/actor.
+   When the idea carries the person's OWN avoid list (a line starting "AVOID:",
+   "Avoid:" or "No:"), part 5 starts with every one of their items, word for word
+   and in their order, then adds the items above. Never drop, merge or reword
+   theirs: they asked for it in so many words.
 
 BEFORE YOU ANSWER, CHECK EVERY WINDOW. A clip is rendered from each one, and
 nobody reads the prompt in between:

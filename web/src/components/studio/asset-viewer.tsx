@@ -28,9 +28,11 @@ import {
   Film,
   FolderInput,
   Image as ImageIcon,
+  Languages,
   Link2Off,
   Maximize,
   Scissors,
+  Send,
   Share2,
   Star,
   Trash2,
@@ -39,8 +41,10 @@ import {
   X,
 } from "lucide-react";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { PostPanel } from "@/components/studio/post-panel";
 import { API_URL } from "@/lib/api";
 import {
+  getCapabilities,
   getShare,
   renderDownloadHref,
   sceneHref,
@@ -185,6 +189,8 @@ type Props = {
   onRemove: () => void;
   onMakeElement: () => void;
   onCopied: (ok: boolean) => void;
+  /** a word for the person after Post… (the shell's toast) */
+  onToast?: (text: string, kind?: "ok" | "err") => void;
   /** width/height the wall already learned for this render (from its
    *  thumbnail or poster), so a clip is sized before its metadata loads */
   ratio?: number;
@@ -205,6 +211,7 @@ export function AssetViewer({
   onRemove,
   onMakeElement,
   onCopied,
+  onToast,
   ratio,
 }: Props) {
   const master = `${API_URL}${item.url}`;
@@ -215,11 +222,24 @@ export function AssetViewer({
 
   const [zoom, setZoom] = useState<"fit" | "full">("fit");
   const [confirming, setConfirming] = useState(false);
+  const [posting, setPosting] = useState(false);
   const [folderDraft, setFolderDraft] = useState(item.folder ?? "");
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
+  // the Voice section is on (the `voice_tab` capability): Dub opens it there
+  // rather than in the composer. Asked once; off, or unknown, is the composer.
+  const [voiceTab, setVoiceTab] = useState(false);
+  useEffect(() => {
+    let live = true;
+    getCapabilities()
+      .then((c) => live && setVoiceTab(c.voice_tab === true))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
   // a new render resets everything that described the last one
   const [shownUrl, setShownUrl] = useState(item.url);
   if (shownUrl !== item.url) {
@@ -590,7 +610,24 @@ export function AssetViewer({
               Use in studio <ArrowRight strokeWidth={2.2} />
             </Link>
           )}
-          <div className={`av-second${isClip ? " one" : ""}`}>
+          {posting && item.generated_id ? (
+            <PostPanel
+              source={`gen:${item.generated_id}`}
+              kind={item.kind}
+              onClose={() => setPosting(false)}
+              onDone={(text) => {
+                setPosting(false);
+                onToast?.(text, "ok");
+              }}
+              onError={(text) => onToast?.(text, "err")}
+            />
+          ) : null}
+          <div className={`av-second${isClip && !item.generated_id ? " one" : ""}`} hidden={posting}>
+            {item.generated_id ? (
+              <button type="button" className="av-sec" onClick={() => setPosting(true)} title="Post it to a connected account, now or later">
+                <Send strokeWidth={1.8} /> Post…
+              </button>
+            ) : null}
             {!isClip ? (
               <button type="button" className="av-sec" onClick={onMakeElement} title="Save this still as a character, prop or place">
                 <UserRound strokeWidth={1.8} /> Make element
@@ -601,6 +638,17 @@ export function AssetViewer({
               // opens ON this render (browsing is free, a pick shows its price)
               <Link href={`/studio?on=gen:${item.generated_id}`} className="av-sec" title="Change it with an effect">
                 <Wand2 strokeWidth={1.8} /> Effects
+              </Link>
+            ) : null}
+            {isClip && item.generated_id ? (
+              // dub it: the studio's dub card opens ON this clip (nothing is
+              // spent there; the card shows the price and waits for a click)
+              <Link
+                href={voiceTab ? `/studio/voice?model=dub&on=gen:${item.generated_id}` : `/studio?dub=gen:${item.generated_id}`}
+                className="av-sec"
+                title="Speak it again in another language"
+              >
+                <Languages strokeWidth={1.8} /> Dub
               </Link>
             ) : null}
           </div>

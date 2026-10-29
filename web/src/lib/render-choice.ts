@@ -138,11 +138,16 @@ export type Plan = {
   credits: number | null;
   pending?: boolean;
   refused?: string;
+  /** a timed scene rendered as ONE clip with its cuts inside (`n` is 1);
+   *  `shots` is how many shots ride inside it */
+  oneClip?: boolean;
+  shots?: number;
 };
 /** the server's price for a pick (pricing.display), or its refusal */
 export type QuoteLike = {
   error?: string;
   timed?: boolean;
+  one_clip?: boolean;
   durations?: number[];
   credits?: number | null;
 } | null | undefined;
@@ -167,6 +172,10 @@ export function planFor(spec: ModelLike, pick: Pick, parts: PartLike[] | null | 
     return { ...base, credits: quote.credits ?? null };
   }
   const todo = parts.filter((p) => !p.media_url);
+  if (quote && !quote.error && quote.one_clip && quote.durations) {
+    // the whole scene in one generation, the cuts in its prompt
+    return { timed: false, oneClip: true, shots: parts.length, n: 1, lengths: quote.durations, credits: quote.credits ?? null };
+  }
   if (!quote || quote.error || !quote.timed || !quote.durations) {
     return { timed: true, n: todo.length, lengths: [], credits: null, pending: !quote, refused: quote?.error ?? "" };
   }
@@ -192,8 +201,12 @@ export const priceText = (plan: Plan, exempt = false): string =>
       ? `${plan.credits.toLocaleString("en-US")} cr${exempt ? NOT_CHARGED : ""}`
       : "pricing…";
 
+/** "3 shots" -- or "3 shots, one clip" when they render as one generation */
+export const shotsText = (plan: Plan): string =>
+  plan.oneClip ? `${plan.shots} shots, one clip` : `${plan.n} shot${plan.n === 1 ? "" : "s"}`;
+
 export const approveText = (plan: Plan, exempt = false, draft = false): string =>
-  `${draft ? "Draft" : "Approve"} · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
+  `${draft ? "Draft" : "Approve"} · ${shotsText(plan)} · ${priceText(plan, exempt)}`;
 
 /* ── draft, then finish (2026-10-11; src/drafts.py) ──
    A draft is the scene's same Render at the model's cheapest frame. The catalogue
@@ -219,7 +232,7 @@ export const withDraft = (spec: ModelLike, pick: Pick, on: boolean): Pick => {
  *  price as `approveText`, said as what the click does. A pick at the
  *  model's draft frame says so, like the Queue card it replaced. */
 export const renderText = (plan: Plan, exempt = false, draft = false): string =>
-  `${draft ? "Draft" : "Render"} · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
+  `${draft ? "Draft" : "Render"} · ${shotsText(plan)} · ${priceText(plan, exempt)}`;
 
 /** Where a scene stands with its clips, off its own row: every shot (or
  *  the whole scene) rendered, some of a timed scene's shots rendered, or
@@ -277,6 +290,11 @@ export const keyframeCeilingNote = (q: KeyframeQuoteLike | null | undefined): st
     scene's own still is shot 1's, so with shots drawn one at a time it can
     be missing while a later shot has one -- "no keyframes drawn" was then
     untrue. */
+/** Under a timed scene that renders as ONE clip (src/timeline.py renders_as_one). */
+export const oneClipNote = (shots: number, photos: number): string =>
+  `The whole scene renders as one clip, its ${shots} shots cut inside it` +
+  (photos ? `, held to your ${photos} photo${photos === 1 ? "" : "s"}` : "") + ".";
+
 export function keyframeNote(parts: ShotLike[] | null | undefined, sceneStill: string | null | undefined): string {
   const shots = parts || [];
   const drawn = shots.filter((p) => p.reference_image).length;
@@ -292,4 +310,30 @@ export const liveJobFor = <J extends JobLike>(jobs: J[], sceneId: number, kind: 
   jobs.find((j) => j.kind === kind && j.ref_id === sceneId && (j.status === "queued" || j.status === "running")) ?? null;
 
 export const chipText = (spec: ModelLike, pick: Pick, plan: Plan): string =>
-  `${spec.label} · ${plan.timed ? `${plan.n} shot${plan.n === 1 ? "" : "s"}` : `${pick.duration}s`} · ${pick.frame ?? "—"}`.toUpperCase();
+  `${spec.label} · ${plan.oneClip ? `${plan.shots} shots · ${plan.lengths[0]}s` : plan.timed ? `${plan.n} shot${plan.n === 1 ? "" : "s"}` : `${pick.duration}s`} · ${pick.frame ?? "—"}`.toUpperCase();
+
+/** A scene's clips are 9:16: its keyframes are drawn at nano_banana.ASPECT_RATIO
+ *  and a text clip at fal.DEFAULT_ASPECT; a scene has no shape of its own
+ *  (2026-10-24, the render test). The chat's Approve button says so. */
+export const SCENE_SHAPE = "9:16";
+
+const SHAPE_WORDS: [RegExp, string][] = [
+  [/\b(\d{1,2})\s*[:x×]\s*(\d{1,2})\b/i, ""],
+  [/\b(landscape|widescreen|wide[- ]screen|horizontal|cinemascope|letterbox(?:ed)?)\b/i, "16:9"],
+  [/\bsquare (?:frame|format|video|clip|crop)\b/i, "1:1"],
+];
+const RATIOS = new Set(["1:1", "4:5", "5:4", "3:4", "4:3", "2:3", "3:2", "9:16", "16:9", "21:9", "2:1", "1:2", "2.39:1"]);
+
+/** The shape a prompt asks for when it is NOT the scene's 9:16, or "".
+ *  Advice only: the clip still renders 9:16, and the card says so. */
+export function shapeAsked(prompt: string | null | undefined): string {
+  const text = prompt || "";
+  for (const [re, shape] of SHAPE_WORDS) {
+    const m = text.match(re);
+    if (!m) continue;
+    const named = shape || `${Number(m[1])}:${Number(m[2])}`;
+    if (!shape && !RATIOS.has(named)) continue;
+    if (named !== SCENE_SHAPE) return named;
+  }
+  return "";
+}

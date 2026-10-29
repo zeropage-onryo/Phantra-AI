@@ -32,9 +32,10 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "What do I actually get out of it?",
         a: (
           <p>
-            Rendered clips, one per shot, with the keyframe and the prompt that made each. A scene is written
-            as timed shots and rendered one shot at a time; the parts are listed in order for you to cut
-            together in your editor.
+            Rendered video, with the prompt that made it. A scene is written as timed shots. When the whole
+            scene fits in one render on the model you pick, it is made as one clip with the cuts inside it,
+            held to your photos. A longer scene is rendered one shot at a time and the shots are joined into
+            one video, with each part kept for you to recut in the editor.
           </p>
         ),
       },
