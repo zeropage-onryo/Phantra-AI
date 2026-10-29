@@ -11,6 +11,7 @@
 //
 import type { MakeAccent } from "./theme";
 import type { SignatureKey } from "./components/signatures";
+import type { Season } from "./seasonal";
 import { AD_GENERATOR } from "./entries/ai-product-ad-generator";
 import { SEEDANCE } from "./entries/seedance-video-generator";
 import { LTX } from "./entries/ltx-video-generator";
@@ -253,6 +254,11 @@ export type MakePage = {
   accent: MakeAccent;
   /** The page's arrangement: hero shape, section order, features shape. */
   layout?: MakeLayout;
+  /** A seasonal page (seasonal.ts, 2026-10-27): inside the window the
+   *  header shows a tab for it and the page wears `accent` (and the
+   *  atmosphere layer); outside it the page is an ordinary page. The page,
+   *  its URL and its links never come down with the season. */
+  season?: Season & { accent?: MakeAccent };
   /** What a "split", "cover", "stack" or "fan" hero draws: stills or
    *  clips, drawn like wall tiles. */
   heroMedia?: MakeTile[];

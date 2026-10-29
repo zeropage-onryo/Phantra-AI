@@ -260,6 +260,23 @@ export const PHANTRA: MakeAccent = {
 };
 
 /** The inline variables the skin wrapper carries for `accent`. */
+// HALLOWEEN (2026-10-27, Mike: the Halloween page "makes it spooky for
+// halloween"): pumpkin orange on a night-purple ground. Worn only inside
+// the page's season (an entry's `season.accent`, seasonal.ts); the rest of
+// the year the page wears its own accent.
+export const HALLOWEEN: MakeAccent = {
+  primary: "#ff7a1a",
+  primaryForeground: "#0b0a08",
+  cardLine: "#3a2446",
+  lineHover: "#ff7a1a",
+  cardLight: "rgba(255,122,26,0.12)",
+  plates: [
+    "radial-gradient(120% 90% at 20% 10%, #3b1a52 0%, #160d1f 55%, #0b0810 100%)",
+    "radial-gradient(120% 90% at 80% 15%, #5a2a08 0%, #1d1018 55%, #0b0810 100%)",
+  ],
+  panel: "#0b0810",
+};
+
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {
     "--primary": accent.primary,

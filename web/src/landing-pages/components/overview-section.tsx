@@ -241,6 +241,10 @@ function Compare({
   const x = useSpring(raw, still ? { stiffness: 1000, damping: 100 } : SPRINGS.glow);
   const clip = useMotionTemplate`inset(0 ${useTransform(x, (v) => (1 - v) * 100)}% 0 0)`;
   const handle = useMotionTemplate`${useTransform(x, (v) => v * 100)}%`;
+  // a vertical pair (9:16, the Halloween try-on's photo against its
+  // costume, 2026-10-29) keeps its own frame, narrower, so a full-length
+  // person is not cropped to the torso; every other pair stays 4:3, as before
+  const upright = right?.aspect && tall(right.aspect) ? right.aspect : null;
   const set = (clientX: number) => {
     const r = ref.current?.getBoundingClientRect();
     if (r) raw.set(Math.min(1, Math.max(0, (clientX - r.left) / r.width)));
@@ -264,7 +268,8 @@ function Compare({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={50}
-      className="relative aspect-[4/3] w-full touch-pan-y overflow-hidden rounded-2xl bg-card outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      style={upright ? { aspectRatio: upright.replace(":", " / ") } : undefined}
+      className={`relative w-full touch-pan-y overflow-hidden rounded-2xl bg-card outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/50 ${upright ? "mx-auto max-w-[360px]" : "aspect-[4/3]"}`}
     >
       <Fill tile={right} alt={rightLabel} plate={plate} near={near} />
       <motion.div aria-hidden style={{ clipPath: clip }} className="absolute inset-0">

@@ -13,7 +13,9 @@ import { PricingSection } from "./pricing-section";
 import { FaqSection } from "./faq-section";
 import { RelatedSection } from "./related-section";
 import { FinalCta } from "./final-cta";
+import { SeasonalAtmosphere } from "./seasonal-atmosphere";
 import { accentVars } from "../theme";
+import { inSeason } from "../seasonal";
 import { DEFAULT_ORDER, type MakePage as MakePageEntry, type MakeSectionKey } from "../pages";
 
 // The whole /make page from one entry. The hero always comes first; the
@@ -23,8 +25,15 @@ import { DEFAULT_ORDER, type MakePage as MakePageEntry, type MakeSectionKey } fr
 // wall, features, models, how-to, FAQ, related, final CTA. Same header,
 // footer and skin as the homepage; the entry's accent rides on the skin
 // wrapper as CSS variables (theme.ts).
+//
+// A seasonal page (seasonal.ts) wears its season's accent and the
+// atmosphere layer while the season is on. The date is read at render, so
+// app/make/[slug] revalidates hourly: a statically built page would keep
+// the look it was built with until the next deploy.
 export function MakePage({ page }: { page: MakePageEntry }) {
   const order = page.layout?.order ?? DEFAULT_ORDER;
+  const seasonal = page.season != null && inSeason(page.season);
+  const accent = seasonal ? (page.season?.accent ?? page.accent) : page.accent;
   const section: Record<MakeSectionKey, () => ReactNode> = {
     overview: () => <OverviewSection page={page} />,
     signature: () => <Signature page={page} />,
@@ -38,9 +47,10 @@ export function MakePage({ page }: { page: MakePageEntry }) {
     final: () => <FinalCta page={page} />,
   };
   return (
-    <EditorialSkin tone={page.tone} style={accentVars(page.accent)}>
+    <EditorialSkin tone={page.tone} style={accentVars(accent)}>
       <SiteHeader />
-      <main className="flex-1">
+      <main className="relative flex-1">
+        {seasonal && <SeasonalAtmosphere />}
         <MakeHero page={page} />
         {order.map((key) => (
           <Fragment key={key}>{section[key]()}</Fragment>
