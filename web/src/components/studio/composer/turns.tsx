@@ -39,6 +39,7 @@ import { useEffect, useRef, useState } from "react";
 import { renderDownloadHref, sceneHref } from "@/lib/studio-api";
 import { assetId, continueActions, split, type ContinueAction, type ContinueKind } from "@/lib/continue";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { PostPanel } from "@/components/studio/post-panel";
 import { TopUpLink } from "@/components/studio/top-up-link";
 import { NOT_SENT, NOT_SENT_CREDITS } from "@/lib/out-of-credits";
 import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@/lib/composer";
@@ -168,6 +169,10 @@ type Handlers = {
   onAdBuild: (id: string) => void;
   /** a built ad's voiceover or music: the click that spends, at the price shown */
   onAdAudio: (id: string, which: "voice" | "music") => void;
+  /** a proposed post's panel (lib/composer.ts POST_TOOL): Schedule's answer,
+   *  a problem to say, and Close (the panel folds to its line) */
+  onPostDone: (id: string, text: string) => void;
+  onPostError: (why: string) => void;
   /** a dub's card (lib/dubbing.ts): its menu, the clips it offers, the
    *  project a clip is filed under, a change applied to the card's current
    *  state, and the Render click */
@@ -886,6 +891,23 @@ export function ComposerStream({
                     onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
                     onError={handlers.onTalkError}
                   />
+                ) : null}
+                {t.post ? (
+                  t.post.done ? (
+                    <p className="zc-post-done">{t.post.done}</p>
+                  ) : (
+                    <div className="zc-post">
+                      <PostPanel
+                        source={t.post.source}
+                        kind={t.post.kind}
+                        caption={t.post.caption}
+                        at={t.post.at}
+                        onDone={(text) => handlers.onPostDone(t.post?.id ?? "", text)}
+                        onError={handlers.onPostError}
+                        onClose={() => handlers.onPostDone(t.post?.id ?? "", "Not posted.")}
+                      />
+                    </div>
+                  )
                 ) : null}
                 {t.dub ? (
                   <DubbingStep

@@ -962,6 +962,22 @@ export const getSkills = () => apiFetch<{ items: Skill[] }>("/skills");
    A studio's page: its formats and brief, whether this account has the
    add-on and whether it is on sale. Open to every account; nothing spends. */
 export const getStudio = (id: string) => apiFetch<StudioPage>(`/studios/${encodeURIComponent(id)}`);
+/** a product page -> one product element (POST /api/studios/product-from-link,
+ *  the connector's add_element: its main picture and what the page says;
+ *  free, no sheet drawn) */
+export const addProductFromLink = (url: string, name = "") =>
+  apiFetch<{ name: string; kind: "prop"; photos: number; note?: string }>("/studios/product-from-link", {
+    method: "POST",
+    headers: GUARDED_HEADERS,
+    body: JSON.stringify({ url, name }),
+  });
+/** what has worked for this workspace (the connector's what_works), as lines */
+export type StudioInsights = {
+  enough_data: boolean;
+  lines: string[];
+  posted: { title: string | null; platform: string | null; views: number | null; likes: number | null }[];
+};
+export const getStudioInsights = (id: string) => apiFetch<StudioInsights>(`/studios/${encodeURIComponent(id)}/insights`);
 
 /* ── effects (src/effects.py; lib/effects.ts) ── */
 export type EffectsCatalogue = {

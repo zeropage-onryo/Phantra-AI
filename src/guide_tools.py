@@ -58,7 +58,7 @@ WRITE_LABELS: dict = {}
 # list_models (2026-10-11, src/model_menu.py) reads the still and clip
 # models this account can make on, with the studio's own line about each.
 LOCAL_READ = ("find_references", "search_footage", "load_skill", "list_effects",
-              "research_look", "list_models")
+              "research_look", "list_models", "what_worked")
 LOCAL_WRITE = ("keep_references",)
 LOCAL_TOOLS = LOCAL_READ + LOCAL_WRITE
 WRITE_LABELS["keep_references"] = "Keep these references and attach them to the composer"
@@ -915,7 +915,7 @@ def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
             or name in PROJECT_TOOLS or name in QUICK_TOOLS
             or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, DUB_TOOL, LOOK_TOOL, SWITCH_TOOL,
-                        KIT_TOOL, AD_TOOL, ASK_TOOL, SCREEN_TOOL))
+                        KIT_TOOL, AD_TOOL, ASK_TOOL, SCREEN_TOOL, POST_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -973,6 +973,8 @@ def step_note(name: str, args: Optional[dict] = None) -> str:
             return f"researched the look of {who}"
     if name == model_menu.TOOL:
         return "looked at the models"
+    if name == INSIGHT_TOOL:
+        return "read what has worked"
     return f"looked at {name}"
 
 
@@ -998,7 +1000,7 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
             and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, DUB_TOOL, LOOK_TOOL, SWITCH_TOOL,
-                             KIT_TOOL, AD_TOOL, ASK_TOOL, SCREEN_TOOL)):
+                             KIT_TOOL, AD_TOOL, ASK_TOOL, SCREEN_TOOL, POST_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
@@ -1052,6 +1054,8 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
         return _check_effect(name, args, results)
     if name in QUICK_TOOLS:
         return check_quick(name, args, results)
+    if name == POST_TOOL:
+        return check_post(args, results)
     if name == TALK_TOOL:
         return check_talk(args, results)
     if name == AD_TOOL:
@@ -1251,6 +1255,103 @@ def quick_line(name: str, args: dict) -> str:
             "Free: no credits.")
 
 
+# WHAT WORKED, AND POSTING IT (2026-10-27, the Ad Studio's loop; Mike: "set up
+# 1-5", item 5 of the Higgsfield / Runway comparison). Runway Ads reads an
+# ad's performance back and makes the next round; here the brain can READ
+# what this account kept, cut, starred or posted (the connector's
+# `what_works`, src/mcp_server.py -- no model, nothing spent) and PROPOSE a
+# post of something this conversation made. The post is never sent from
+# here: the proposal opens the Library's own Post... panel in the thread, and
+# Schedule on it writes the ONE `posts` row the publish worker sends.
+INSIGHT_TOOL = "what_worked"
+POST_TOOL = "schedule_post"
+WRITE_LABELS[POST_TOOL] = "Schedule this post"
+MAX_POST_CAPTION = 2200
+_POST_AT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
+
+INSIGHT_SPEC = {
+    "name": INSIGHT_TOOL,
+    "description": (
+        "Read what this workspace has kept, cut, downloaded, starred or posted -- which "
+        "models' results it keeps, which camera presets, and how its posted videos did "
+        "(views, likes) -- as short lines. Costs nothing and makes nothing. Use it before "
+        "writing a second ad or a variant, or when the person asks what is working, and "
+        "lean on it; never invent numbers it did not return."),
+    "input_schema": {"type": "object", "properties": {}},
+    "write": False,
+}
+
+POST_SPEC = {
+    "name": POST_TOOL,
+    "description": (
+        "Propose posting ONE still or clip from this conversation to one of the person's "
+        "connected social accounts. Nothing is posted by this call: it opens a Post card "
+        "in the thread with your caption and time filled in, and the person picks the "
+        "account and presses Schedule. Call it ONLY when the person asked to post, "
+        "schedule or publish in this turn. Write the caption for the platform they named."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "caption": {"type": "string",
+                        "description": "The post's words, plain text, no links, up to 2,200 "
+                                       "characters."},
+            "at": {"type": "string",
+                   "description": "Optional: when, as local time YYYY-MM-DDTHH:MM, only when "
+                                  "the person named a time. Leave it out for 'post it now'."},
+            "on": {"type": "integer",
+                   "description": "Optional: the NUMBER of the still or clip to post, only "
+                                  "when the person pointed at one and only a number from the "
+                                  "listed results."},
+        },
+        "required": ["caption"],
+    },
+    "write": True,
+}
+
+
+def check_post(args: dict, results: Optional[list] = None) -> dict:
+    """A post proposal: words bounded, a time in the one shape the card takes,
+    and a number held to the turn's list (a still or a clip)."""
+    from . import result_refs
+    caption = str(args.get("caption") or "").strip()
+    if not caption:
+        raise Refused(f"`{POST_TOOL}` needs the caption")
+    out: dict = {"caption": caption[:MAX_POST_CAPTION]}
+    at = str(args.get("at") or "").strip()
+    if at:
+        if not _POST_AT.fullmatch(at[:16]):
+            raise Refused(f"`{POST_TOOL}` takes `at` as YYYY-MM-DDTHH:MM, or no time for now")
+        out["at"] = at[:16]
+    try:
+        on = result_refs.one(args.get("on"), results, takes="")
+    except result_refs.Unknown as exc:
+        raise Refused(str(exc)) from exc
+    if on is not None:
+        kind = next((r["kind"] for r in results or [] if r["n"] == on), None)
+        if kind not in ("still", "clip"):
+            raise Refused(f"#{on} is a {kind}; a post takes a still or a clip")
+        out["on"] = on
+    return out
+
+
+def post_line(args: dict) -> str:
+    """The line above the Post card."""
+    when = f" for {args['at'].replace('T', ' at ')}" if args.get("at") else ""
+    return (f"Here is the post{when}. Pick the account and press Schedule -- nothing goes "
+            "out until you do.")
+
+
+def insight_lines(account_id: Optional[int], dsn: Optional[str] = None) -> str:
+    """what_worked's answer: the connector's `what_works` lines. Never raises."""
+    try:
+        from . import mcp_server
+        got = mcp_server.what_works(dsn=dsn, account_id=account_id)
+    except Exception as exc:                                        # noqa: BLE001
+        return f"what worked could not be read just now ({type(exc).__name__}); say so"
+    lines = got.get("lines") or []
+    return "\n".join(f"- {line}" for line in lines) or "- nothing to read yet"
+
+
 def check_talk(args: dict, results: Optional[list] = None) -> dict:
     """A talking-photo proposal: a still named by number held to the turn's
     list, and the words bounded. Nothing here is a spend, so nothing is
@@ -1399,6 +1500,11 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
     if is_look(name):
         # needs the project the client is in: run_look_tool
         raise Refused(f"`{name}` takes the project; the act route runs it")
+    if name == POST_TOOL:
+        # opened as the Post card in the thread; Schedule on it is the send
+        raise Refused(f"`{name}` opens the Post card; the person's Schedule sends it")
+    if name == INSIGHT_TOOL:
+        return insight_lines(account_id, dsn)
     from . import assistant_brain
     return assistant_brain.run_local(name, args, account_id=account_id,
                                      dsn=dsn, attachments=attachments, on_step=on_step)
@@ -1534,6 +1640,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
         # turn; the write that keeps it only where there is a project
         from . import look_research
         tool_specs = tool_specs + [dict(look_research.SPEC)]
+        # what this workspace kept and posted (2026-10-27): a read, everywhere
+        tool_specs = tool_specs + [dict(INSIGHT_SPEC)]
         if in_project:
             tool_specs = tool_specs + [dict(LOOK_SPEC)]
             if kit:
@@ -1564,6 +1672,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             tool_specs = tool_specs + [dict(DUB_SPEC)]
             # ... and the free edits on what it made (2026-10-19)
             tool_specs = tool_specs + [dict(s) for s in QUICK_SPECS]
+            # ... and a post of what it made, opened as a card (2026-10-27)
+            tool_specs = tool_specs + [dict(POST_SPEC)]
             # ... and may propose the model a still or a scene is made on,
             # from the list this read hands it (item 12, src/model_menu.py)
             tool_specs = tool_specs + [dict(model_menu.SPEC)]

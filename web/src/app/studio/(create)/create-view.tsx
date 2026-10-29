@@ -172,6 +172,7 @@ import {
   isAdTool,
   isDubTool,
   isQuickTool,
+  isPostTool,
   type QuickTool,
   isMake,
   isPlanTool,
@@ -729,14 +730,21 @@ function Composer() {
       .catch(() => setRefRoles([]));
     // the picker lists elements only; a render handed over from the
     // Assets wall ("Use in a shot") needs the wider scope to resolve
-    getAssets(undefined, attachId?.startsWith("generated-") ? "all" : "elements")
+    // ?attach= may name several, comma-separated (the Ad Studio hands over
+    // the person on camera and the product, 2026-10-27), in their order
+    const wanted = (attachId ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    getAssets(undefined, wanted.some((x) => x.startsWith("generated-")) ? "all" : "elements")
       .then((r) => {
         setAssets(r.items.filter((a) => (a.category as string) !== "generated"));
         // "Use in a shot" on Assets lands here with the asset attached
-        const hit = attachId ? r.items.find((a) => a.id === attachId) : null;
-        if (hit) setAttachPhotos(elementFrames(hit, FRAMES_PER_ASSET));
+        const hits = wanted.map((x) => r.items.find((a) => a.id === x)).filter((a): a is Asset => !!a);
+        // one that is gone still lets the link's spark land (the wait is on this)
+        if (wanted.length) setAttachPhotos(hits.flatMap((hit) => elementFrames(hit, FRAMES_PER_ASSET)));
       })
-      .catch(() => setAssets([]));
+      .catch(() => {
+        setAssets([]);
+        if (wanted.length) setAttachPhotos([]);
+      });
     apiFetch<{ brains: { id: string; label: string; note: string }[]; default: string }>("/brains")
       .then((r) => {
         setBrains(r.brains.map((b) => ({ id: b.id, label: b.label, note: b.note })));
@@ -2431,6 +2439,69 @@ function Composer() {
     }
   }
 
+  /* "MAKE IT NOW" (the Ad Studio, 2026-10-27, lib/ad-studio.ts handoffHref):
+     ?send=1 sends the link's first message once, as the person's own Send
+     would, after everything the link carried has landed -- the spark in the
+     box, the studio brief, the recipe, the photos, the kit. The message asks
+     for the make ("Make it now."), so the answer is the priced card, which
+     waits for its click like any other: nothing here spends. The param
+     leaves the address so a reload does not send it again. */
+  const sendParam = params.get("send") === "1";
+  const appliedSendParam = useRef(false);
+  useEffect(() => {
+    if (!sendParam || appliedSendParam.current || !ready || signedOut || !guideReady) return;
+    if (!sparkParam || appliedSpark.current !== sparkParam || idea.trim() !== sparkParam.trim()) return;
+    if (studioParam && !draft.studio) return;
+    if (skillParam && appliedSkill.current !== skillParam) return;
+    if (attachId && attachPhotos === null) return;
+    if (kitWanted && appliedKit.current !== kitWanted) return;
+    if (!canSend) return;
+    appliedSendParam.current = true;
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("send");
+    router.replace(`${pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+    void send();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the link has landed
+  }, [sendParam, ready, signedOut, guideReady, sparkParam, idea, draft.studio, skill, attachPhotos, kits, canSend]);
+
+  /* A POST (lib/composer.ts POST_TOOL, 2026-10-27): the brain asked to post
+     something this conversation made. The source is the result it named,
+     else the newest render or upload by id; the turn carries the Library's
+     own Post panel with the words and the time filled in. Nothing is sent
+     from here -- Schedule on the panel writes the one row. */
+  function openPost(reply: GuideReply, looked: Turn["looked"], args: Record<string, unknown>) {
+    const [named] = numbersOf(args.on);
+    const target = named ? findResult(thread, named) : null;
+    const byId = (c: { ref: string } | null) => !!c && /^(gen|asset):\d+$/.test(c.ref);
+    const pointed = target ? candidateOf(target, refTag(named)) : null;
+    const source = byId(pointed) ? pointed : (fxCandidates.find((c) => c.from !== "attached" && byId(c)) ?? null);
+    if (!source) {
+      setThread((all) => [
+        ...all,
+        { role: "assistant", content: "There is nothing made here to post yet. Make it first, then ask again.", looked },
+      ]);
+      return;
+    }
+    setThread((all) => [
+      ...all,
+      {
+        role: "assistant",
+        content: reply.message,
+        reply,
+        looked,
+        post: {
+          id: newMadeId(),
+          source: source.ref,
+          kind: source.kind === "clip" ? "video" : "image",
+          caption: typeof args.caption === "string" ? args.caption : "",
+          at: typeof args.at === "string" && args.at ? args.at : null,
+        },
+      },
+    ]);
+  }
+  const patchPost = (id: string, done: string) =>
+    setThread((all) => all.map((t) => (t.post?.id === id ? { ...t, post: { ...t.post, done } } : t)));
+
   /* Make from the brief: the person's own click on the card the brain
      wrote, so it rides on their turn. */
   async function makeBrief() {
@@ -2618,6 +2689,9 @@ function Composer() {
           // building waits on the card's own button, Auto or not
           // (not awaited: the card says it is writing, the box is free)
           void startAd(proposal.args as Record<string, unknown>, reply, looked);
+        } else if (proposal && isPostTool(proposal.tool)) {
+          // A POST: the Post panel opens filled in; its Schedule sends it
+          openPost(reply, looked, proposal.args as Record<string, unknown>);
         } else if (proposal && isDubTool(proposal.tool)) {
           // A DUB: the card opens with the clip the person pointed at and
           // the language named; nothing is spent here
@@ -3540,6 +3614,11 @@ function Composer() {
                 onAdPatch: patchAd,
                 onAdBuild: (id) => void buildAd(id),
                 onAdAudio: (id, which) => void runAdAudio(id, which),
+                onPostDone: (id, text) => {
+                  patchPost(id, text);
+                  if (text !== "Not posted.") toast(text);
+                },
+                onPostError: (why) => toast(why, "err"),
                 dubMenu,
                 dubChoices,
                 dubProject: project?.id ?? null,

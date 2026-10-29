@@ -401,3 +401,92 @@ def test_the_balance_says_which_add_ons_are_held(shop):
     assert r.status_code == 200 and r.json()["addons"] == {"studios": False}
     addons.grant("phantra", "studios", True)
     assert client.get("/api/billing/balance").json()["addons"] == {"studios": True}
+
+
+# --- 2026-10-27: examples, a product link, what worked, a post ----------------
+
+def test_every_format_has_an_example_from_the_showcase_and_ugc_casts():
+    studio = studios.get("ads")
+    keys = studios._showcase_keys()
+    assert keys, "the showcase manifest is readable"
+    for f in studio["formats"]:
+        assert f.get("example") in keys, f["id"]
+    assert {f["id"] for f in studio["formats"] if f.get("cast")} == {"ugc", "ugc_unboxing"}
+    page_formats = {f["id"]: f for f in studios.public("ads")["formats"]}
+    assert page_formats["ugc"]["cast"] is True and page_formats["ugc"]["example"]
+
+
+def test_a_product_name_comes_off_its_page_address():
+    assert studios.name_from_link("https://shop.com/products/halo-runner?ref=1") == "Halo Runner"
+    assert studios.name_from_link("https://shop.com/p/12345/blue_bottle.html") == "Blue Bottle"
+    assert studios.name_from_link("https://acme.io/") == "Acme"
+
+
+def test_a_product_link_becomes_a_product_element_through_add_element(signed_in, monkeypatch):
+    from src import mcp_server
+    seen = {}
+
+    def add_element(kind, name, source, notes="", *, create_element=None, dsn=None, account_id=None):
+        seen.update(kind=kind, name=name, source=source, account_id=account_id,
+                    has_create=callable(create_element))
+        return {"added": True, "name": name, "element": {"photos": [{"ref": "x"}]},
+                "page": {"url": source}, "note": "Added."}
+
+    monkeypatch.setattr(mcp_server, "add_element", add_element)
+    guarded = {"X-Phantra-Model-Connection": "1"}
+    r = client.post("/api/studios/product-from-link", headers=guarded,
+                    json={"url": "https://shop.com/products/halo-runner"})
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Halo Runner" and r.json()["photos"] == 1
+    assert seen == {"kind": "prop", "name": "Halo Runner",
+                    "source": "https://shop.com/products/halo-runner",
+                    "account_id": signed_in["account_id"], "has_create": True}
+    # not a link, and a page that gives nothing, are said plainly
+    assert client.post("/api/studios/product-from-link", headers=guarded,
+                       json={"url": "halo"}).status_code == 400
+    monkeypatch.setattr(mcp_server, "add_element",
+                        lambda *a, **k: (_ for _ in ()).throw(ValueError("the page has no picture")))
+    r = client.post("/api/studios/product-from-link", headers=guarded,
+                    json={"url": "https://shop.com/x"})
+    assert r.status_code == 400 and "no picture" in r.json()["error"]["message"]
+    # a cross-site form cannot make one
+    assert client.post("/api/studios/product-from-link",
+                       json={"url": "https://shop.com/x"}).status_code == 403
+
+
+def test_the_insights_are_the_connectors_what_works(signed_in, monkeypatch):
+    from src import mcp_server
+    monkeypatch.setattr(mcp_server, "what_works", lambda **k: {
+        "enough_data": True, "lines": ["you kept 3 of 4 outputs (75%)"], "posted": []})
+    r = client.get("/api/studios/ads/insights")
+    assert r.status_code == 200 and r.json()["lines"] == ["you kept 3 of 4 outputs (75%)"]
+    monkeypatch.setattr(mcp_server, "what_works", lambda **k: 1 / 0)
+    assert client.get("/api/studios/ads/insights").json() == {
+        "enough_data": False, "lines": [], "posted": []}
+    assert client.get("/api/studios/films/insights").status_code == 404
+
+
+def test_vesper_can_read_what_worked_and_propose_a_post(monkeypatch):
+    from src import guide_tools, mcp_server
+    specs, run_tool = guide_tools.session(account_id=7, local=True, maker=True)
+    names = {s["name"] for s in specs}
+    assert {"what_worked", "schedule_post"} <= names
+    monkeypatch.setattr(mcp_server, "what_works",
+                        lambda **k: {"lines": ["on Seedance 2.5: kept 2 of 3"]})
+    assert run_tool("what_worked", {}) == "- on Seedance 2.5: kept 2 of 3"
+    # a post is a proposal: never run, held to the turn's list
+    with pytest.raises(guide_tools.Refused):
+        run_tool("schedule_post", {"caption": "hi"})
+    results = [{"n": 1, "kind": "clip"}, {"n": 2, "kind": "scene"}]
+    assert guide_tools.check_args("schedule_post", {"caption": " New drop ", "on": 1,
+                                                    "at": "2026-11-02T09:30"}, results) == {
+        "caption": "New drop", "on": 1, "at": "2026-11-02T09:30"}
+    for bad in ({"caption": ""}, {"caption": "x", "at": "tomorrow"},
+                {"caption": "x", "on": 2}, {"caption": "see https://x.co"}):
+        with pytest.raises(guide_tools.Refused):
+            guide_tools.check_args("schedule_post", bad, results)
+    assert "Schedule" in guide_tools.post_line({"caption": "x", "at": "2026-11-02T09:30"})
+    # a talk-only turn is handed the read, not the post
+    talk, _ = guide_tools.session(account_id=7, local=True)
+    assert "what_worked" in {s["name"] for s in talk}
+    assert "schedule_post" not in {s["name"] for s in talk}

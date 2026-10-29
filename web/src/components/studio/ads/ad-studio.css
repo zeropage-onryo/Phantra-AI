@@ -589,3 +589,91 @@
     min-height: 0;
   }
 }
+
+/* ── 2026-10-27: examples, a product link, who is on camera, Make it now,
+   what has worked ── */
+.as .as-format {
+  overflow: hidden;
+}
+.as .as-format-pic {
+  position: relative;
+  display: block;
+  margin: -14px -15px 4px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--raise);
+}
+.as .as-format-pic img,
+.as .as-format-pic video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.as .as-format:hover .as-format-pic img {
+  transform: scale(1.04);
+}
+.as .as-format-play {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.6);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-style: normal;
+}
+.as .as-format[aria-checked="true"] .as-format-pic {
+  box-shadow: inset 0 -2px 0 var(--signal);
+}
+.as .as-cast {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.as .as-go-second {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  margin-top: -4px;
+  border: 1px solid var(--edge-hi);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color var(--t);
+}
+.as .as-go-second:hover {
+  border-color: var(--bone-3);
+}
+.as .as-insights {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.as .as-insights .as-lab {
+  justify-content: flex-start;
+  gap: 6px;
+}
+.as .as-insights ul {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.as .as-insights li {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--bone-2);
+}
+.as .as-insights .as-hint {
+  margin: 0;
+}

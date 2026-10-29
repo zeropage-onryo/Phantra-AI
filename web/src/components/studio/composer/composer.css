@@ -1616,6 +1616,17 @@
     flex: none;
   }
 }
+/* a post the brain proposed (schedule_post, 2026-10-27): the Library's Post
+   panel in the thread, then the one line Schedule answered */
+.zc .zc-post {
+  max-width: 440px;
+  margin-top: 8px;
+}
+.zc .zc-post-done {
+  margin: 6px 0 0;
+  color: var(--zc-ink-2);
+  font-size: 13px;
+}
 
 /* ── THE PHONE'S CHAT HOLDS STILL, 2026-10-27 ──
    Mike: "when im working in the studio nothing stays static and its hard to
