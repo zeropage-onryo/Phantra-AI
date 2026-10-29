@@ -171,7 +171,7 @@ export const VEO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["seedance-video-generator", "ltx-video-generator", "kling-video-generator", "wan-video-generator"],
+  related: ["kling-4-video-generator", "seedance-video-generator", "ltx-video-generator", "kling-video-generator", "wan-video-generator"],
   finalCta: {
     eyebrow: "Your first scene",
     title: "Write a scene you can hear.",
