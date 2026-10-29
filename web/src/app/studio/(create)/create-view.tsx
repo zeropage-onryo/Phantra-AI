@@ -207,6 +207,7 @@ import {
   skipStep,
   stepAt,
   stepText,
+  variantOf,
   type Plan,
   type PlanStep,
   type Prices,
@@ -1400,7 +1401,16 @@ function Composer() {
     // `from`: the result this make continues (a Variation), by its render id
     // `renderModel`: the clip model the brain proposed for a scene -- only
     // where its Render card opens (lib/step-model.ts)
-    step: { plan?: boolean; refs?: string[]; from?: string; renderModel?: string; renderWhy?: string } = {},
+    // `variant`: one version of an ad in a test (lib/make-plan.ts variantOf),
+    // filed on the scene it writes so imported ad results read as a test
+    step: {
+      plan?: boolean;
+      refs?: string[];
+      from?: string;
+      renderModel?: string;
+      renderWhy?: string;
+      variant?: { label: string; group: string; test: string } | null;
+    } = {},
   ): Promise<MadeOut> {
     const madeId = newMadeId();
     const isImage = out === "image";
@@ -1495,6 +1505,11 @@ function Composer() {
       if (proposedRender) {
         form.append("render_model", proposedRender.id);
         if (renderWhy) form.append("render_model_why", renderWhy);
+      }
+      if (step.variant) {
+        form.append("variant", step.variant.label);
+        form.append("variant_group", step.variant.group);
+        if (step.variant.test) form.append("variant_test", step.variant.test);
       }
     }
     appendReferences(form);
@@ -1848,6 +1863,7 @@ function Composer() {
             refs: picturesFor(plan, st),
             ...(typeof st.args.model === "string" ? { renderModel: st.args.model } : {}),
             ...(typeof st.args.model_why === "string" ? { renderWhy: st.args.model_why } : {}),
+            variant: variantOf(plan, st),
           },
         );
         return outOf(out, "scene");

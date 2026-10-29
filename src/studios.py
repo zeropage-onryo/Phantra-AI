@@ -174,6 +174,20 @@ def turn_note(pick: Optional[dict]) -> str:
             .replace("{note}", fmt.get("note") or ""))
 
 
+def results_note(pick: Optional[dict], account_id: Optional[int]) -> str:
+    """What the Ad Studio's turn is told about this account's ads that ran
+    (src/ad_results.py, 2026-10-29): its best costs per result and its
+    tests' verdicts, so the next ad builds on what won. "" outside the Ad
+    Studio, with nothing imported, or on any error."""
+    if not pick or pick.get("id") != "ads" or account_id is None:
+        return ""
+    try:
+        from . import ad_results
+        return ad_results.note(account_id)
+    except Exception:                                           # noqa: BLE001
+        return ""
+
+
 def public(studio_id, *, account_id: Optional[int] = None) -> Optional[dict]:
     """What the studio's page draws: the config without its prompt notes,
     whether this account has the add-on, and how to buy it."""

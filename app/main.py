@@ -39,6 +39,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src import accounts as accounts_mod
 from src import (
+    ad_results,
     addons,
     asset_shelf,
     assistant_store,
@@ -211,6 +212,7 @@ def init_tables() -> None:
     settings_mod.init()  # the Dev Studio tunables (gate/threshold/k)
     fal_requests.init()  # fal's queue receipts, persisted at submit
     render_qc.init()     # what Gemini saw in each landed clip
+    ad_results.init()    # what a person's ads did, and the versions in a test
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     plugin_tokens.init()    # editing-app panels' sign-in codes and tokens

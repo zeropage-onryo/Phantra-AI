@@ -16,6 +16,8 @@ without asking them to grade anything:
                download  it was downloaded
                star      it was starred on the wall
                post      a posted video was linked to it
+               ad_run    it ran as a paid ad (an imported ad report named it;
+                         src/ad_results.py)
     discarded  delete    it was taken off the wall
                regen     the same scene part, or the same prompt, was made
                          again within ten minutes with this one never kept
@@ -55,7 +57,7 @@ from typing import Any, Iterable, Optional
 from . import db
 
 KEPT = ("cut_add", "export", "element_from", "ref_reuse", "continued",
-        "download", "star", "post")
+        "download", "star", "post", "ad_run")
 DISCARDED = ("delete", "regen")
 EDITED = ("prompt_edit",)
 EVENTS = KEPT + DISCARDED + EDITED

@@ -384,6 +384,49 @@ def studio_page(studio_id: str, account_id: int = Depends(auth.current_account_i
     return page
 
 
+# --- ad results (2026-10-29, src/ad_results.py, docs/tasks/task-ad-results.md) ---
+# What a person's ads did once they ran: the ad-level report they export from
+# Meta Ads Manager or TikTok Ads Manager, dropped on the Ad Studio. Open to
+# every account (it is their own data and nothing here spends); the brain
+# reads it only inside the Ad Studio, which is the add-on.
+
+
+@router.get("/ad-results")
+def ad_results_summary(account_id: int = Depends(auth.current_account_id)):
+    """Every imported ad summed over its windows, with its render's code, its
+    variant and its rates; the variant tests and their verdicts; the imports."""
+    from src import ad_results
+    return ad_results.summary(account_id=account_id)
+
+
+@router.post("/ad-results/import")
+async def ad_results_import(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """One CSV export (multipart `file`). Upserted by ad and window, so the
+    same export twice changes nothing. 400 with the reason for a file that is
+    not an ad-level CSV; nothing is written then."""
+    model_connections.mutation_header(request)
+    from src import ad_results
+    form = await request.form()
+    upload = form.get("file")
+    if upload is None or not hasattr(upload, "read"):
+        return _error(400, "no_file", "attach the CSV you exported from your ads manager")
+    data = await upload.read(ad_results.MAX_BYTES + 1)
+    try:
+        return ad_results.import_csv(data, account_id=account_id,
+                                     filename=getattr(upload, "filename", "") or "")
+    except ad_results.ImportRefused as exc:
+        return _error(400, "bad_export", str(exc))
+
+
+@router.delete("/ad-results/imports/{import_id}")
+def ad_results_delete_import(import_id: str, request: Request,
+                             account_id: int = Depends(auth.current_account_id)):
+    """Take one import back out (an export dropped by mistake)."""
+    model_connections.mutation_header(request)
+    from src import ad_results
+    return {"deleted": ad_results.delete_import(import_id, account_id=account_id)}
+
+
 @router.get("/brains")
 def brains(account_id: int = Depends(auth.current_account_id)):
     """The model tiers the composer may offer, as a PROJECTION of
@@ -3526,6 +3569,11 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     from src import model_menu
     render_model = model_menu.video_id(form.get("render_model"))
     render_why = model_menu.clean_why(form.get("render_model_why")) if render_model else ""
+    # one version of an ad in a test (2026-10-29, make_plan's `variant`):
+    # filed on the scene it writes, so imported ad results read as a test
+    variant = (form.get("variant") or "").strip()
+    variant_group = (form.get("variant_group") or "").strip()
+    variant_test = (form.get("variant_test") or "").strip()
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
@@ -3582,6 +3630,12 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                                                   account_id=account_id, why=render_why)
                 except Exception:                           # noqa: BLE001
                     pass
+        if variant and variant_group:
+            from src import ad_results
+            for s in saved:
+                ad_results.record_variant(s["concept_id"], account_id=account_id,
+                                          group_id=variant_group, label=variant,
+                                          test=variant_test)
         detail = f"{len(saved)} concept(s)"
         if brain != gemini_utils.DEFAULT_BRAIN:
             detail += f" · {brain}"

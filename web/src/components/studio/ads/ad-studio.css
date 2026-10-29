@@ -546,6 +546,195 @@
   color: var(--dim);
 }
 
+/* ── results (2026-10-29, ad-results-panel.tsx): the person's own ad report ── */
+.as .as-results-how {
+  margin: 0 0 14px;
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--bone-2);
+}
+.as .as-results-how b {
+  color: var(--text);
+  font-weight: 600;
+}
+.as .as-drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px dashed var(--edge-hi);
+  border-radius: var(--r1);
+  color: var(--bone);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t);
+}
+.as .as-drop:hover,
+.as .as-drop.is-over {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+}
+.as .as-drop.is-busy {
+  cursor: progress;
+  opacity: 0.7;
+}
+.as .as-file {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.as .as-results-error {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--danger-hi);
+}
+.as .as-results-done p {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.as .as-tests {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.as .as-test {
+  padding: 12px 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r1);
+  background: var(--raise);
+}
+.as .as-test-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.as .as-test-head b {
+  font-size: 13px;
+  color: var(--text);
+}
+.as .as-test-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--bone-3);
+}
+.as .as-test-head span.is-won {
+  color: var(--signal-hi);
+}
+.as .as-test ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.as .as-test li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--bone);
+}
+.as .as-test li.is-won {
+  color: var(--text);
+  font-weight: 600;
+}
+.as .as-table-wrap {
+  margin-top: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.as .as-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.as .as-table th,
+.as .as-table td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--line);
+  text-align: right;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.as .as-table thead th {
+  border-top: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+.as .as-table th:first-child {
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+}
+.as .as-table td {
+  color: var(--text);
+}
+.as .as-ad-name {
+  display: block;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.as .as-ad-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--bone-3);
+}
+.as .as-ad-meta em {
+  font-style: normal;
+  color: var(--warn);
+}
+.as .as-ad-variant {
+  padding: 0 7px;
+  border-radius: var(--rp);
+  background: var(--signal-soft);
+  color: var(--signal-hi);
+}
+.as .mono {
+  font-family: var(--mono);
+}
+.as .as-results-imports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--bone-3);
+}
+.as .as-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bone);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.as .as-link:hover {
+  color: var(--text);
+}
+
 /* ── narrower screens ── */
 @media (max-width: 1100px) {
   .as .as-body {

@@ -96,5 +96,5 @@ Entries: the rail (Megaphone, after Video), the phone menu, the palette ("Ad Stu
 
 - The add-on's price, and one price for all three studios or one each.
 - Create the Stripe Price and set `STRIPE_PRICE_STUDIOS`; until then grant by hand.
-- Next in the spec: variants as one plan, `schedule_post` / `what_worked` for Vesper, ad QC on
-  the card. Film and Fashion wait on usage.
+- Next in the spec: `schedule_post` / `what_worked` for Vesper, ad QC on the card. Variants as
+  one plan and ad results were built 2026-10-29 (`docs/tasks/task-ad-results.md`). Film and Fashion wait on usage.
