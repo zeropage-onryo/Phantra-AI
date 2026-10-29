@@ -410,6 +410,11 @@ OWNED_TABLES = (
     # worker did with it
     "posts",
     "post_events",
+    # the affiliate program (2026-10-26, src/affiliates.py): all three are
+    # keyed by the PARTNER's account, because the earnings are theirs
+    "affiliate_partners",
+    "affiliate_referrals",
+    "affiliate_commissions",
     # a workspace's paid add-ons (2026-10-26, src/addons.py): what one
     # account bought beside its plan (the Ad Studio), and whether it holds
     "account_addons",

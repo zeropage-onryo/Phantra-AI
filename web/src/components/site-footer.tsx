@@ -34,6 +34,7 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
       ["What's new", "/whats-new"],
       ["FAQ", "/faq"],
       ["Support", "/support"],
+      ["Affiliates", "/affiliates"],
       ["Sign in", "/studio"],
       ["Start creating", "/studio"],
     ],
