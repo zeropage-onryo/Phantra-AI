@@ -116,7 +116,7 @@ def test_a_plan_of_one_step_is_that_steps_own_tool():
 def test_the_spec_offers_exactly_what_check_takes():
     step = plans.SPEC["input_schema"]["properties"]["steps"]["items"]["properties"]
     assert step["do"]["enum"] == list(plans.DOES)
-    taken = {k for keys in plans.ARG_KEYS.values() for k in keys} | {"do", "scene", "uses", "why"}
+    taken = {k for keys in plans.ARG_KEYS.values() for k in keys} | {"do", "scene", "uses", "why", "variant"}
     assert set(step) == taken
     assert plans.SPEC["write"] is True and plans.SPEC["name"] == plans.TOOL
     # every step kind is said in the description the model reads

@@ -416,6 +416,11 @@ OWNED_TABLES = (
     # a person's own cloned voices (2026-10-27, src/voice_clone.py): their
     # voice, the consent line heard in it, and the model's voice id
     "voice_clones",
+    # what a person's ads did once they ran (2026-10-29, src/ad_results.py):
+    # one workspace's own ad-account export, and which of its scenes were
+    # versions of one ad in a test
+    "ad_results",
+    "ad_variants",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

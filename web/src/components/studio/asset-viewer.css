@@ -827,3 +827,16 @@
   order: 3;
   margin-bottom: 16px;
 }
+
+/* the ad code (2026-10-29): the code, Copy, and one line on what it is for */
+.av-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.av-code .av-none {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+}

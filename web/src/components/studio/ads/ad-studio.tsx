@@ -34,6 +34,7 @@ import {
   type StudioPage,
 } from "@/lib/ad-studio";
 import { useShell } from "@/components/studio/shell";
+import { AdResultsPanel } from "./ad-results-panel";
 import "./ad-studio.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -493,6 +494,9 @@ function AdStudioPage() {
           </div>
         </aside>
       </div>
+
+      {/* what the ads did once they ran (2026-10-29): the person's own report */}
+      <AdResultsPanel />
     </section>
   );
 }

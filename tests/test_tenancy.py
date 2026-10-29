@@ -89,6 +89,8 @@ def test_every_owned_table_grows_an_account_id(pg):
     billing.init(pg)
     fal_requests.init(pg)
     render_qc.init(pg)
+    from src import ad_results
+    ad_results.init(pg)
     whats_new.init(pg)
     from src.cut import moments as cut_moments
     from src.cut import store as cut_store
@@ -1053,6 +1055,8 @@ def _init_everything(path):
     addons.init(path)
     fal_requests.init(path)
     render_qc.init(path)
+    from src import ad_results
+    ad_results.init(path)
     whats_new.init(path)
     cut_store.init(path)
     from src import brand_kits

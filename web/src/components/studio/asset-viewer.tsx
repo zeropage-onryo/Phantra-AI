@@ -53,6 +53,7 @@ import {
   workspaceHref,
   type MediaItem,
 } from "@/lib/studio-api";
+import { adCode } from "@/lib/ad-results";
 import "./asset-viewer.css";
 
 /* SHARE (2026-10-20, src/shares.py): a public page for this one render --
@@ -132,6 +133,32 @@ export function ShareControls({ id }: { id: number }) {
         </span>
       ) : null}
     </>
+  );
+}
+
+/* The output's ad code (2026-10-29, lib/ad-results.ts): put in an ad's name
+   in Meta or TikTok Ads Manager, it is how a dropped ad report finds this
+   render on the Ad Studio. Copy is the one action. */
+function AdCodeRow({ id }: { id: number }) {
+  const code = adCode(id);
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // no clipboard (an old browser, an iframe): the code is on screen to select
+    }
+  }
+  return (
+    <span className="av-code">
+      <span className="mono">{code}</span>
+      <button type="button" className="av-ghost" onClick={copy} title="Copy the ad code">
+        {copied ? "Copied" : "Copy"}
+      </button>
+      <span className="av-none">Put it in the ad&apos;s name to see its results on the Ad Studio.</span>
+    </span>
   );
 }
 
@@ -548,6 +575,14 @@ export function AssetViewer({
                   <span className="av-none">Not from a concept</span>
                 )}
               </dd>
+              {item.generated_id ? (
+                <>
+                  <dt>Ad code</dt>
+                  <dd>
+                    <AdCodeRow id={item.generated_id} key={`code-${item.generated_id}`} />
+                  </dd>
+                </>
+              ) : null}
               {item.draft ? (
                 <>
                   <dt>Draft</dt>
