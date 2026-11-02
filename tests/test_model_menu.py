@@ -53,9 +53,22 @@ def test_the_still_menu_is_the_pickers_and_comes_off_the_table(keyed):
     assert ids == [model_menu.NANO_ID] + list(fal.IMAGE_MODELS) and menu["default"] == "nano"
     for item in menu["items"][1:]:
         row = fal.IMAGE_MODELS[item["id"]]
-        assert item["label"] == row["label"] and item["note"] == row["note"]
+        assert item["label"] in (row["label"], row["label"] + model_menu.ALT) and item["note"] == row["note"]
         assert item["references"] == bool(row.get("edit"))
         assert isinstance(item["credits"], int) and item["credits"] >= pricing.CREDIT_FLOOR
+
+
+# guards: no picker names a host (Mike, 2026-11-02: "rename it"), and two
+# routes to one model never read the same
+def test_no_still_is_named_by_its_host(keyed, monkeypatch):
+    monkeypatch.setattr(nano_banana, "MODEL", "gemini-3-pro-image")
+    labels = [m["label"] for m in model_menu.image_menu(7)["items"]]
+    assert not [label for label in labels if "fal" in label.lower()]
+    assert len(labels) == len(set(labels))
+    assert labels[0] == "Nano Banana Pro" and "Nano Banana Pro" + model_menu.ALT in labels
+    monkeypatch.setattr(nano_banana, "has_key", lambda account_id=None: False)
+    assert "Nano Banana Pro" in [m["label"] for m in model_menu.image_menu(7)["items"]]
+    assert model_menu.label_for("nano-banana-pro") == "Nano Banana Pro"
 
 
 # guards: the menus follow the keys -- nothing is listed that cannot be made on

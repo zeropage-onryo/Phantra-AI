@@ -141,8 +141,7 @@ def _label(tool: str, model: str) -> str:
     except Exception:                                   # noqa: BLE001
         named = None
     if named:
-        # fal's own copy of a Gemini model carries "(fal)" in the picker
-        return named.removesuffix(" (fal)")
+        return named
     if model in _RETIRED_NAMES:
         return _RETIRED_NAMES[model]
     if (model or "").startswith("talk-"):              # src/talking_photo.py's clip

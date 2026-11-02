@@ -43,6 +43,9 @@ TOOL = "list_models"
 # the picker's id for Gemini's image model on the studio key (the others
 # are fal.IMAGE_MODELS' own keys)
 NANO_ID = "nano"
+# A second route to a model already listed (fal's copy of Nano Banana Pro
+# beside the direct Gemini one) reads as this, not as its host.
+ALT = " · alt"
 
 WHY_MAX = 140
 
@@ -63,7 +66,9 @@ def image_menu(account_id: Optional[int] = None) -> dict:
                       "credits": pricing.still_credits(nano_banana.MODEL)})
     if fal.has_key(account_id):
         for opt in fal.image_options():
-            items.append({"id": opt["id"], "provider": "fal", "label": opt["label"],
+            taken = any(m["label"] == opt["label"] for m in items)
+            items.append({"id": opt["id"], "provider": "fal",
+                          "label": opt["label"] + ALT if taken else opt["label"],
                           "note": opt["note"], "references": opt["references"],
                           "credits": pricing.credits_for(pricing.usd_micros(opt["usd"]))})
     default = items[0]["id"] if items else NANO_ID
