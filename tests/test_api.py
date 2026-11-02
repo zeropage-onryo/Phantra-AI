@@ -500,7 +500,7 @@ def test_generated_media_carries_organize_fields_and_folders(tmp_db, monkeypatch
     assert wall["counts"]["all"] == 2
     assert wall["wall"] == {"image": 1, "video": 1, "starred": 1}
     assert wall["folders"] == {"bike portraits": 1}
-    assert set(wall["providers"]) == {"Nano Banana Pro", "Runway"}
+    assert set(wall["providers"]) == {"Nano Banana Pro", "Runway Gen-4.5"}
     by_id = {i["generated_id"]: i for i in wall["items"]}
     assert by_id[image_id]["folder"] == "bike portraits"
     assert by_id[image_id]["starred"] is True
@@ -510,7 +510,7 @@ def test_generated_media_carries_organize_fields_and_folders(tmp_db, monkeypatch
     assert [i["generated_id"] for i in in_folder["items"]] == [image_id]
     starred = client.get("/api/media?kind=all&scope=generated&starred=true").json()
     assert [i["generated_id"] for i in starred["items"]] == [image_id]
-    runway = client.get("/api/media?kind=all&scope=generated&provider=Runway").json()
+    runway = client.get("/api/media?kind=all&scope=generated&provider=Runway+Gen-4.5").json()
     assert [i["generated_id"] for i in runway["items"]] == [video_id]
 
     # a field left out is left alone; an empty folder clears it

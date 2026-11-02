@@ -451,8 +451,19 @@ def test_an_image_publish_draws_no_poster(configured_env, fake_s3, tmp_path,
     ("seedance", "seedance2-fast", "Seedance 2.0 Fast"),
     ("veo", "veo3.1", "Veo 3.1"),
     ("nano", "gemini-2.5-flash-image", "Nano Banana"),
-    ("runway", "gen4_turbo", "Runway"),
+    ("runway", "gen4_turbo", "Runway Gen-4 Turbo"),
+    ("runway", "gen4.5", "Runway Gen-4.5"),
+    ("runway", "an-unknown-id", "Runway"),
     ("manual", "kling 3 web app", "Manual"),
+    # QA 2026-11-02 T4: fal hosts every still and effect, and none of them
+    # is "Fal"; Kling 4.0 is a parked slot the video catalog does not list
+    ("fal", "flux2-pro", "FLUX.2 Pro"),
+    ("fal", "seedream4.5", "Seedream 4.5"),
+    ("fal", "nano-banana-pro", "Nano Banana Pro"),
+    ("fal", "remove-background", "Remove background"),
+    ("fal", "talk-omnihuman-v2", "Talking photo"),
+    ("fal", "an-unknown-id", "an-unknown-id"),
+    ("kling", "kling4", "Kling 4.0"),
 ])
 def test_the_wall_names_the_model_not_the_platform(tool, model, label):
     from src import render_assets

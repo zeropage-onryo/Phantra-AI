@@ -4119,7 +4119,9 @@ function Composer() {
                         ...clipModels.map((m) => ({
                           id: m.id,
                           label: m.label,
-                          note: `${m.note ?? ""}${typeof m.credits === "number" ? ` · ${m.credits.toLocaleString("en-US")} credits a clip` : ""}`,
+                          // no price in a picker: the price is on the one button
+                          // that spends (Mike's rule; QA 2026-11-02 T3)
+                          note: m.note ?? "",
                         })),
                         ...(talkModelOffered(talkMenu) ? [{ ...TALK_MODEL_OPTION }] : []),
                       ]}
