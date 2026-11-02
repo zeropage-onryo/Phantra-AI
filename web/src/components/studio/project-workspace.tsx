@@ -155,13 +155,16 @@ export function ProjectWorkspace({ id }: { id: number }) {
   const removed = useMemo(() => (scenes || []).filter((c) => c.archived), [scenes]);
   const listed = showRemoved ? [...live, ...removed] : live;
   const asked = Number(params.get("scene")) || null;
+  // ?new=1 (the project home's Create Workflow, 2026-11-02): a blank canvas
+  // -- the browser-local draft -- instead of a scene
+  const blank = params.get("new") === "1" && !asked;
   const shot = Number(params.get("shot")) || undefined;
   // arrival is the nodes (Mike's standing rule): no scene named opens the
   // newest one still being worked on, else the newest
   // (a scene named in the URL that is not this project's falls back too,
   // once the list has said so -- the workspace only opens its own scenes)
   const askedHere = !!asked && (!scenes || scenes.some((c) => c.id === asked));
-  const selected = askedHere ? asked : live.find((c) => !c.media_url)?.id || live[0]?.id || null;
+  const selected = blank ? null : askedHere ? asked : live.find((c) => !c.media_url)?.id || live[0]?.id || null;
 
   const go = useCallback((href: string) => router.push(href, { scroll: false }), [router]);
   const registerLeave = useCallback((fn: ((destination: string) => Promise<boolean>) | null) => {
@@ -259,7 +262,7 @@ export function ProjectWorkspace({ id }: { id: number }) {
           aria-label="Scenes"
         >
           <div className="flex items-center gap-2 border-b border-noir-line px-3 py-2.5">
-            <Link href="/studio/projects" className={`${ICON_BTN} size-9!`} title="All projects" aria-label="All projects">
+            <Link href={`/studio/projects/${id}`} className={`${ICON_BTN} size-9!`} title="Project home" aria-label="Project home">
               <ArrowLeft size={16} strokeWidth={2} aria-hidden />
             </Link>
             <div className="min-w-0 flex-1">
@@ -398,8 +401,19 @@ export function ProjectWorkspace({ id }: { id: number }) {
               shotN={selected === asked ? shot : undefined}
               nav={{
                 embedded: true,
-                backHref: "/studio/projects",
-                backLabel: "All projects",
+                backHref: `/studio/projects/${id}`,
+                backLabel: "Project home",
+                hrefFor: (sceneId, n) => workspaceHref(id, sceneId, n),
+                go,
+                registerLeave,
+              }}
+            />
+          ) : blank ? (
+            <FlowWorkspace
+              nav={{
+                embedded: true,
+                backHref: `/studio/projects/${id}`,
+                backLabel: "Project home",
                 hrefFor: (sceneId, n) => workspaceHref(id, sceneId, n),
                 go,
                 registerLeave,
