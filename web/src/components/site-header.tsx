@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Menu as MenuIcon, X } from "lucide-react";
+import { ChevronDown, Ghost, Menu as MenuIcon, X } from "lucide-react";
 import { NavigationMenu as Menu } from "@base-ui/react/navigation-menu";
 import { Dialog } from "@base-ui/react/dialog";
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { goToSignIn } from "@/lib/api";
 import { Wordmark } from "@/components/wordmark";
 import { skinClass, useTone } from "@/components/editorial-skin";
-import { makePath, pagesIn, menuUseCases } from "@/landing-pages/pages";
+import { makePath, pagesIn, menuUseCases, type MakePage } from "@/landing-pages/pages";
+import { inSeason } from "@/landing-pages/seasonal";
 import { isVideoModelPage, pageLabel } from "@/landing-pages/shared";
 import { SOCIALS } from "@/lib/socials";
 import { SocialIcon } from "@/components/social-icon";
@@ -30,6 +31,23 @@ import { SocialIcon } from "@/components/social-icon";
 // "Resources" (Mike, 2026-10-23) is a third panel after Models: Phantra's
 // own social accounts, read off lib/socials.ts. Each opens in a new tab.
 const USE_CASES = menuUseCases();
+
+// A seasonal page's tab (2026-10-27, Mike: the Halloween page "can get its
+// own tab ... but ends the day after halloween"). The tab is the one thing
+// that comes down with the season; the page stays linked from the footer
+// and the /make hub all year (landing-pages/seasonal.ts says why). The date
+// is read in the browser after mount, not at build, so a statically built
+// header still turns the tab on and off on the right day; the server and
+// the first paint draw no tab, so hydration never disagrees.
+const SEASONAL = pagesIn("make").filter((p) => p.season);
+function useSeasonalPages(): MakePage[] {
+  const [on, setOn] = useState<MakePage[]>([]);
+  useEffect(() => {
+    setOn(SEASONAL.filter((p) => p.season != null && inSeason(p.season)));
+  }, []);
+  return on;
+}
+const seasonColor = (page: MakePage) => page.season?.accent?.primary ?? "var(--primary)";
 const AFTER = [
   // the MCP server and Claude plugin page (2026-10-12, Mike's call: "listed
   // as MCP in the header")
@@ -49,6 +67,7 @@ const ITEM =
 
 export function SiteHeader() {
   const bar = useRef<HTMLElement>(null);
+  const seasonal = useSeasonalPages();
   // The Product and Models panels portal to <body>, outside the skin wrapper, so it
   // carries the page's tone itself or it draws dark on a white page.
   const tone = useTone();
@@ -91,7 +110,17 @@ export function SiteHeader() {
                 />
               </Menu.Trigger>
               <Menu.Content className="w-[520px] p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200">
-                <span className="eyebrow block px-3 pt-1.5 pb-1">Use cases</span>
+                <Menu.Link
+                  render={<Link href="/make" />}
+                  closeOnClick
+                  className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                >
+                  <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">All use cases</span>
+                  <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
+                    Everything you can make in the studio, on one page.
+                  </span>
+                </Menu.Link>
+                <span className="eyebrow mt-1 block border-t border-border px-3 pt-2.5 pb-1">Use cases</span>
                 <ul className="grid grid-cols-2">
                   {USE_CASES.map((page) => (
                     <li key={page.slug}>
@@ -191,6 +220,19 @@ export function SiteHeader() {
               </Menu.Content>
             </Menu.Item>
 
+            {seasonal.map((page) => (
+              <Menu.Item key={page.slug}>
+                <Menu.Link
+                  render={<Link href={makePath(page)} />}
+                  className={`${ITEM} gap-1.5 font-medium`}
+                  style={{ color: seasonColor(page) }}
+                >
+                  <Ghost aria-hidden strokeWidth={1.75} className="size-3.5" />
+                  {page.season?.tab}
+                </Menu.Link>
+              </Menu.Item>
+            ))}
+
             {AFTER.map((link) => (
               <Menu.Item key={link.href}>
                 <Menu.Link render={<Link href={link.href} />} className={ITEM}>
@@ -250,6 +292,7 @@ const SUB =
 
 function MobileMenu() {
   const [open, setOpen] = useState(false);
+  const seasonal = useSeasonalPages();
   const close = () => setOpen(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const home = useRef<HTMLElement | null>(null);
@@ -273,6 +316,9 @@ function MobileMenu() {
       label: "Product",
       body: (
         <div className="pb-2">
+          <Link href="/make" onClick={close} className={SUB}>
+            All use cases
+          </Link>
           <span className="eyebrow block px-3 pt-1.5 pb-1">Use cases</span>
           <ul className="flex flex-col">
             {USE_CASES.map((page) => (
@@ -394,6 +440,18 @@ function MobileMenu() {
                 </AccordionItem>
               ))}
             </Accordion>
+            {seasonal.map((page) => (
+              <Link
+                key={page.slug}
+                href={makePath(page)}
+                onClick={close}
+                className={`${ROW} justify-start gap-2`}
+                style={{ color: seasonColor(page) }}
+              >
+                <Ghost aria-hidden strokeWidth={1.75} className="size-4" />
+                {page.season?.tab}
+              </Link>
+            ))}
             {AFTER.map((link) => (
               <Link key={link.href} href={link.href} onClick={close} className={ROW}>
                 {link.label}

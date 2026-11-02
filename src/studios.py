@@ -57,6 +57,18 @@ def get(studio_id) -> Optional[dict]:
     return _read(sid) if sid in IDS else None
 
 
+def name_from_link(url: str) -> str:
+    """A product's name off its page address, for when the person gave
+    none: the last path word, dashes to spaces ("/products/halo-runner" ->
+    "Halo Runner"), else the host. Renamed on Elements if it is wrong."""
+    from urllib.parse import urlparse
+    parts = urlparse(url or "")
+    words = [w for w in (parts.path or "").split("/") if w and not w.isdigit()]
+    raw = (words[-1] if words else (parts.hostname or "product")).rsplit(".", 1)[0]
+    name = " ".join(w for w in raw.replace("_", "-").split("-") if w)[:60].strip()
+    return name.title() if name else "Product"
+
+
 def clean_id(studio_id) -> str:
     return get(studio_id)["id"] if get(studio_id) else ""
 
@@ -210,6 +222,17 @@ def _plan(account_id: int) -> Optional[str]:
     return accounts.plan_of(account_id)
 
 
+def _showcase_keys() -> set:
+    """The media keys the site's showcase manifest holds (the Create page's
+    and the Effects tab's examples): a format's example is one of them, so
+    no new render is made for a card."""
+    try:
+        data = json.loads((ROOT / "web" / "public" / "showcase" / "manifest.json").read_text())
+        return set((data.get("items") or {}).keys())
+    except (OSError, ValueError, AttributeError):
+        return set()
+
+
 def problems(studio_id) -> list[str]:
     """What is wrong with a config, for the test that keeps it honest: a
     skill that is not on the shelf, an output or aspect nothing makes, a
@@ -253,6 +276,11 @@ def problems(studio_id) -> list[str]:
                 out.append(f"format {fid}: need {n!r}")
         if not (f.get("note") or "").strip():
             out.append(f"format {fid}: no prompt note")
+        example = f.get("example")
+        if example is not None and example not in _showcase_keys():
+            out.append(f"format {fid}: example {example!r} is not in the showcase manifest")
+        if f.get("cast") and f.get("output") != "video":
+            out.append(f"format {fid}: cast is for a clip with a person in it")
         span, default = f.get("seconds"), f.get("default_seconds")
         if f.get("output") == "image":
             if span or default:

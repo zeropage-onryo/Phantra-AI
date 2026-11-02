@@ -138,6 +138,11 @@ venv/bin/python -m ops.supabase_auth_email apply --templates [--dry-run]
 venv/bin/python -m ops.ig_tokens check [--probe]
 venv/bin/python -m ops.ig_tokens refresh|publish|keep
 
+# The affiliate desk (docs/AFFILIATES.md). NEVER loads .env: export DATABASE_URL first.
+# `report` lists applications; `approve <slug>` mints the code; `release` (daily) pays
+# commissions whose 60-day hold ended; `payouts` / `mark-paid` are the hand-sent cash path.
+python -m src.affiliates report
+
 # The reference library (RAG, pgvector)
 venv/bin/python -m src.rag ingest <files...>
 venv/bin/python -m src.rag query "<text>" [--k 5]

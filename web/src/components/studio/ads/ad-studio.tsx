@@ -17,8 +17,19 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Check, Globe, Lock, Package, Plus } from "lucide-react";
-import { getAssets, getStudio, importBrandKit, listBrandKits, waitForJob, type Asset } from "@/lib/studio-api";
+import { ArrowRight, Check, Globe, Link2, Lock, Package, Plus, Sparkles, UserRound, Zap } from "lucide-react";
+import {
+  addProductFromLink,
+  getAssets,
+  getStudio,
+  getStudioInsights,
+  importBrandKit,
+  listBrandKits,
+  waitForJob,
+  type Asset,
+  type StudioInsights,
+} from "@/lib/studio-api";
+import { loadShowcase, restingFrame, type ShowcaseManifest } from "@/lib/showcase";
 import { startCheckout, signInThenCheckout } from "@/lib/site-billing";
 import {
   answer,
@@ -53,6 +64,26 @@ function productThumb(a: Asset): string | null {
   return a.photo_thumbs?.[0] ?? a.poster ?? null;
 }
 
+/* A format card's example: a frame from the site's own showcase (the Create
+   page's and Effects tab's media), and the clip itself on the picked card.
+   Nothing is rendered for it. No entry, no picture. */
+function FormatExample({ format, showcase, playing }: { format: AdFormat; showcase: ShowcaseManifest | null; playing: boolean }) {
+  const item = format.example ? showcase?.items[format.example] : undefined;
+  if (!item) return null;
+  const frame = restingFrame(item);
+  const clip = item.kind === "clip" && /\.(mp4|webm|mov)(\?|#|$)/i.test(item.after) ? item.after : null;
+  return (
+    <span className="as-format-pic" aria-hidden>
+      {clip && playing ? (
+        <video src={clip} poster={frame ?? undefined} muted loop playsInline autoPlay />
+      ) : frame ? (
+        <img src={frame} alt="" loading="lazy" />
+      ) : null}
+      {clip ? <em className="as-format-play">Clip</em> : null}
+    </span>
+  );
+}
+
 export function AdStudio() {
   return (
     <Suspense fallback={null}>
@@ -73,6 +104,15 @@ function AdStudioPage() {
   const [site, setSite] = useState("");
   const [reading, setReading] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
+  // the people a UGC format can cast (character elements, 2026-10-27)
+  const [cast, setCast] = useState<Asset[] | null>(null);
+  // the format cards' examples (the site's showcase manifest; no new renders)
+  const [showcase, setShowcase] = useState<ShowcaseManifest | null>(null);
+  // a product page pasted on the Product step
+  const [link, setLink] = useState("");
+  const [adding, setAdding] = useState(false);
+  // what has worked here (the connector's what_works)
+  const [insights, setInsights] = useState<StudioInsights | null>(null);
 
   const load = useCallback(() => {
     getStudio("ads")
@@ -96,13 +136,31 @@ function AdStudioPage() {
         }),
     [],
   );
+  const loadElements = useCallback(
+    () =>
+      getAssets(undefined, "elements")
+        .then((r) => {
+          const props = r.items.filter((a) => a.category === "prop");
+          setProducts(props);
+          setCast(r.items.filter((a) => a.category === "character"));
+          return props;
+        })
+        .catch(() => {
+          setProducts([]);
+          setCast([]);
+          return [] as Asset[];
+        }),
+    [],
+  );
   useEffect(() => {
     load();
     loadKits();
-    getAssets(undefined, "elements")
-      .then((r) => setProducts(r.items.filter((a) => a.category === "prop")))
-      .catch(() => setProducts([]));
-  }, [load, loadKits]);
+    loadElements();
+    loadShowcase().then(setShowcase);
+    getStudioInsights("ads")
+      .then(setInsights)
+      .catch(() => setInsights(null));
+  }, [load, loadKits, loadElements]);
 
   // back from Stripe: say so once, read the page again, drop the param
   const checkout = params.get("checkout");
@@ -118,6 +176,7 @@ function AdStudioPage() {
   const sentence = page && brief ? briefText(page, brief) : "";
   const advice = format && brief ? missing(format, brief) : [];
   const href = page && brief ? handoffHref(page, brief) : "/studio";
+  const nowHref = page && brief ? handoffHref(page, brief, { now: true }) : "/studio";
   const needsProduct = !!format?.needs.includes("product");
 
   const set = (next: AdBrief) => setBrief(next);
@@ -134,15 +193,32 @@ function AdStudioPage() {
       const kit = rows.find((k) => k.id === made);
       if (kit && brief) setBrief({ ...brief, kit });
       // the reader files a site's products as Elements: show them here too
-      getAssets(undefined, "elements")
-        .then((r) => setProducts(r.items.filter((a) => a.category === "prop")))
-        .catch(() => {});
+      loadElements();
       setSite("");
       toast(kit ? `${kit.name} read into a new kit` : "Kit made");
     } catch (e) {
       toast(e instanceof Error ? e.message : "The website could not be read.", "err");
     } finally {
       setReading(null);
+    }
+  };
+
+  // a product page -> one product element, then picked (the connector's
+  // add_element through POST /api/studios/product-from-link; free)
+  const addFromLink = async () => {
+    if (!link.trim() || adding || !brief) return;
+    setAdding(true);
+    try {
+      const made = await addProductFromLink(link.trim());
+      const props = await loadElements();
+      const hit = props.find((a) => a.name.toLowerCase() === made.name.toLowerCase());
+      if (hit) setBrief((b) => (b ? { ...b, product: { id: hit.id, name: hit.name } } : b));
+      setLink("");
+      toast(`${made.name} added to Elements from the page`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "That page could not be read.", "err");
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -228,6 +304,7 @@ function AdStudioPage() {
                   className="as-format"
                   onClick={() => set(switchFormat(page, brief, f))}
                 >
+                  <FormatExample format={f} showcase={showcase} playing={f.id === brief.format} />
                   <span className="as-format-top">
                     <b>{f.title}</b>
                     {f.free ? <em className="as-free">Free</em> : null}
@@ -289,9 +366,86 @@ function AdStudioPage() {
             </div>
             {products && !products.length ? (
               <p className="as-hint">
-                No products yet. Add one on Elements with its photos, or read the brand&rsquo;s website below: its products
-                come in as elements.
+                No products yet. Paste its page below, add one on Elements with its photos, or read the brand&rsquo;s website
+                in the Brand kit step: its products come in as elements.
               </p>
+            ) : null}
+            <form
+              className="as-read"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void addFromLink();
+              }}
+            >
+              <Link2 size={15} strokeWidth={1.7} />
+              <input
+                placeholder="Paste a product page: https://shop.com/products/your-product"
+                value={link}
+                inputMode="url"
+                onChange={(e) => setLink(e.target.value)}
+                aria-label="Product page address"
+                disabled={adding}
+              />
+              <button type="submit" className="as-pill as-pill-solid" disabled={!link.trim() || adding}>
+                {adding ? "Reading…" : "Add product"}
+              </button>
+            </form>
+            {format.cast ? (
+              <div className="as-cast">
+                <span className="as-lab">On camera</span>
+                <div className="as-products">
+                  <button
+                    type="button"
+                    className="as-product"
+                    aria-pressed={!brief.actor}
+                    title="Vesper casts a stand-in customer"
+                    onClick={() => set({ ...brief, actor: null })}
+                  >
+                    <span className="as-product-pic">
+                      <UserRound size={20} strokeWidth={1.6} />
+                      {!brief.actor ? (
+                        <span className="as-tick" aria-hidden>
+                          <Check size={12} strokeWidth={3} />
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="as-product-name">Stand-in</span>
+                  </button>
+                  {(cast ?? []).map((a) => {
+                    const on = brief.actor?.id === a.id;
+                    const thumb = productThumb(a);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className="as-product"
+                        aria-pressed={on}
+                        title={a.name}
+                        onClick={() => set({ ...brief, actor: on ? null : { id: a.id, name: a.name } })}
+                      >
+                        <span className="as-product-pic">
+                          {thumb ? <img src={thumb} alt="" loading="lazy" /> : <UserRound size={20} strokeWidth={1.6} />}
+                          {on ? (
+                            <span className="as-tick" aria-hidden>
+                              <Check size={12} strokeWidth={3} />
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="as-product-name">{a.name}</span>
+                      </button>
+                    );
+                  })}
+                  <Link href="/studio/elements" className="as-product as-product-add">
+                    <span className="as-product-pic">
+                      <Plus size={20} strokeWidth={1.7} />
+                    </span>
+                    <span className="as-product-name">Add a person</span>
+                  </Link>
+                </div>
+                <p className="as-hint">
+                  A character from Elements, held to their own photos. Only people who agreed to be in your ads.
+                </p>
+              </div>
             ) : null}
           </section>
 
@@ -442,9 +596,14 @@ function AdStudioPage() {
               </ul>
             ) : null}
             {unlock?.kind === "open" ? (
-              <Link href={href} className="as-go">
-                Start in Create <ArrowRight size={16} strokeWidth={2.2} />
-              </Link>
+              <>
+                <Link href={nowHref} className="as-go">
+                  <Zap size={16} strokeWidth={2.2} /> Make it now
+                </Link>
+                <Link href={href} className="as-go-second">
+                  Talk it through in Create <ArrowRight size={15} strokeWidth={2} />
+                </Link>
+              </>
             ) : unlock?.kind === "buy" ? (
               <button type="button" className="as-go" onClick={buy} disabled={unlocking}>
                 {unlocking ? "Opening checkout…" : unlock.label}
@@ -460,7 +619,7 @@ function AdStudioPage() {
             )}
             <p className="as-fine">
               {unlock?.kind === "open"
-                ? "Opens Create with all of this in the box. Nothing is made until you send it, and every still and clip waits on its priced card."
+                ? "Make it now sends this to Vesper at once and comes back with the priced card; talking it through puts it in the box for you to send. Either way, every still and clip waits on your click at its price."
                 : unlock?.kind === "plan-first"
                   ? "Ad Studio is an add-on to a plan. Pick a plan, then add it here."
                   : unlock?.kind === "buy"
@@ -479,6 +638,20 @@ function AdStudioPage() {
             </div>
           </div>
           <div className="as-card-foot">
+            <div className="as-insights">
+              <span className="as-lab">
+                <Sparkles size={11} strokeWidth={2} /> What has worked here
+              </span>
+              {insights && insights.lines.length ? (
+                <ul>
+                  {insights.lines.slice(0, 4).map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="as-hint">Fills in as you keep, star and post your ads. Vesper reads it before the next one.</p>
+              )}
+            </div>
             <ul className="as-facts">
               <li>
                 Recipe <b>{format.skill_title ?? format.skill}</b>
@@ -489,6 +662,11 @@ function AdStudioPage() {
               <li>
                 Kit <b>{brief.kit?.name ?? "none"}</b>
               </li>
+              {format.cast ? (
+                <li>
+                  On camera <b>{brief.actor?.name ?? "a stand-in"}</b>
+                </li>
+              ) : null}
             </ul>
           </div>
         </aside>

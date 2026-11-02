@@ -125,3 +125,10 @@ test('an action taken on one result is bound to THAT result, not to the newest',
   assert.equal(candidateOf({}, 'this still'), null);
 });
 
+
+test('a hook card carries its scene, and the scene never reaches the run', () => {
+  const card = begin(KLING, candidates(['/refs/a.jpg'], []), 'h1', { hookFor: 42 });
+  assert.equal(card.hookFor, 42);
+  assert.equal('hookFor' in requestOf(card), false);
+  assert.equal('hookFor' in begin(KLING, candidates(['/refs/a.jpg'], []), 'h2'), false);
+});

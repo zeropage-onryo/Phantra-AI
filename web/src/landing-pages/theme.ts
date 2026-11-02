@@ -223,6 +223,23 @@ export const MAROON: MakeAccent = {
   ],
 };
 
+// SIGNAL (2026-10-22, the Kling 4.0 page): the studio's own Kling 4.0
+// spotlight (create-v2.css .cv2-spotlight: the yellow signal #fee32d washed
+// into the panel #151514). The button is the panel with signal type:
+// #151514 on white is 18.3:1, #fee32d on #151514 is 14.1:1. No other page
+// is black and yellow.
+export const SIGNAL: MakeAccent = {
+  primary: "#151514",
+  primaryForeground: "#fee32d",
+  cardLine: "#e7e5e4",
+  lineHover: "#151514",
+  cardLight: "rgba(254,227,45,0.18)",
+  plates: [
+    "linear-gradient(135deg, #fefce8 0%, #fee32d 48%, #151514 100%)",
+    "linear-gradient(135deg, #fef9c3 0%, #78716c 55%, #151514 100%)",
+  ],
+};
+
 // PHANTRA (2026-10-23, Mike: "do marigold"): the brand's own accent for
 // every NEW page, on the dark tone (the homepage's warm black #0b0a08).
 // Marigold #ffc21f against that ground is 12.6:1; the button's type is the
@@ -243,6 +260,23 @@ export const PHANTRA: MakeAccent = {
 };
 
 /** The inline variables the skin wrapper carries for `accent`. */
+// HALLOWEEN (2026-10-27, Mike: the Halloween page "makes it spooky for
+// halloween"): pumpkin orange on a night-purple ground. Worn only inside
+// the page's season (an entry's `season.accent`, seasonal.ts); the rest of
+// the year the page wears its own accent.
+export const HALLOWEEN: MakeAccent = {
+  primary: "#ff7a1a",
+  primaryForeground: "#0b0a08",
+  cardLine: "#3a2446",
+  lineHover: "#ff7a1a",
+  cardLight: "rgba(255,122,26,0.12)",
+  plates: [
+    "radial-gradient(120% 90% at 20% 10%, #3b1a52 0%, #160d1f 55%, #0b0810 100%)",
+    "radial-gradient(120% 90% at 80% 15%, #5a2a08 0%, #1d1018 55%, #0b0810 100%)",
+  ],
+  panel: "#0b0810",
+};
+
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {
     "--primary": accent.primary,

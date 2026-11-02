@@ -92,9 +92,44 @@ Entries: the rail (Megaphone, after Video), the phone menu, the palette ("Ad Stu
   "Ad Studio · UGC review" chip; the saved draft carried the pick. Phone width has no
   horizontal scroll.
 
+## As built, round 2 (2026-10-27, after the Higgsfield / Runway comparison)
+
+1. **Examples on the format cards.** Each format in `prompts/studios/ads.json` names an
+   `example`, a key in `web/public/showcase/manifest.json` (existing showcase media, nothing
+   generated); `studios.problems()` refuses a key the manifest does not have. The selected card
+   plays its clip; the rest show the resting frame.
+2. **Product from a link.** `POST /api/studios/product-from-link {url, name}` (mutation header)
+   is the connector's `mcp_server.add_element("prop", ...)` over `create_element(sheet=False,
+   strict=True)`: the page's own product images become a product element. 400 `bad_link` /
+   `not_added`, 402 `subscribe_or_top_up`. `studios.name_from_link` names it from the path.
+3. **Make it now.** The card's primary button is the same hand-off with `send=1` and
+   "Make it now." on the sentence; Create sends exactly once, after the spark, skill, studio pick,
+   attachments and kit have all applied. The answer is the priced card, which still waits.
+   "Talk it through in Create" is the old hand-off.
+4. **Who is on camera.** A format with `"cast": true` (UGC review, Unboxing) offers Stand-in, the
+   person's character elements, or Add a person. The pick adds ", with X on camera" and is
+   attached FIRST (`attach=character,product`: `refs[0]` anchors the clip). Kept across format
+   switches, used only where the format casts.
+5. **Learn and post.** Vesper gets `what_worked` (a read tool over `mcp_server.what_works`) and
+   `schedule_post` (a write: caption, optional `at`, optional `on`), which ends the turn on the
+   Library's Post panel prefilled in the thread (`.zc-post`); nothing posts without the panel's
+   own button. The page's card footer shows "What has worked here" from
+   `GET /api/studios/{id}/insights` (never fails; says when there is too little to say).
+   `ads_turn.txt` tells Vesper when to use each.
+
+Not built: posting into ad ACCOUNTS (Meta / Google / TikTok Ads). Only social posting through the
+existing connections.
+
+Verified: `tests/test_studios.py` (30), `web/tests/ad-studio.test.mjs` (12), the full node suite
+(386), typecheck, ruff; clicked through locally: Halo Runner + Maya, Make it now sent one turn
+carrying the pick and `skill=ugc` with both photos attached.
+
 ## Open (Mike)
 
-- The add-on's price, and one price for all three studios or one each.
+- The add-on's price, and one price for all three studios or one each. Runway Ads and Higgsfield
+  Marketing Studio are both inside their normal paid plans (not enterprise), so a separate
+  add-on is priced against "included".
 - Create the Stripe Price and set `STRIPE_PRICE_STUDIOS`; until then grant by hand.
-- Next in the spec: variants as one plan, `schedule_post` / `what_worked` for Vesper, ad QC on
-  the card. Film and Fashion wait on usage.
+- Approve the example picks per format.
+- Next: variants as one plan, ad QC on the card, ad-account publishing. Film and Fashion wait on
+  usage.

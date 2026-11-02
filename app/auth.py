@@ -653,7 +653,8 @@ def _finish(request: Request, session: dict) -> RedirectResponse:
         meta.get("avatar_url") or meta.get("picture"))
     if error:
         return _signin_error(error)
-    _provision(user_id, claims.get("email"), display_name)
+    _provision(user_id, claims.get("email"), display_name,
+               ref=request.cookies.get("phantra_ref"))
     # A sign-in that was FOR an OAuth consent (app/oauth_consent.py) goes
     # back to the consent page holding this sign-in's token for the one
     # decision, instead of into the studio.
@@ -680,7 +681,7 @@ def _finish(request: Request, session: dict) -> RedirectResponse:
 
 
 def _provision(user_id: str, email: Optional[str],
-               display_name: Optional[str]) -> None:
+               display_name: Optional[str], ref: Optional[str] = None) -> None:
     """The first time through the door IS signing up (2026-09-24, what
     InVideo and LTX Studio do): a person with no membership gets their
     own empty workspace, so the studio handoff below has somewhere to
@@ -698,6 +699,15 @@ def _provision(user_id: str, email: Optional[str],
         return
     if made:
         accounts.grant_signup_credits(made["account_id"])
+        if ref:
+            # the affiliate link's cookie (src/affiliates.py): a NEW workspace
+            # only, and never a reason to fail the sign-in
+            try:
+                from src import affiliates
+                affiliates.attribute(made["account_id"], ref)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[auth] affiliate attribution failed for {user_id}: {exc}",
+                      file=sys.stderr)
 
 
 # --------------------------------------------------------------------------

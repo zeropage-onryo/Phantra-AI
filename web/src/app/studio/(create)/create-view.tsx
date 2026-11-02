@@ -120,6 +120,8 @@ import {
   uploadRefs,
   waitForJob,
   cutAssemble,
+  setSceneHook,
+  clearSceneHook,
   workspaceHref,
   type Asset,
   type AssetHit,
@@ -140,7 +142,7 @@ import { DurationPill, type SceneLengths } from "@/components/studio/duration-pi
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
 import { partsOf } from "@/components/studio/concept-card";
-import { keepOnlyCut, shouldJoin, type FinalCut } from "@/lib/final-cut";
+import { HOOK_SECONDS, hookStill, keepOnlyCut, shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import { handoffKind, openingProject } from "@/lib/handoff";
 import { kitParam } from "@/lib/kit-use";
@@ -172,6 +174,7 @@ import {
   isAdTool,
   isDubTool,
   isQuickTool,
+  isPostTool,
   type QuickTool,
   isMake,
   isPlanTool,
@@ -655,6 +658,12 @@ function Composer() {
   // Effects button): the gallery, and the card a pick makes, are bound to it
   const [fxOn, setFxOn] = useState<Candidate[] | null>(null);
   const [fxTab, setFxTab] = useState<string | undefined>(undefined);
+  // the gallery opened to make a scene's HOOK (lib/final-cut.ts): the pick's
+  // card carries the scene, and its clip re-joins that scene's Final cut
+  const [fxHookFor, setFxHookFor] = useState<number | null>(null);
+  // a hook's clip landed: set it on the scene and re-join, free. A ref,
+  // filled once joinShots exists, because finishEffect is made above it
+  const hookLanded = useRef<(conceptId: number, asset: string) => void>(() => {});
   // "Make element" under a still: the add-element form, the still attached
   const [elementFrom, setElementFrom] = useState<Made | null>(null);
   const [slashAt, setSlashAt] = useState(0);
@@ -729,14 +738,21 @@ function Composer() {
       .catch(() => setRefRoles([]));
     // the picker lists elements only; a render handed over from the
     // Assets wall ("Use in a shot") needs the wider scope to resolve
-    getAssets(undefined, attachId?.startsWith("generated-") ? "all" : "elements")
+    // ?attach= may name several, comma-separated (the Ad Studio hands over
+    // the person on camera and the product, 2026-10-27), in their order
+    const wanted = (attachId ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    getAssets(undefined, wanted.some((x) => x.startsWith("generated-")) ? "all" : "elements")
       .then((r) => {
         setAssets(r.items.filter((a) => (a.category as string) !== "generated"));
         // "Use in a shot" on Assets lands here with the asset attached
-        const hit = attachId ? r.items.find((a) => a.id === attachId) : null;
-        if (hit) setAttachPhotos(elementFrames(hit, FRAMES_PER_ASSET));
+        const hits = wanted.map((x) => r.items.find((a) => a.id === x)).filter((a): a is Asset => !!a);
+        // one that is gone still lets the link's spark land (the wait is on this)
+        if (wanted.length) setAttachPhotos(hits.flatMap((hit) => elementFrames(hit, FRAMES_PER_ASSET)));
       })
-      .catch(() => setAssets([]));
+      .catch(() => {
+        setAssets([]);
+        if (wanted.length) setAttachPhotos([]);
+      });
     apiFetch<{ brains: { id: string; label: string; note: string }[]; default: string }>("/brains")
       .then((r) => {
         setBrains(r.brains.map((b) => ({ id: b.id, label: b.label, note: b.note })));
@@ -1295,6 +1311,8 @@ function Composer() {
         asset: extra.asset ?? null,
         ...(extra.media === "video" ? { clip: out, image: null } : { image: out, clip: null }),
       });
+      const hookFor = threadRef.current.find((t) => t.made?.id === madeId)?.effect?.hookFor;
+      if (hookFor && extra.media === "video" && extra.asset) hookLanded.current(hookFor, extra.asset);
     },
     [patchMade, toast],
   );
@@ -2073,21 +2091,23 @@ function Composer() {
   }, [fx, fxCandidates, setTurnsRaw]);
   // a pick from the gallery: a card in the thread, and nothing has run
   function startEffect(item: Effect) {
-    const state = begin(item, fxCandidates, newMadeId(), { on: fxOn });
+    const state = begin(item, fxCandidates, newMadeId(), { on: fxOn, hookFor: fxHookFor });
     setThread((all) => [...all, { role: "assistant", content: item.label, effect: state }]);
     closeEffects();
   }
   /* The gallery, opened plainly (`/effects`) or ON one result: then it
      lists what that result can take, and a pick is bound to it. */
-  function openEffects(on?: Candidate[] | null, tab?: string) {
+  function openEffects(on?: Candidate[] | null, tab?: string, hookFor?: number | null) {
     setFxOn(on?.length ? on : null);
     setFxTab(tab);
+    setFxHookFor(hookFor ?? null);
     setFxOpen(true);
   }
   function closeEffects() {
     setFxOpen(false);
     setFxOn(null);
     setFxTab(undefined);
+    setFxHookFor(null);
   }
   const changeEffect = (next: EffectState) =>
     setThread((all) => all.map((t) => (t.effect?.id === next.id && !isRunning(t) ? { ...t, effect: next } : t)));
@@ -2431,6 +2451,69 @@ function Composer() {
     }
   }
 
+  /* "MAKE IT NOW" (the Ad Studio, 2026-10-27, lib/ad-studio.ts handoffHref):
+     ?send=1 sends the link's first message once, as the person's own Send
+     would, after everything the link carried has landed -- the spark in the
+     box, the studio brief, the recipe, the photos, the kit. The message asks
+     for the make ("Make it now."), so the answer is the priced card, which
+     waits for its click like any other: nothing here spends. The param
+     leaves the address so a reload does not send it again. */
+  const sendParam = params.get("send") === "1";
+  const appliedSendParam = useRef(false);
+  useEffect(() => {
+    if (!sendParam || appliedSendParam.current || !ready || signedOut || !guideReady) return;
+    if (!sparkParam || appliedSpark.current !== sparkParam || idea.trim() !== sparkParam.trim()) return;
+    if (studioParam && !draft.studio) return;
+    if (skillParam && appliedSkill.current !== skillParam) return;
+    if (attachId && attachPhotos === null) return;
+    if (kitWanted && appliedKit.current !== kitWanted) return;
+    if (!canSend) return;
+    appliedSendParam.current = true;
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("send");
+    router.replace(`${pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+    void send();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the link has landed
+  }, [sendParam, ready, signedOut, guideReady, sparkParam, idea, draft.studio, skill, attachPhotos, kits, canSend]);
+
+  /* A POST (lib/composer.ts POST_TOOL, 2026-10-27): the brain asked to post
+     something this conversation made. The source is the result it named,
+     else the newest render or upload by id; the turn carries the Library's
+     own Post panel with the words and the time filled in. Nothing is sent
+     from here -- Schedule on the panel writes the one row. */
+  function openPost(reply: GuideReply, looked: Turn["looked"], args: Record<string, unknown>) {
+    const [named] = numbersOf(args.on);
+    const target = named ? findResult(thread, named) : null;
+    const byId = (c: { ref: string } | null) => !!c && /^(gen|asset):\d+$/.test(c.ref);
+    const pointed = target ? candidateOf(target, refTag(named)) : null;
+    const source = byId(pointed) ? pointed : (fxCandidates.find((c) => c.from !== "attached" && byId(c)) ?? null);
+    if (!source) {
+      setThread((all) => [
+        ...all,
+        { role: "assistant", content: "There is nothing made here to post yet. Make it first, then ask again.", looked },
+      ]);
+      return;
+    }
+    setThread((all) => [
+      ...all,
+      {
+        role: "assistant",
+        content: reply.message,
+        reply,
+        looked,
+        post: {
+          id: newMadeId(),
+          source: source.ref,
+          kind: source.kind === "clip" ? "video" : "image",
+          caption: typeof args.caption === "string" ? args.caption : "",
+          at: typeof args.at === "string" && args.at ? args.at : null,
+        },
+      },
+    ]);
+  }
+  const patchPost = (id: string, done: string) =>
+    setThread((all) => all.map((t) => (t.post?.id === id ? { ...t, post: { ...t.post, done } } : t)));
+
   /* Make from the brief: the person's own click on the card the brain
      wrote, so it rides on their turn. */
   async function makeBrief() {
@@ -2618,6 +2701,9 @@ function Composer() {
           // building waits on the card's own button, Auto or not
           // (not awaited: the card says it is writing, the box is free)
           void startAd(proposal.args as Record<string, unknown>, reply, looked);
+        } else if (proposal && isPostTool(proposal.tool)) {
+          // A POST: the Post panel opens filled in; its Schedule sends it
+          openPost(reply, looked, proposal.args as Record<string, unknown>);
         } else if (proposal && isDubTool(proposal.tool)) {
           // A DUB: the card opens with the clip the person pointed at and
           // the language named; nothing is spent here
@@ -2916,6 +3002,7 @@ function Composer() {
             seconds: job.seconds ?? null,
             version: job.version ?? null,
             asset: job.asset ?? null,
+            hook: !!job.hook,
           },
         });
         toast(job.asset ? "Final cut ready · it's in your Library" : "Final cut ready · the shots are joined into one video");
@@ -2934,6 +3021,44 @@ function Composer() {
       joining.current.delete(madeId);
     }
   }
+  /* THE HOOK (2026-10-29, lib/final-cut.ts). "Add a hook" under a Final
+     cut opens the effects gallery on the scene's first frame; the pick is
+     an ordinary priced card (the only spend). When its clip lands it is set
+     as the scene's hook and the cut is joined again to open on it: both free. */
+  function addHook(m: Made) {
+    if (!m.conceptId) return;
+    const still = hookStill(m.parts, m.refs);
+    const on: Candidate[] | null = still ? [{ ref: still, kind: "image", thumb: still, from: "the scene's first frame" }] : null;
+    openEffects(on, "video_effect", m.conceptId);
+  }
+  async function removeHook(m: Made) {
+    if (!m.conceptId) return;
+    try {
+      await clearSceneHook(m.conceptId);
+      await joinShots(m.id, m.conceptId);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "The hook was not taken off.", "err");
+    }
+  }
+  useEffect(() => {
+    hookLanded.current = (conceptId, asset) => {
+      const scene = [...threadRef.current].reverse().find((t) => t.made?.conceptId === conceptId && t.made.finalCut);
+      void (async () => {
+        try {
+          await setSceneHook(conceptId, asset, HOOK_SECONDS);
+        } catch (e) {
+          toast(e instanceof Error ? e.message : "The hook was made but not put on the cut.", "err");
+          return;
+        }
+        if (scene?.made) {
+          toast("Hook made · joining it onto the front of the Final cut");
+          await joinShots(scene.made.id, conceptId);
+        } else {
+          toast("Hook made · the scene's next Final cut opens on it");
+        }
+      })();
+    };
+  });
   /* TRIM the final cut, here, for free: the connector's own trim
      (POST /api/quick-edit trim_clip) on the cut's Library row. It makes a
      NEW clip, filed in the Library beside the cut; the cut is untouched. */
@@ -3502,6 +3627,8 @@ function Composer() {
                 onScene: sceneRead,
                 onJoin: (m: Made) => m.conceptId && void joinShots(m.id, m.conceptId),
                 onTrim: (m: Made, start: number, end: number) => void trimCut(m.id, start, end),
+                onHook: addHook,
+                onUnhook: (m: Made) => void removeHook(m),
                 onChip: (c) => {
                   setIdea(c);
                   textarea.current?.focus();
@@ -3540,6 +3667,11 @@ function Composer() {
                 onAdPatch: patchAd,
                 onAdBuild: (id) => void buildAd(id),
                 onAdAudio: (id, which) => void runAdAudio(id, which),
+                onPostDone: (id, text) => {
+                  patchPost(id, text);
+                  if (text !== "Not posted.") toast(text);
+                },
+                onPostError: (why) => toast(why, "err"),
                 dubMenu,
                 dubChoices,
                 dubProject: project?.id ?? null,

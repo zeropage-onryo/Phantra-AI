@@ -444,7 +444,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
         kit = brand_kits.for_project(project)
     # the numbered results, only where a tool can take a number
     named = (results if offered & {"make_image", "make_video", "apply_effect",
-                                   *guide_tools.QUICK_TOOLS} else None)
+                                   *guide_tools.QUICK_TOOLS, guide_tools.POST_TOOL} else None)
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
                                 explore_note(guide_tools.SWITCH_TOOL in offered)
@@ -566,7 +566,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                                      guide_tools.DUB_TOOL,
                                      guide_tools.KIT_TOOL, guide_tools.AD_TOOL,
                                      guide_tools.ASK_TOOL, guide_tools.SCREEN_TOOL,
-                                     *guide_tools.QUICK_TOOLS)
+                                     guide_tools.POST_TOOL, *guide_tools.QUICK_TOOLS)
                             or len(runs) >= MAX_TOOL_CALLS):
                         raise
                     runs.append({"tool": name, "args": args, "ok": False})
@@ -629,6 +629,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.AD_TOOL:
             # the card writes the beats and waits for Build
             message = guide_tools.ad_line(proposal["args"])
+        if proposal["tool"] == guide_tools.POST_TOOL:
+            # the Post card is filled in; Schedule on it is the person's
+            message = guide_tools.post_line(proposal["args"])
         if proposal["tool"] == guide_tools.DUB_TOOL:
             # the card asks for the clip, the language and the consent
             message = guide_tools.dub_line(proposal["args"])

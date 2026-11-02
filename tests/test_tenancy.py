@@ -120,7 +120,8 @@ def test_every_owned_table_grows_an_account_id(pg):
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
     watermark.init(pg)
-    from src import addons, plugin_tokens, posts, social_connections
+    from src import addons, affiliates, plugin_tokens, posts, social_connections
+    affiliates.init(pg)
     plugin_tokens.init(pg)
     social_connections.init(pg)
     posts.init(pg)
@@ -535,6 +536,21 @@ def test_a_generation_cannot_be_logged_against_someone_elses_shot(two_accounts):
 # predicate. Each needs a reason, and the reason has to be about the
 # statement, not about convenience.
 UNSCOPED_ALLOWED = {
+    # src/affiliates.py (2026-10-26). A partner code is a PUBLIC, globally
+    # unique handle -- it is the ?ref= in the link -- so finding who owns
+    # one, and checking that a new one is free, cannot name an account first.
+    # Both answer only "does this code exist / who is it", which the link
+    # already tells every visitor. Everything that reads or writes earnings
+    # is scoped by the partner's account_id.
+    "SELECT 1 FROM affiliate_partners WHERE lower(code) = %s",
+    "SELECT * FROM affiliate_partners WHERE lower(code) = %s",
+    # the operator's CLI names a partner by its numeric id (the review desk,
+    # run by Mike against his own database; there is no route to it)
+    "SELECT * FROM affiliate_partners WHERE id = %s",
+    # the Stripe invoice id is globally unique and is the webhook's
+    # idempotency key: "was this invoice already booked" has no account to
+    # name before the lookup, and the answer is a yes/no
+    "SELECT 1 FROM affiliate_commissions WHERE invoice_ref = %s",
     # src/plugin_tokens.py (2026-10-22): an editing-app panel's bearer secret
     # looked up by its SHA-256. The secret IS the credential -- no account
     # can be named before it is verified, and the hash finds only the one
@@ -1083,7 +1099,8 @@ def _init_everything(path):
     mcp_preferences.init(path)
     mcp_recipes.init(path)
     watermark.init(path)
-    from src import plugin_tokens, posts, social_connections
+    from src import affiliates, plugin_tokens, posts, social_connections
+    affiliates.init(path)
     plugin_tokens.init(path)
     social_connections.init(path)
     posts.init(path)
