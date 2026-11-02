@@ -10,6 +10,7 @@
 // (content/pricing.json, through lib/catalog), for 5-second clips.
 import { MODELS, type CatalogModel } from "@/lib/catalog";
 import { HERO_REEL, type ReelClip } from "@/content/hero-reel";
+import { IMAGE_MODELS } from "@/landing-pages/shared";
 import { DEFAULT_MASCOT, MOODS, mascotSrc, type Mood } from "@/lib/mascot";
 
 /** Vesper is the default mascot, the Ferryman in Storm. */
@@ -217,18 +218,10 @@ export const SHOWCASE: { name: string; ar: string; line?: string }[] = [
 
 /* ---- the models strip --------------------------------------------- */
 
-export const STRIP_MODELS = [
-  "Kling 3",
-  "Seedance 2.5",
-  "Veo 3.1",
-  "Wan 3.0",
-  "LTX 2.3",
-  "Nano Banana Pro",
-  "FLUX.2",
-  "GPT Image 2",
-  "Seedream 4.5",
-  "Ideogram 4.5",
-];
+/** Read off the catalogue (QA 2026-11-02 P7: a typed list fell behind and
+ *  left out Kling 4.0 and Grok): every video model content/pricing.json
+ *  sells, then the image models the /models pages list. */
+export const STRIP_MODELS = [...MODELS.map((m) => m.name), ...IMAGE_MODELS.map((m) => m.label)];
 
 /* ---- prefill: a starting point or a showcase tile into the demo ---- */
 

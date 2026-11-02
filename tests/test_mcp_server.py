@@ -616,22 +616,60 @@ def test_write_scene_saves_the_timed_shots_without_a_model_call(studio):
     assert out["shots_written"] == 1 and "timeline" not in shot and shot["seconds"] == 8
 
 
-def test_quote_prices_the_stills_and_the_clip_and_says_what_is_affordable(studio):
+def test_quote_prices_the_stills_and_the_clip_and_says_what_is_affordable(studio, monkeypatch):
+    from src import timeline
     path, _ = studio
     with pytest.raises(ValueError, match="no scene 424242"):
         mcp_server.quote_render(424242, dsn=path)
     sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
     q = mcp_server.quote_render(sid, dsn=path)
     assert q["scene_id"] == sid and q["status"] == "written" and "picked" not in q
-    assert q["keyframes"]["stills"] == 2 and q["keyframes"]["credits"] > 0
-    # two timed shots that fit the model: one render, the cut inside it
+    # two timed shots that fit the model: one render, the cut inside it, and
+    # no keyframes offered -- that clip goes out on the photos (2026-11-02)
     assert q["clip"]["one_clip"] is True and len(q["clip"]["renders"]) == 1
     assert q["clip"]["signed"] is False and q["clip"]["renders"][0]["token"] is None
-    assert q["credits_needed"] == q["keyframes"]["credits"] + q["clip"]["credits"]
+    assert q["keyframes"] is None and q["credits_needed"] == q["clip"]["credits"]
     # the unowned pool has no balance to check, so nothing is refused here
     assert q["balance"] is None and q["affordable"] is True
+    # split shot by shot, each shot starts on its still: those are priced
+    monkeypatch.setenv(timeline.ONE_CLIP_ENV, "0")
+    q = mcp_server.quote_render(sid, dsn=path)
+    assert q["keyframes"]["stills"] == 2 and q["keyframes"]["credits"] > 0
+    assert q["credits_needed"] == q["keyframes"]["credits"] + q["clip"]["credits"]
     with pytest.raises(ValueError, match="bad renderer choice"):
         mcp_server.quote_render(sid, model="no-such-model", dsn=path)
+
+
+def test_quote_refuses_a_removed_scene(studio):
+    """A removed scene was priced and handed an approve link (QA 2026-11-02 K4)."""
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+    preprod.set_archived(sid, dsn=path, account_id=None)
+    with pytest.raises(ValueError, match="was removed"):
+        mcp_server.quote_render(sid, dsn=path)
+    with pytest.raises(ValueError, match="was removed"):
+        mcp_server.quote_render(sid, dsn=path, listing="claude")
+
+
+def test_quote_says_when_the_model_renders_another_length(studio):
+    """A 4 s scene on ltx2.3 was priced at 6 s with nothing said (QA
+    2026-11-02 K3). The quote now says the length it prices."""
+    path, _ = studio
+    one_take = SCENE.replace("(0-4s) ", "").replace("(4-10s) ", "")
+    sid = mcp_server.write_scene(one_take, seconds=4, refs=[FACE], dsn=path)["scene_id"]
+    q = mcp_server.quote_render(sid, model="ltx2.3", dsn=path)
+    assert q["clip"]["durations"] == [6]
+    said = q["clip"]["length_note"]
+    assert "written to 4 s" in said and "renders 6 s" in said
+    # by the model's name, never its id (seen running it, 2026-11-02)
+    assert "LTX 2.3 renders" in said and "ltx2.3" not in said
+    assert q["note"].startswith(said)
+    listed = mcp_server.quote_render(sid, model="ltx2.3", dsn=path, listing="claude")
+    assert listed["clip"]["length_note"] == said and listed["note"].startswith(said)
+    # a length the model renders as written says nothing
+    sid = mcp_server.write_scene(one_take, seconds=6, refs=[FACE], dsn=path)["scene_id"]
+    q = mcp_server.quote_render(sid, model="ltx2.3", dsn=path)
+    assert "length_note" not in q["clip"]
 
 
 def test_quote_hands_out_the_stills_token_only_where_an_approve_can_take_it(studio,
@@ -639,6 +677,8 @@ def test_quote_hands_out_the_stills_token_only_where_an_approve_can_take_it(stud
     """The stills' price has always been on the quote; since 2026-10-11 so is
     the signed token `approve` needs for them -- on the listing that has an
     `approve`, and only where this server can sign."""
+    from src import timeline
+    monkeypatch.setenv(timeline.ONE_CLIP_ENV, "0")     # stills steer a split scene only
     from src import pricing, scene_chain
 
     path, _ = studio

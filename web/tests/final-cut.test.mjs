@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { joinable, shouldJoin, cutLine, trimProblem } from '../src/lib/final-cut.ts';
+import { joinable, shouldJoin, cutLine, trimProblem, hookStill, HOOK_SECONDS } from '../src/lib/final-cut.ts';
 
 const clip = (u) => ({ media_url: u });
 
@@ -51,4 +51,16 @@ test('once the shots are joined, the chat keeps only the final cut turn', async 
   assert.deepEqual(keepOnlyCut(turns, 'm1').map((t) => t.made.id), ['m1']);
   // a turn that is not there leaves the chat alone
   assert.equal(keepOnlyCut(turns, 'gone'), turns);
+});
+
+test('a hook is drawn from the first keyframe, else the first reference photo', () => {
+  assert.equal(hookStill([{ reference_image: '/k1.png' }, { reference_image: '/k2.png' }], ['/refs/a.jpg']), '/k1.png');
+  assert.equal(hookStill([{ reference_image: null }], ['', '/refs/a.jpg']), '/refs/a.jpg');
+  assert.equal(hookStill(undefined, undefined), null);
+  assert.equal(HOOK_SECONDS, 2);
+});
+
+test('a cut that opens on a hook says so', () => {
+  assert.equal(cutLine({ status: 'done', seconds: 14, hook: true }, 3), 'Final cut · hook + 3 shots · 14.0s · free');
+  assert.equal(cutLine({ status: 'done', seconds: 12 }, 3), 'Final cut · 3 shots · 12.0s · free');
 });

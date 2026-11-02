@@ -39,6 +39,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src import accounts as accounts_mod
 from src import (
+    ad_results,
     addons,
     affiliates,
     asset_shelf,
@@ -63,6 +64,7 @@ from src import (
     plugin_tokens,
     posts,
     preprod,
+    pricing,
     publish_review,
     quote_redemptions,
     rag,
@@ -90,6 +92,7 @@ from src.cut import store as cut_store
 from . import (
     api,
     auth,
+    cross_site,
     jobs,
     mcp_auth,
     mcp_mount,
@@ -212,6 +215,7 @@ def init_tables() -> None:
     settings_mod.init()  # the Dev Studio tunables (gate/threshold/k)
     fal_requests.init()  # fal's queue receipts, persisted at submit
     render_qc.init()     # what Gemini saw in each landed clip
+    ad_results.init()    # what a person's ads did, and the versions in a test
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     plugin_tokens.init()    # editing-app panels' sign-in codes and tokens
@@ -249,6 +253,11 @@ async def lifespan(app: FastAPI):
         if os.environ.get("FAL_RECOVER", "1") != "0":
             fal_requests.start_background()
         retire_gold_standard()              # the exemplar is not a winner (2026-10-02)
+        # The deployed API says which price table is live, so a studio
+        # server on an older checkout refuses to quote (src/pricing.py,
+        # live_drift; QA 2026-11-02 K1). Fly only: a Mac's API is not live.
+        if (os.environ.get("FLY_APP_NAME") or "").strip():
+            pricing.record_live()
         # What's new (2026-10-25): file a pending announcement for every
         # model / effect / look / skill the wall has never seen. Spends
         # nothing; off with PHANTRA_WHATS_NEW_SYNC=0.
@@ -410,6 +419,10 @@ app.add_middleware(SessionMiddleware, secret_key=auth._session_secret(),
 # The sign-in, consent and upload pages are never framed (clickjacking;
 # security review S10, 2026-10-15).
 app.add_middleware(security_headers.NoFraming)
+# A write made with the session cookie from another site's page is
+# refused before any route runs (QA 2026-11-02 E1; app/cross_site.py).
+# Added before CORS so CORS stays outermost and its headers reach a 403.
+app.add_middleware(cross_site.CrossSiteWrites)
 # Cross-origin access for a separate frontend (the Next.js app). Its
 # fetches are credentialed (the phantra_session cookie), so the allow-list must
 # be explicit origins -- a wildcard is illegal with credentials -- and

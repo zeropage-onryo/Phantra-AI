@@ -67,6 +67,11 @@ export const QUICK_TOOLS = ["reformat", "trim_clip"] as const;
 export type QuickTool = (typeof QUICK_TOOLS)[number];
 export const isQuickTool = (tool?: string | null): tool is QuickTool =>
   !!tool && (QUICK_TOOLS as readonly string[]).includes(tool);
+/* A post of something this conversation made (src/guide_tools.py POST_TOOL,
+   2026-10-27): the brain proposes the words and the time; the thread opens
+   the Library's own Post... panel filled in, and its Schedule is the send. */
+export const POST_TOOL = "schedule_post";
+export const isPostTool = (tool?: string | null) => tool === POST_TOOL;
 /** the ad card (lib/ad-card.ts): its beats are written free, built free */
 export const isAdTool = (tool?: string | null) => tool === "make_ad";
 export const isMake = (tool?: string | null) =>
@@ -124,6 +129,10 @@ export type Made = {
   prompt?: string;
   /** IMAGE: which model drew it (an /image-models id) */
   model?: string;
+  /** IMAGE: what the route said this still costs at the shape and pictures
+   *  sent, when that was above the card's price; the card shows it and the
+   *  next Approve is held to it (app/api.py generate_run, 2026-11-02) */
+  quoted?: number;
   /** VIDEO: the clip model the brain proposed for this scene and why --
    *  only where its Render card opens (lib/step-model.ts) */
   renderModel?: string;

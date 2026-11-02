@@ -69,6 +69,9 @@ export type EffectState = {
   /** what Approve was pressed at: the card's line once it has run, so a
    *  finished card never has to be priced again */
   paid?: { credits: number; charged: boolean };
+  /** the scene (concept id) this effect is a HOOK for: when its clip lands
+   *  the scene's Final cut is re-joined to open on it (free) */
+  hookFor?: number;
 };
 
 export type ResultLike = { image?: string | null; clip?: string | null; asset?: string | null };
@@ -236,6 +239,8 @@ export function begin(
     /** the result the action was taken on: it is the source, whatever
      *  else is attached or newer. Ignored when it does not fit. */
     on?: Candidate[] | null;
+    /** a hook for this scene (lib/final-cut.ts) */
+    hookFor?: number | null;
   } = {},
 ): EffectState {
   const fits = (given.on ?? []).filter((c) => c.kind === wants(effect)).slice(0, effect.sources.max);
@@ -248,5 +253,6 @@ export function begin(
     sources: fits.length >= effect.sources.min ? fits : sourcesFor(effect, all),
     options: settle(effect, given.options),
     prompt: effect.prompt === "none" ? "" : (given.prompt ?? "").trim(),
+    ...(given.hookFor ? { hookFor: given.hookFor } : {}),
   };
 }

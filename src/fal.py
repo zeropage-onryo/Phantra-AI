@@ -382,10 +382,9 @@ VIDEO_MODELS: dict[str, dict] = {
     # sound is generated with the picture. Rates are the model pages' rate
     # cards (fal's pricing API answers a placeholder $0.01/unit): 1.5 is
     # $0.08 / $0.14 / $0.25 a second, Lite $0.02 / $0.03 / $0.14. Image-to-
-    # video adds $0.01 per input image, which is NOT in these rows: one
-    # start frame is a cent, and MARKUP covers it at every length and
-    # frame (the thinnest case, Lite 480p for 1 s, bills $0.03 against a
-    # $0.048 quote before the credit floor). `enable_safety_checker` stays
+    # video adds $0.01 per input image: `start_frame_usd` (2026-11-02; it
+    # used to be left to MARKUP), priced on the Video page and held with the
+    # clip (estimate_cost `start_frame`). `enable_safety_checker` stays
     # at fal's default (on) and is never sent. The reference-to-video
     # endpoints (`reference_image_urls`, 720p max) and the 1.0 edit /
     # extend routes exist and are not wired.
@@ -398,6 +397,7 @@ VIDEO_MODELS: dict[str, dict] = {
         "resolutions": ("480p", "720p", "1080p"),
         "default_resolution": "720p",
         "prices": {"480p": 0.08, "720p": 0.14, "1080p": 0.25},
+        "start_frame_usd": 0.01,
         "platform": "grok",
         "checked": "2026-10-23",
         "source": "https://fal.ai/models/xai/grok-imagine-video/v1.5/text-to-video",
@@ -411,6 +411,7 @@ VIDEO_MODELS: dict[str, dict] = {
         "resolutions": ("480p", "720p", "1080p"),
         "default_resolution": "720p",
         "prices": {"480p": 0.02, "720p": 0.03, "1080p": 0.14},
+        "start_frame_usd": 0.01,
         "platform": "grok",
         "checked": "2026-10-23",
         "source": "https://fal.ai/models/xai/grok-imagine-video/v1.5/lite/text-to-video",
@@ -603,6 +604,14 @@ REF2V: dict[str, dict] = {
     "grok1.5": {"endpoint": "xai/grok-imagine-video/v1.5/reference-to-video",
                 "field": "reference_image_urls", "max": 7, "tag": "<IMAGE_{n}>", "tag_from": 0,
                 "resolutions": ("480p", "720p"), "per_image_usd": 0.01},
+    # Wan 3.0 (added 2026-11-02, read off fal's llms.txt for the endpoint
+    # that day): up to 10 pictures as `reference_image_urls`, named in the
+    # prompt by position ("the subject in Image 1"), billed at the same
+    # per-second rate as the image-to-video row ($0.05/$0.10/$0.20). Video
+    # and audio references exist on the endpoint and are not wired.
+    # https://fal.ai/models/alibaba/wan-3.0/reference-to-video/llms.txt
+    "wan3": {"endpoint": "alibaba/wan-3.0/reference-to-video",
+             "field": "reference_image_urls", "max": 10, "tag": "Image {n}", "tag_from": 1},
 }
 
 
@@ -711,7 +720,7 @@ IMAGE_MODELS: dict[str, dict] = {
     },
     "flux2-pro": {
         "label": "FLUX.2 Pro",
-        "note": "FLUX's newest; takes up to 9 reference images.",
+        "note": "FLUX's newest; takes up to 8 reference images.",
         "endpoint": "fal-ai/flux-2-pro",
         "edit": "fal-ai/flux-2-pro/edit",
         "size": "wh",
@@ -725,8 +734,11 @@ IMAGE_MODELS: dict[str, dict] = {
         "source": "https://fal.ai/models/fal-ai/flux-2-pro",
     },
     "nano-banana-pro": {
-        "label": "Nano Banana Pro (fal)",
-        "note": "Gemini's image model through fal; strong on references and text.",
+        # named by the model, never the host (Mike, 2026-11-02); beside the
+        # direct Gemini route the picker reads it "Nano Banana Pro · alt"
+        # (model_menu.ALT)
+        "label": "Nano Banana Pro",
+        "note": "Gemini's image model on a second route; strong on references and text.",
         "endpoint": "fal-ai/nano-banana-pro",
         "edit": "fal-ai/nano-banana-pro/edit",
         "size": "aspect",
@@ -1228,7 +1240,7 @@ def price_per_second(model: str = DEFAULT_MODEL,
 def estimate_cost(n: int, *, model: str = DEFAULT_MODEL,
                   duration: int = DEFAULT_DURATION,
                   resolution: Optional[str] = None,
-                  references: int = 0) -> float:
+                  references: int = 0, start_frame: bool = False) -> float:
     """What n clips will cost, off the dated table above.
 
     Real per-second pricing, not an estimate scaled off a clip: fal publishes a
@@ -1242,7 +1254,9 @@ def estimate_cost(n: int, *, model: str = DEFAULT_MODEL,
     """
     seconds = fit_duration(model, duration)
     per_image = (ref_spec(model) or {}).get("per_image_usd", 0) if references else 0
-    return round(n * (price_per_second(model, resolution) * seconds + per_image * references), 4)
+    # a start frame billed on its own (Grok's $0.01 an input image)
+    start = VIDEO_MODELS.get(model, {}).get("start_frame_usd", 0) if start_frame else 0
+    return round(n * (price_per_second(model, resolution) * seconds + per_image * references + start), 4)
 
 
 def estimate_image_cost(n: int, *, megapixels: float = 1.0) -> float:
@@ -2314,7 +2328,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
         out_path = RENDER_DIR / (render_names.unguessable(f"wf-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
         usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution,
-                            references=len(ref_urls))
+                            references=len(ref_urls), start_frame=bool(image_url))
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=usd,
@@ -2375,6 +2389,10 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                 model=model, media_kind="video", prompt=prompt, media_url=media_url,
                 output_path=str(out_path), metadata=row_params(), dsn=db_path)
             extra = {"asset_id": asset.get("id")}
+        # how many held pictures went out: one that could not be fetched did
+        # not, and the Video page says so
+        if references:
+            extra["references"] = len(ref_urls)
         return {"ok": True, "media_url": media_url,
                 "generation_id": generation_id, "path": str(out_path),
                 "error": None, **extra}

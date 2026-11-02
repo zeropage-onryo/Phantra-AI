@@ -1365,6 +1365,34 @@ def reap(older_than=DEFAULT_REAP_AGE, *, account_id: Optional[int] = None,
     return {"settled": settled, "released": released, "orphaned": orphaned}
 
 
+def release_stale_holds(provider_prefix: str, older_than, *, account_id: Optional[int],
+                        dsn: Optional[str] = None) -> list[int]:
+    """Release this account's outstanding holds from providers starting with
+    `provider_prefix` that were never stamped submitted and are older than
+    `older_than` (a timedelta). Returns the hold ids released.
+
+    For holds whose work leaves no row to look for and no money to lose if it
+    died: the priced chat turns (src/text_charge.py), which never call
+    `mark_submitted`. Nothing schedules `reap`, and a deploy that killed a
+    worker mid-turn would otherwise leave that turn's ceiling held until a
+    person ran it by hand. Scoped by provider prefix on purpose: a render's
+    hold in flight is none of this function's business."""
+    if account_id is None:         # _outstanding_holds reads None as "everyone"
+        return []
+    cutoff = (datetime.now(timezone.utc) - older_than).isoformat()
+    with db.connect(dsn) as conn:
+        pending = _outstanding_holds(conn, account_id, cutoff)
+    released = []
+    for h in pending:
+        if not str(h.get("provider") or "").startswith(provider_prefix):
+            continue
+        if h.get("submitted_at"):
+            continue
+        release(int(h["hold_id"]), "reaped: a chat turn that never finished", dsn=dsn)
+        released.append(int(h["hold_id"]))
+    return released
+
+
 # --------------------------------------------------------------------------
 # the seam the render path will call
 # --------------------------------------------------------------------------

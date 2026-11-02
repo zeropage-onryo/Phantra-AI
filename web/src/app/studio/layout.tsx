@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cardFonts } from "@/components/studio/card-fonts";
 import { StudioShell } from "@/components/studio/shell";
 import { FilmGrain } from "@/components/film-grain";
@@ -8,6 +8,18 @@ import { AssistantThreadProvider } from "@/components/studio/assistant-thread";
 export const metadata: Metadata = {
   title: "Studio",
   robots: { index: false, follow: false },
+};
+
+/* The phone's studio fills the screen edge to edge (so the tab bar's
+   env(safe-area-inset-bottom) padding is real, not zero) and the keyboard
+   resizes the page, so the docked chat box rides up on it rather than
+   hiding under it -- what Higgsfield's mobile site does (2026-10-27). No
+   zoom lock: inputs are 16px on a phone, so a tap never zooms. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 /* Every signed-in page sits inside the one shell: the rail, the bar,

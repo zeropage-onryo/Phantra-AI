@@ -25,7 +25,7 @@ What a signed-in person has:
 - **Image and Video** (`/studio/image`, `/studio/video`, 2026-10-22): the direct generators. Pick
   any image or clip model, type a prompt (sent as typed), see the price on the one Generate
   button; a clip may be made from text alone, one start frame, or (on Seedance, Kling 4 and
-  Grok 1.5, 2026-10-25) several pictures held as references and named in the prompt by tag
+  Grok 1.5, 2026-10-25; Wan 3, 2026-11-02) several pictures held as references and named in the prompt by tag
   (`fal.REF2V`), each model's prompt held to its own cap (`fal.PROMPT_MAX`), and writes no
   scene (`docs/tasks/task-direct-generators.md`).
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
@@ -37,6 +37,16 @@ What a signed-in person has:
   `prompts/studios/`. A paid flat add-on (`src/addons.py`, OWNED `account_addons`,
   `pricing.ADDONS`): its Stripe events are routed before any plan branch; the page is open to
   all, the brief reaches the brain only with the add-on.
+  **Results and versions** (2026-10-29, `docs/tasks/task-ad-results.md`): a dropped Meta /
+  TikTok ad-level CSV (`src/ad_results.py`, OWNED `ad_results`) is tied to renders by the ad
+  code in the ad's name (`PH<generated_assets.id>`, shown in the Library viewer); a plan's scene
+  steps may be labelled versions of one ad (`make_plan` `variant` / `test`, OWNED
+  `ad_variants`), read back as a test with a verdict; Ad Studio turns and `what_works` are told
+  the numbers.
+  **Every shape** (2026-11-02, `docs/tasks/task-every-shape.md`): one click under the Final cut or
+  in the Library viewer makes 9:16, 1:1 and 16:9 from a finished item (`POST /api/every-shape`,
+  `quick.plan_every_shape` / `every_shape`: free reformats, crop when it keeps half the picture,
+  else pad; a shape it already is or already has is not made again).
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
   Veo, Seedance, LTX, Wan). The priced button on the card is the only place a clip is paid for.
 - **Elements** (`/studio/elements`): the characters, products and places a scene is held to,
@@ -562,7 +572,7 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
 Three plans (`pricing.PLANS`), monthly and yearly (yearly is a schedule released monthly, never a
 twelve-month lot), top-ups, Stripe Checkout and portal (`app/billing.py`, `src/billing.py`), grants
 through `/billing/webhook` (at `https://api.phantra.ai/billing/webhook`). Renders and stills cost
-credits; writing scenes and the brain's text cost none on a plan, but `charge.create_refusal`
+credits; writing scenes and the brain's text cost none on a plan (the one exception: the two Claude brains in the picker are priced per message, held at a ceiling and settled to what the turn used, `src/text_charge.py`), but `charge.create_refusal`
 refuses model-text routes (402 `subscribe_or_top_up`) for an account with no plan and no balance,
 and a trial's model text is capped once (`pricing.trial_thinking_usd`, 402
 `trial_thinking_used`). The studio shows credits, never dollars, except a plan's price

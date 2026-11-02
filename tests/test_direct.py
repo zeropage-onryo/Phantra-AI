@@ -165,8 +165,8 @@ def test_a_clip_runs_at_the_shown_price_from_text_alone(client, monkeypatch):
     assert job["output"] == "https://bucket.example/clip.mp4" and job["asset"] == "gen:31"
     assert job["kind"] == "make"
     # no photograph and no scene: the prompt as typed, the exact pick, approved
-    # by the click, filed on the Library wall
-    assert sent == [{"prompt": "A lone rider pulls up, steam rising off the asphalt",
+    # by the click, filed on the Library wall; spaces folded, its line kept
+    assert sent == [{"prompt": "A lone rider pulls up,\nsteam rising off the asphalt",
                      "reference_image": None, "model": "seedance2.5", "duration": 12,
                      "resolution": "720p", "aspect_ratio": "21:9", "approved": True,
                      "account_id": ACCOUNT, "source": "direct", "bank": True}]
@@ -377,3 +377,45 @@ def test_the_picked_clip_model_reaches_the_brain_and_a_stranger_is_auto(client, 
         assert r.status_code == 200, r.text
         _wait(guarded, r.json()["job_id"])
     assert seen == ["Veo 3.1", None, None]
+
+
+def test_grok_prices_the_picture_it_starts_on(monkeypatch):
+    """2026-11-02: Grok 1.5 bills $0.01 for each input image. A start frame
+    is in the Video page's price and in the clip's hold, never left to the
+    markup."""
+    from src import direct, fal
+    monkeypatch.setenv("FAL_KEY", "k")
+    bare = direct.video_quote(model="grok1.5-lite", seconds=1, resolution="480p", aspect="9:16")
+    framed = direct.video_quote(model="grok1.5-lite", seconds=1, resolution="480p", start_frame=True)
+    assert framed["usd"] == round(bare["usd"] + 0.01, 4)
+    assert fal.estimate_cost(1, model="grok1.5-lite", duration=1, resolution="480p",
+                             start_frame=True) == framed["usd"]
+    # a model that bills no start frame of its own is unchanged
+    assert direct.video_quote(model="seedance2.5", seconds=5, resolution="720p",
+                              start_frame=True)["usd"] == \
+        direct.video_quote(model="seedance2.5", seconds=5, resolution="720p", aspect="9:16")["usd"]
+
+
+# ---------- the Video page opens on a model that holds several pictures (2026-11-02) ----------
+
+def test_the_video_page_opens_on_the_cheapest_model_that_holds_pictures():
+    items = [{"id": "ltx2.3", "max_refs": 0}, {"id": "wan3", "max_refs": 10},
+             {"id": "seedance2-fast", "max_refs": 9}, {"id": "grok1.5", "max_refs": 7}]
+    per_s = {"ltx2.3": 0.08, "wan3": 0.10, "seedance2-fast": 0.24, "grok1.5": 0.14}
+    assert direct.opening_video_model(items, per_s, "ltx2.3") == "wan3"
+    # none holds pictures: the studio's own render default, else the first
+    only_start = [{"id": "ltx2.3", "max_refs": 0}, {"id": "veo3.1", "max_refs": 0}]
+    assert direct.opening_video_model(only_start, {"ltx2.3": 0.08}, "veo3.1") == "veo3.1"
+    assert direct.opening_video_model(only_start, {}, "gone") == "ltx2.3"
+    assert direct.opening_video_model([], {}, "ltx2.3") == ""
+
+
+def test_wan3_holds_pictures_on_its_own_reference_endpoint():
+    assert fal.ref_max("wan3") == 10
+    assert fal.ref_tags("wan3", 2) == ["Image 1", "Image 2"]
+    model_id, body = fal.build_body("the subject in Image 1 walks into Image 2", model="wan3",
+                                    aspect_ratio="9:16", resolution="720p",
+                                    reference_urls=["https://a/1.jpg", "https://a/2.jpg"])
+    assert model_id == "alibaba/wan-3.0/reference-to-video"
+    assert body["reference_image_urls"] == ["https://a/1.jpg", "https://a/2.jpg"]
+    assert "start_image_url" not in body

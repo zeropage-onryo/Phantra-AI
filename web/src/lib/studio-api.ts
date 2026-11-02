@@ -231,14 +231,16 @@ async function apiForm<T>(
   if (!res.ok) {
     let message = res.statusText || `request failed (${res.status})`;
     let code: string | undefined;
+    let credits: number | undefined;
     try {
       const body = await res.clone().json();
       message = body?.error?.message ?? body?.detail ?? message;
       code = body?.error?.code;
+      if (typeof body?.credits === "number") credits = body.credits;
     } catch {
       /* not JSON */
     }
-    throw new ApiError(message, res.status, code);
+    throw new ApiError(message, res.status, code, credits);
   }
   return (await res.json()) as T;
 }
@@ -731,6 +733,16 @@ export const cutAssemble = (concept_id: number, opts: { music?: string; voice?: 
     method: "POST",
     body: JSON.stringify({ concept_id, ...opts }),
   });
+/** PUT /api/scenes/{id}/hook — the clip (gen:<id>, a video in the
+ *  Library) the scene's Final cut opens on, for `seconds`. Free. */
+export const setSceneHook = (concept_id: number, asset: string, seconds = 2) =>
+  apiFetch<{ ok: true; hook: { asset: string; seconds: number } }>(`/scenes/${concept_id}/hook`, {
+    method: "PUT",
+    body: JSON.stringify({ asset, seconds }),
+  });
+/** DELETE /api/scenes/{id}/hook — the cut opens on shot 1 again. Free. */
+export const clearSceneHook = (concept_id: number) =>
+  apiFetch<{ ok: true; removed: boolean }>(`/scenes/${concept_id}/hook`, { method: "DELETE" });
 /** POST /api/cut/media — an uploaded music bed or voiceover -> asset:<id>. */
 export const cutUploadMedia = (file: File) => {
   const form = new FormData();
@@ -782,6 +794,8 @@ export type Job = {
   version?: number | null;
   /** a finished cut job: how long the joined video runs */
   seconds?: number | null;
+  /** a finished cut job: it opens on the scene's hook (2026-10-29) */
+  hook?: boolean;
   /** what a job filed in the Library, `gen:<id>` (an effect, a free edit,
    *  an assembled cut) */
   asset?: string | null;
@@ -962,6 +976,22 @@ export const getSkills = () => apiFetch<{ items: Skill[] }>("/skills");
    A studio's page: its formats and brief, whether this account has the
    add-on and whether it is on sale. Open to every account; nothing spends. */
 export const getStudio = (id: string) => apiFetch<StudioPage>(`/studios/${encodeURIComponent(id)}`);
+/** a product page -> one product element (POST /api/studios/product-from-link,
+ *  the connector's add_element: its main picture and what the page says;
+ *  free, no sheet drawn) */
+export const addProductFromLink = (url: string, name = "") =>
+  apiFetch<{ name: string; kind: "prop"; photos: number; note?: string }>("/studios/product-from-link", {
+    method: "POST",
+    headers: GUARDED_HEADERS,
+    body: JSON.stringify({ url, name }),
+  });
+/** what has worked for this workspace (the connector's what_works), as lines */
+export type StudioInsights = {
+  enough_data: boolean;
+  lines: string[];
+  posted: { title: string | null; platform: string | null; views: number | null; likes: number | null }[];
+};
+export const getStudioInsights = (id: string) => apiFetch<StudioInsights>(`/studios/${encodeURIComponent(id)}/insights`);
 
 /* ── effects (src/effects.py; lib/effects.ts) ── */
 export type EffectsCatalogue = {
@@ -1114,6 +1144,21 @@ export type QuickEditRequest = {
 };
 export const runQuickEdit = (body: QuickEditRequest) =>
   apiFetch<{ job_id: number; credits: number }>("/quick-edit", { method: "POST", body: JSON.stringify(body) });
+
+/** Every shape an ad runs in, from one finished clip or still (POST
+ *  /api/every-shape, 2026-11-02): one free reformat per missing shape, as a
+ *  job whose result lists each shape (lib/every-shape.ts). */
+export type EveryShapeStart = {
+  job_id: number;
+  credits: number;
+  making: string[];
+  shapes: { aspect: string; do: "make" | "same" | "have"; fit?: string }[];
+};
+export const runEveryShape = (source: string, shapes?: string[]) =>
+  apiFetch<EveryShapeStart>("/every-shape", {
+    method: "POST",
+    body: JSON.stringify(shapes ? { source, shapes } : { source }),
+  });
 
 /* ── the account switch and sign-out live at the API root ── */
 /** POST /account/{slug} THROUGH THE PROXY (API_URL is empty in production,
@@ -1329,7 +1374,9 @@ export function recallActiveProject(): number | null {
    reference fields Create sends (`files`, `asset_photos`) -> one Nano
    Banana still saved as a one-shot concept. Not mutation_header-guarded
    (the Create route beside it is not either). `aspect` is optional and
-   allowlisted server-side. */
+   allowlisted server-side. `expect_credits` is the price the card showed:
+   the still is held to it at the shape and pictures actually sent (409
+   price_changed, with `credits`, if they price it otherwise). */
 /* GET /api/image-models: what a still can be drawn on, with what one
    costs -- the composer's picker, and the pill's step card price line */
 export type ImageModels = { items: { id: string; label: string; note: string; credits: number }[]; default: string };

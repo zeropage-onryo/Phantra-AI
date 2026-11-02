@@ -37,8 +37,9 @@ _OURS = re.compile(r"(?i)^out of credits\b|top up to continue|\btoday\b.*\b(cap|
                    # (charge.TRIAL_THINKING_REFUSAL)
                    r"subscribe to keep going|"
                    # a message that already says what was charged (effects.run
-                   # after its settle) is never told "Nothing was charged"
-                   r"\bwas charged\b")
+                   # after its settle, run_voice's "made and paid for") is never
+                   # told "Nothing was charged" (QA 2026-11-02 E5)
+                   r"\bwas charged\b|\bpaid for\b")
 
 _CAUSES = (
     # the provider turned the STUDIO away: its key, its balance, its account

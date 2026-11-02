@@ -33,12 +33,16 @@ import {
   Sparkles,
   UserRound,
   Wand2,
+  X,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { renderDownloadHref, sceneHref } from "@/lib/studio-api";
 import { assetId, continueActions, split, type ContinueAction, type ContinueKind } from "@/lib/continue";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { PostPanel } from "@/components/studio/post-panel";
+import { EveryShape } from "@/components/studio/every-shape";
 import { TopUpLink } from "@/components/studio/top-up-link";
 import { NOT_SENT, NOT_SENT_CREDITS } from "@/lib/out-of-credits";
 import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@/lib/composer";
@@ -103,6 +107,10 @@ type Handlers = {
   onScene: (madeId: string, scene: Concept) => void;
   /** join a rendered scene's shots into one video (lib/final-cut.ts) */
   onJoin: (m: Made) => void;
+  /** open the effects gallery to make this scene's hook (lib/final-cut.ts) */
+  onHook: (m: Made) => void;
+  /** take the hook off; the cut is joined again without it (free) */
+  onUnhook: (m: Made) => void;
   /** trim the final cut into a new clip, free (seconds) */
   onTrim: (m: Made, start: number, end: number) => void;
   onChip: (text: string) => void;
@@ -135,7 +143,7 @@ type Handlers = {
   onApprove: (i: number) => void;
   /** under Approve: the model that draws the still (this one, else the
    *  picker's) and what one costs -- "Nano Banana · 10 credits" */
-  stillLine: (modelId?: string) => string;
+  stillLine: (modelId?: string, quoted?: number) => string;
   /** an element sheet step's Approve: saves the character, draws the sheet */
   onApproveSheet: (i: number) => void;
   /** under the sheet's Approve: "Nano Banana Pro · 36 credits" */
@@ -168,6 +176,10 @@ type Handlers = {
   onAdBuild: (id: string) => void;
   /** a built ad's voiceover or music: the click that spends, at the price shown */
   onAdAudio: (id: string, which: "voice" | "music") => void;
+  /** a proposed post's panel (lib/composer.ts POST_TOOL): Schedule's answer,
+   *  a problem to say, and Close (the panel folds to its line) */
+  onPostDone: (id: string, text: string) => void;
+  onPostError: (why: string) => void;
   /** a dub's card (lib/dubbing.ts): its menu, the clips it offers, the
    *  project a clip is filed under, a change applied to the card's current
    *  state, and the Render click */
@@ -449,10 +461,27 @@ function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
             </button>
           ) : null}
           {m.conceptId ? (
+            <button
+              type="button"
+              className="zc-act"
+              onClick={() => h.onHook(m)}
+              title="Open the cut on a 2-second effect drawn from its first frame. The effect shows its price before it runs; putting it on the cut is free."
+            >
+              <Zap strokeWidth={1.6} /> {cut.hook ? "Change the hook" : "Add a hook"}
+            </button>
+          ) : null}
+          {m.conceptId && cut.hook ? (
+            <button type="button" className="zc-act" onClick={() => h.onUnhook(m)} title="Join the cut again without the hook. Free.">
+              <X strokeWidth={1.6} /> Remove the hook
+            </button>
+          ) : null}
+          {m.conceptId ? (
             <OpenInEditor concept_id={m.conceptId} className="zc-act" title="Open this cut in the editor: cuts, music, captions. Free.">
               <Clapperboard strokeWidth={1.6} /> Edit the cut
             </OpenInEditor>
           ) : null}
+          {/* every placement's shape, free (2026-11-02, lib/every-shape.ts) */}
+          {cut.asset ? <EveryShape source={cut.asset} look="chat" /> : null}
         </div>
       ) : null}
       {trimOpen && cut.status === "done" && cut.asset ? (
@@ -851,7 +880,10 @@ export function ComposerStream({
                 {isStillStep(t) ? (
                   <StillStep
                     turn={t}
-                    line={handlers.stillLine(t.made?.model ?? handlers.stillModelOf(t).id)}
+                    line={handlers.stillLine(
+                      t.made?.model ?? handlers.stillModelOf(t).id,
+                      t.made?.quoted != null && t.made.model === handlers.stillModelOf(t).id ? t.made.quoted : undefined,
+                    )}
                     busy={handlers.busy}
                     onApprove={() => handlers.onApprove(i)}
                     held={heldLine(stillsFor(turns, t.reply?.proposal?.args.results).map((s) => s.n))}
@@ -886,6 +918,23 @@ export function ComposerStream({
                     onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
                     onError={handlers.onTalkError}
                   />
+                ) : null}
+                {t.post ? (
+                  t.post.done ? (
+                    <p className="zc-post-done">{t.post.done}</p>
+                  ) : (
+                    <div className="zc-post">
+                      <PostPanel
+                        source={t.post.source}
+                        kind={t.post.kind}
+                        caption={t.post.caption}
+                        at={t.post.at}
+                        onDone={(text) => handlers.onPostDone(t.post?.id ?? "", text)}
+                        onError={handlers.onPostError}
+                        onClose={() => handlers.onPostDone(t.post?.id ?? "", "Not posted.")}
+                      />
+                    </div>
+                  )
                 ) : null}
                 {t.dub ? (
                   <DubbingStep

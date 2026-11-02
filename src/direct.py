@@ -35,6 +35,7 @@ writes a scene.
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 # the most pictures a still is sent with from the direct page, the
@@ -49,13 +50,16 @@ PROMPT_MIN = 3
 
 
 def clean_prompt(raw, video_model: Optional[str] = None) -> str:
-    """The prompt as typed, whitespace folded; ValueError when empty or
+    """The prompt as typed, spaces folded and lines kept; ValueError when empty or
     past the cap (a wall of text is refused, not cut). A clip's cap is its
     model's own (fal.prompt_max, 2026-10-25: Higgsfield's best clip ran on a
     6,487-character prompt), a still's PROMPT_MAX."""
     from . import fal
     cap = fal.prompt_max(video_model) if video_model else PROMPT_MAX
-    text = " ".join(str(raw or "").split())
+    # spaces folded, line breaks kept (2026-11-02): a pasted shot list keeps
+    # its lines; runs of blank lines become one
+    lines = [" ".join(line.split()) for line in str(raw or "").splitlines()]
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
     if not text:
         raise ValueError("type what you want to see")
     if len(text) < PROMPT_MIN:
@@ -99,6 +103,7 @@ def video_menu(account_id: Optional[int] = None) -> dict:
         return {"ready": False, "items": [], "default": "", "exempt": exempt}
     from . import pricing
     items = []
+    per_second: dict = {}
     for provider, model, name, blurb in pricing.catalog_rows():
         try:
             spec = providers.model_options(provider, model)
@@ -108,6 +113,8 @@ def video_menu(account_id: Optional[int] = None) -> dict:
         except ValueError:
             continue
         aspects = list(fal.t2v_aspects(model))
+        if opening["duration"]:
+            per_second[model] = opening["estimate_usd"] / opening["duration"]
         items.append({
             "id": model, "label": name, "note": blurb,
             "seconds": spec["duration"],
@@ -122,11 +129,24 @@ def video_menu(account_id: Optional[int] = None) -> dict:
             "ref_resolutions": (list((fal.ref_spec(model) or {}).get("resolutions") or ())
                                 or None),
         })
-    ids = [m["id"] for m in items]
-    first = providers.default_model("fal")
     return {"ready": True, "items": items,
-            "default": first if first in ids else (ids[0] if ids else ""),
+            "default": opening_video_model(items, per_second, providers.default_model("fal")),
             "exempt": exempt}
+
+
+def opening_video_model(items: list, per_second: dict, fallback: str) -> str:
+    """The model the Video page opens on (2026-11-02, Mike: the page let
+    you add one picture because it opened on a start-frame-only model):
+    the cheapest per second of the models that hold several pictures as
+    references, so a second picture is never refused by the default. The
+    studio's render default (`providers.default_model`) only when none
+    does. A person's own last pick still outranks this (lib/direct.ts
+    openingModel)."""
+    held = [m["id"] for m in items if m.get("max_refs", 0) >= 2 and m["id"] in per_second]
+    if held:
+        return min(held, key=lambda i: (per_second[i], i))
+    ids = [m["id"] for m in items]
+    return fallback if fallback in ids else (ids[0] if ids else "")
 
 
 def video_quote(account_id: Optional[int] = None, *, model: str,
@@ -169,6 +189,9 @@ def video_quote(account_id: Optional[int] = None, *, model: str,
     usd = float(choice["estimate_usd"])
     if references:
         usd = round(usd + float((fal.ref_spec(model) or {}).get("per_image_usd", 0)) * references, 4)
+    if start_frame:
+        # what the model bills for the picture it starts on (Grok: a cent)
+        usd = round(usd + float(fal.VIDEO_MODELS[model].get("start_frame_usd", 0)), 4)
     return {"model": model, "label": _label(model),
             "seconds": int(choice["duration"]), "resolution": choice["frame"],
             "aspect": frame, "start_frame": bool(start_frame), "references": references,

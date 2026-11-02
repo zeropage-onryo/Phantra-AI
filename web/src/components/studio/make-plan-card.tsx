@@ -116,6 +116,8 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
         <span>{plan.steps.length} steps</span>
         <em>{head}</em>
       </div>
+      {/* versions of one ad (2026-10-29, src/ad_results.py): what they test */}
+      {plan.test ? <p className="pl-test">Testing: {plan.test}</p> : null}
       <ol className="pl-steps">
         {plan.steps.map((s) => {
           const paid = isPaid(s);
@@ -129,6 +131,7 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
               <div className="pl-body">
                 <div className="pl-title">
                   <b>{stepTitle(s)}</b>
+                  {s.variant ? <span className="pl-variant">{s.variant}</span> : null}
                   {s.edited ? <i>edited</i> : null}
                   {STATUS[s.status] ? <em>{STATUS[s.status]}</em> : null}
                 </div>

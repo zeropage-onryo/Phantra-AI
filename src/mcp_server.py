@@ -824,7 +824,9 @@ DESCRIPTIONS["what_works"] = (
     "What has worked for you, read off your own studio: how many outputs you "
     "made and kept (downloaded, cut, starred, used again), per model; which "
     "camera presets you tried and kept; how many tries a keeper takes; and "
-    "what you posted with a scene behind it, with its latest numbers. Said "
+    "what you posted with a scene behind it, with its latest numbers; and, "
+    "once you have dropped an ad report on the Ad Studio, what each ad spent "
+    "and what each result cost, with the verdict of every A/B test. Said "
     "plainly in `lines`, and `enough_data` says when there is too little to "
     "mean anything yet. Nothing is called and nothing is spent. Read-only."
 )
@@ -1857,6 +1859,30 @@ def _card_fields(concept: dict, shot: dict, account_id: Optional[int]) -> dict[s
     return out
 
 
+def _length_note(shot: dict, clip: Optional[dict]) -> Optional[str]:
+    """A sentence when the clip is priced at another length than the scene
+    is written to: a model renders only its own legal lengths, fitted UP
+    (fal.VIDEO_MODELS), and a 4 s scene on ltx2.3 was priced at 6 s with
+    nothing said (QA 2026-11-02 K3)."""
+    try:
+        written = float(shot.get("seconds") or 0)
+    except (TypeError, ValueError):
+        return None
+    durations = [d for d in (clip or {}).get("durations") or [] if d]
+    if not written or not durations:
+        return None
+    billed = sum(durations)
+    if abs(billed - written) < 0.5:
+        return None
+    parts = " + ".join(f"{d:g}" for d in durations)
+    how = f"{parts} = {billed:g} s" if len(durations) > 1 else f"{billed:g} s"
+    from . import model_menu
+    model = clip.get("model")
+    name = (model_menu.label_for(model) or model) if model else "this model"
+    return (f"The scene is written to {written:g} s; {name} "
+            f"renders {how}, so that is the length priced and made.")
+
+
 def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
                  duration: Optional[int] = None, frame: Optional[str] = None,
                  dsn: Optional[str] = None,
@@ -1873,6 +1899,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
     concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if concept is None:
         raise ValueError(f"no scene {scene_id}")
+    if concept.get("archived"):
+        # a removed scene was priced and handed an approve link (QA 2026-11-02 K4)
+        raise ValueError(f"scene {scene_id} was removed, so it is not priced -- the person "
+                         "restores it in the studio first, or `write_scene` writes a new one")
     shot = (concept.get("shots") or [None])[0]
     if not shot or not (shot.get("prompt") or "").strip():
         raise ValueError(f"scene {scene_id} has no scene prompt yet -- `write_scene` first")
@@ -1906,7 +1936,13 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             raise ValueError(str(e)) from e
     except ValueError as e:
         raise ValueError(f"bad renderer choice: {e}") from e
-    keyframes = _quoted_keyframes(concept, account_id, listing)
+    said = _length_note(shot, clip)
+    if said:
+        clip["length_note"] = said
+    # a scene rendered as ONE clip goes out on its photos, and its keyframes
+    # would not steer it: no stills are offered or priced (2026-11-02)
+    keyframes = (None if (clip or {}).get("one_clip")
+                 else _quoted_keyframes(concept, account_id, listing))
     exempt = bool(account_id is not None and accounts.is_credit_exempt(account_id, dsn=dsn))
     # the ledger's tables exist wherever the app booted; a bare database
     # (stdio on a fresh clone, a test schema) gets them here, once per
@@ -1941,8 +1977,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
                 "show the person this price and wait for a yes before `approve`")
             if clip is not None and listing == "render":
                 out["note"] += "." + CARD_NOTE
+        if said:
+            out["note"] = f"{said} {out['note']}"
         return out
-    return {
+    out = {
         "scene_id": int(scene_id),
         "status": _status_of(concept),
         "keyframes": keyframes,
@@ -1956,6 +1994,9 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             "every shot already has a clip" if clip is None else
             "this server signs no quotes; `approve` takes the renderer choice alone")),
     }
+    if said:
+        out["note"] = f"{said} {out['note']}"
+    return out
 
 
 # --- the studio surface: images, video and effects, quoted in chat ----------
@@ -2162,6 +2203,12 @@ def approval_gate(usd: float, quote_token: str, *, tool: str, args: dict, what: 
     Single use is the caller's (`start_approved`), which claims the
     token before the job starts."""
     from . import ledger, pricing
+    # A server on an old checkout prices with old tables (QA 2026-11-02
+    # K1): neither its quote nor its approve may stand.
+    drift = pricing.live_drift(dsn)
+    if drift:
+        return ({"ok": False, "refused": "stale_prices", "note": drift}, None,
+                {"credits": None, "usd": None})
     # `model`: a clip's video model, which carries its own markup
     # (pricing.markup_for, 2026-10-27); None for stills, sheets and effects
     credits = ledger.charge_credits(usd, model=model)
@@ -3531,6 +3578,14 @@ def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -
                    "views": r.get("views"), "likes": r.get("likes"),
                    "comments": r.get("comments"), "saves": r.get("saves"),
                    "shares": r.get("shares")} for r in posted[:20]]
+    # what their ads did once they ran (src/ad_results.py): the person's own
+    # ad-account export, their own money in their own currency
+    from . import ad_results
+    ads = ad_results.summary(account_id=account_id, dsn=dsn)        # never raises
+    ads_out = [{k: a[k] for k in ("code", "ad_name", "platform", "variant", "currency", "spend",
+                                  "results", "cpa", "ctr", "roas")} for a in ads["ads"][:20]]
+    tests_out = [{"test": t["test"], "winner": t["winner"], "verdict": t["verdict"]}
+                 for t in ads["tests"][:10]]
     enough = made >= INSIGHT_MIN_OUTPUTS
     lines: list[str] = []
     if not enough:
@@ -3546,6 +3601,11 @@ def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -
             lines.append(f"a keeper takes {tries['average']} tries on average")
     for p in presets_out[:5]:
         lines.append(f"camera preset {p['preset']}: tried {p['tried']}, kept {p['kept']}")
+    for a in sorted((x for x in ads_out if x["cpa"] is not None), key=lambda x: x["cpa"])[:3]:
+        money = " ".join(filter(None, (f"{a['cpa']:.2f}", a["currency"])))
+        lines.append(f"ad {a['code'] or a['ad_name']}: {a['results']:g} results at {money} each")
+    for t in tests_out[:3]:
+        lines.append(f"ad test{(': ' + t['test']) if t['test'] else ''} -- {t['verdict']}")
     if posted_out:
         for r in posted_out[:5]:
             views = r["views"] if r["views"] is not None else "no numbers yet"
@@ -3561,6 +3621,8 @@ def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -
                     "discards": summary.get("discards") or []},
         "presets": presets_out,
         "posted": posted_out,
+        "ads": ads_out,
+        "ad_tests": tests_out,
         "lines": lines,
         "note": ("read off what you kept, downloaded, cut, starred or posted; nothing here "
                  "calls a model, and credits are credits"),

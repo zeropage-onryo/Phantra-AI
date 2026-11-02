@@ -303,8 +303,9 @@ def generate_image(prompt: str, out_path: Path, *, model: str = MODEL,
     `aspect_ratio` and `image_size` shape the output (see ASPECT_RATIO).
     Either empty means "don't configure it" and the model picks, which
     is what it did for every render before this. A config the endpoint
-    rejects retries once without it: a wrongly-shaped frame is a far
-    better outcome than an INVALID_ARGUMENT on a paid call."""
+    rejects retries with the shape alone, then with nothing: a wrongly-
+    shaped frame is a far better outcome than an INVALID_ARGUMENT on a
+    paid call."""
     from google.genai import types
 
     client = client or _client(account_id)
@@ -325,7 +326,15 @@ def generate_image(prompt: str, out_path: Path, *, model: str = MODEL,
     except Exception as e:
         if config is None or not _rejected_the_config(e):
             raise
-        response = _generate_content(client, model, parts)
+        # the SHAPE is what the person picked (2026-11-02): drop the size
+        # first and keep it; only a shape refused too is left to the model
+        lighter = image_config(types, aspect_ratio) if image_size and aspect_ratio else None
+        try:
+            response = _generate_content(client, model, parts, config=lighter)
+        except Exception as again:
+            if lighter is None or not _rejected_the_config(again):
+                raise
+            response = _generate_content(client, model, parts)
     # metered as one image (src/spend.py prices the image models per
     # image, not per token); the token counts ride along raw
     spend.record_call(stage="nano_image", model_asked=model, response=response,

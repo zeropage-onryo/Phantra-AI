@@ -6,7 +6,7 @@ import time
 from google import genai
 from google.genai import types
 
-from . import spend
+from . import claude_client, spend
 
 # The budget for the LAST model in the chain, which has nowhere to fall
 # through to and may as well keep asking.
@@ -142,7 +142,65 @@ BRAINS = {
         "level": "HIGH",
         "substitute": False,
     },
+    # THE CLAUDE BRAINS (2026-11-02, Mike: "add the claude brain as an option
+    # ... you can choose two models like Higgsfield, it's priced"). Two more
+    # rows in the same menu, answered by src/claude_client.py through the SAME
+    # generate_with_retry, so the composer, the scene writer and the planner
+    # need no second code path. Three differences from the Gemini rows, each
+    # one a decision:
+    #  - `substitute` is False: a Claude turn that fails FAILS. It is never
+    #    quietly answered by Gemini, which reads identically on the board and
+    #    is billed at the wrong price (the reasoning tier's rule).
+    #  - `priced`: model text is free on a plan, and these two are the
+    #    exception. A turn on one holds credits up front and settles to what
+    #    the model actually used (src/text_charge.py), and the picker's note
+    #    says what a message costs before it is sent.
+    #  - `available` gates the row: with no ANTHROPIC_API_KEY, or with
+    #    PHANTRA_CLAUDE_BRAINS=0, the rows are not in the menu and a stale tab
+    #    that sends one gets the default brain (resolve_brain's clamp).
+    "claude-sonnet": {
+        "label": "Claude Sonnet 5.5",
+        "note": "Balanced",
+        "model": lambda: CLAUDE_SONNET_MODEL,
+        "level": None,
+        "substitute": False,
+        "priced": True,
+        "available": lambda: claude_brains_on(),
+    },
+    "claude-opus": {
+        "label": "Claude Opus 5.5",
+        "note": "Deepest reasoning",
+        "model": lambda: CLAUDE_OPUS_MODEL,
+        "level": "HIGH",
+        "substitute": False,
+        "priced": True,
+        "available": lambda: claude_brains_on(),
+    },
 }
+
+CLAUDE_SONNET_MODEL = os.environ.get("PHANTRA_CLAUDE_SONNET_MODEL", "claude-sonnet-5-5")
+CLAUDE_OPUS_MODEL = os.environ.get("PHANTRA_CLAUDE_OPUS_MODEL", "claude-opus-5-5")
+CLAUDE_BRAINS_ENV = "PHANTRA_CLAUDE_BRAINS"
+
+
+def claude_brains_on() -> bool:
+    """Whether the Claude rows are offered: a key is set and the switch is not
+    pulled. Read per call, never at import (the src/settings.py convention)."""
+    if (os.environ.get(CLAUDE_BRAINS_ENV) or "").strip().lower() in ("0", "false", "off", "no"):
+        return False
+    return claude_client.available()
+
+
+def brain_available(name) -> bool:
+    """Whether `name` is a brain this install offers right now."""
+    spec = BRAINS.get((name or "").strip().lower())
+    return bool(spec) and spec.get("available", lambda: True)()
+
+
+def is_priced(name) -> bool:
+    """Whether a turn on this brain costs credits (the Claude rows)."""
+    spec = BRAINS.get((name or "").strip().lower())
+    return bool(spec and spec.get("priced") and brain_available(name))
 
 
 def resolve_brain(name=None) -> dict:
@@ -159,9 +217,9 @@ def resolve_brain(name=None) -> dict:
     Resolved per call, never at import, so PHANTRA_REASONING_MODEL can
     be changed without a restart (the src/settings.py convention)."""
     key = (name or DEFAULT_BRAIN).strip().lower()
-    spec = BRAINS.get(key) or BRAINS[DEFAULT_BRAIN]
-    if key not in BRAINS:
+    if key not in BRAINS or not brain_available(key):
         key = DEFAULT_BRAIN
+    spec = BRAINS[key]
     config = None
     if spec["level"]:
         config = types.GenerateContentConfig(
@@ -174,9 +232,12 @@ def brain_options() -> list:
     """The menu, for the composer's select. A PROJECTION of BRAINS, never
     a second list -- a hardcoded <option> in a template is a copy that
     goes stale the first time a tier is added."""
-    return [{"id": key, "label": spec["label"], "note": spec["note"],
-             "default": key == DEFAULT_BRAIN}
-            for key, spec in BRAINS.items()]
+    from . import text_charge
+    return [{"id": key, "label": spec["label"],
+             "note": text_charge.picker_note(key, spec["note"]),
+             "default": key == DEFAULT_BRAIN,
+             "priced": bool(spec.get("priced"))}
+            for key, spec in BRAINS.items() if brain_available(key)]
 
 
 # The 429 that is not a rate limit. Google returns RESOURCE_EXHAUSTED for
@@ -194,6 +255,8 @@ DEPLETED_MARKERS = (
     # wording for an ordinary per-minute limit, which is exactly the 429
     # that DOES clear by waiting. Only the money strings belong here.
     "check your plan and billing details",
+    # Anthropic's wording for an empty prepaid balance (a 400, never retried)
+    "credit balance is too low",
 )
 
 
@@ -337,7 +400,6 @@ def generate_with_retry(client: genai.Client, model: str, contents,
     chain = FALLBACK_MODELS if fallbacks is None else list(fallbacks)
     models_to_try = [model] + [m for m in chain if m != model]
     no_substitute = fallbacks is not None and not chain
-    stream = getattr(client.models, "generate_content_stream", None) if on_text else None
     streamed_before = False
 
     def note(text: str) -> None:
@@ -349,6 +411,10 @@ def generate_with_retry(client: genai.Client, model: str, contents,
         budget = MAX_RETRIES if last else FALLTHROUGH_RETRIES
         for attempt in range(budget):
             started = time.monotonic()
+            # a claude-* model is answered by claude_client's Gemini-shaped
+            # facade; every other model by the client the caller handed in
+            active = claude_client.get() if claude_client.is_claude(current_model) else client
+            stream = getattr(active.models, "generate_content_stream", None) if on_text else None
             try:
                 if stream is not None:
                     if streamed_before:
@@ -357,9 +423,9 @@ def generate_with_retry(client: genai.Client, model: str, contents,
                     response = _streamed(stream, current_model, contents, config, on_text)
                 else:
                     response = (
-                        client.models.generate_content(model=current_model, contents=contents)
+                        active.models.generate_content(model=current_model, contents=contents)
                         if config is None else
-                        client.models.generate_content(model=current_model,
+                        active.models.generate_content(model=current_model,
                                                        contents=contents, config=config))
                 if current_model != model:
                     print(f"  (used fallback model {current_model})", file=sys.stderr)

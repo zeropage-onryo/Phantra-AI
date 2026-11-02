@@ -16,8 +16,10 @@ import { CLIP_BASE } from "@/landing-pages/media";
 
 export type ReelClip = {
   title: string;
-  /** the model's name, as the tag on the tile reads it */
-  model: string;
+  /** the model's name, as the tag on the tile reads it: a catalogue name
+   *  (content/pricing.json), or none for a clip made on a model Phantra no
+   *  longer offers (QA 2026-11-02 P5: a tag is read as "you can use this") */
+  model?: string;
   mp4: string;
   poster: string;
   column: 0 | 1;
@@ -42,12 +44,12 @@ export const HERO_REEL: ReelClip[] = [
   page(WAN, "leaves", "Autumn leaves in a gust", "Wan 3.0", 0),
   page(KLING, "boxer", "Shadowboxing in one shaft of light", "Kling 3 Turbo Pro", 0),
   page(SEEDANCE, "surfer", "Backlight and water", "Seedance 2.5", 0),
-  { title: "Neon city", model: "Runway Gen-4 Turbo", mp4: `${R}/c375.mp4`, poster: `${R}/c375.jpg`, column: 0 },
+  { title: "Neon city", mp4: `${R}/c375.mp4`, poster: `${R}/c375.jpg`, column: 0 },
   page(SEEDANCE, "skate", "Spray and momentum", "Seedance 2.5", 0),
   page(KLING, "dancer", "Popping and locking under a bridge", "Kling 3 Turbo Pro", 1),
   page(WAN, "balloons", "Balloons over a canyon at sunrise", "Wan 3.0", 1),
   page(SEEDANCE, "noodles", "Rain and steam", "Seedance 2.5", 1),
-  { title: "Creature comedy", model: "Seedance 2 Fast", mp4: `${R}/c135.mp4`, poster: `${R}/c135.jpg`, column: 1 },
+  { title: "Creature comedy", model: "Seedance 2.0 Fast", mp4: `${R}/c135.mp4`, poster: `${R}/c135.jpg`, column: 1 },
   page(KLING, "dock", "Two hands on one fishing rod", "Kling 3 Turbo Pro", 1),
   page(SEEDANCE, "table", "Multi-beat action", "Seedance 2.5", 1),
 ];

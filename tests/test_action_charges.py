@@ -193,7 +193,7 @@ def test_the_composers_image_door_is_gated_like_create(client, studio, monkeypat
     monkeypatch.setattr(nano_banana, "generate_from_prompt", fake_still)
     import google.genai as genai_mod
     monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
-    form = {"prompt": "a still", "output": "image"}
+    form = {"prompt": "a still", "output": "image", "expect_credits": "100"}
     res = client.post("/api/generate/run", data=form)
     assert res.status_code == 402
     assert res.json()["error"]["code"] == "subscribe_or_top_up"
@@ -465,7 +465,8 @@ def test_the_composers_image_door_draws_on_the_picked_fal_model(client, studio, 
     import google.genai as genai_mod
     monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
     _fund(studio)
-    form = {"prompt": "a still", "output": "image", "image_model": "seedream4.5", "aspect": "4:5"}
+    form = {"prompt": "a still", "output": "image", "expect_credits": "100",
+            "image_model": "seedream4.5", "aspect": "4:5"}
     # no fal key: refused before the job, no enhance paid for
     monkeypatch.delenv("FAL_KEY", raising=False)
     res = client.post("/api/generate/run", data=form)
@@ -482,6 +483,41 @@ def test_the_composers_image_door_draws_on_the_picked_fal_model(client, studio, 
     assert seen["aspect"] == "4:5" and seen["approved"] is True
     assert seen["account_id"] == studio["account_id"]
     assert "Seedream 4.5" in job["detail"]
+
+
+def test_the_composers_still_is_never_charged_above_its_card(client, studio, monkeypatch):
+    """2026-11-02: the card shows a model's opening price, but FLUX.2 bills
+    each picture as an input megapixel. The route prices the still at the
+    shape and pictures actually sent and refuses it, before any job, when
+    that is more than the card said; the 409 carries the real price, and a
+    run held to that price (or to a higher card) goes through."""
+    from app import api
+    from src import direct
+    monkeypatch.setenv("FAL_KEY", "k")
+    started = []
+    monkeypatch.setattr(api.jobs, "start", lambda *a, **kw: started.append(a) or {"id": 1})
+
+    async def three_pictures(form, want_video=False, account_id=None):
+        return [(b"png", "image/png", f"photo {n}") for n in range(3)], [], []
+
+    monkeypatch.setattr(api, "_collect_refs", three_pictures)
+    _fund(studio)
+    card = next(i for i in client.get("/api/image-models").json()["items"] if i["id"] == "flux2-pro")
+    real = direct.image_quote(model="flux2-pro", aspect="16:9", references=3)["credits"]
+    assert real > card["credits"]
+    form = {"prompt": "the can on steel", "output": "image", "image_model": "flux2-pro", "aspect": "16:9"}
+    res = client.post("/api/generate/run", data=form)
+    assert res.status_code == 400 and res.json()["error"]["code"] == "missing_price"
+    res = client.post("/api/generate/run", data={**form, "expect_credits": str(card["credits"])})
+    assert res.status_code == 409 and res.json()["credits"] == real
+    assert res.json()["error"]["code"] == "price_changed" and not started
+    res = client.post("/api/generate/run", data={**form, "expect_credits": str(real)})
+    assert res.status_code == 200 and len(started) == 1
+    # an off-table shape is refused, never drawn at another
+    res = client.post("/api/generate/run", data={**form, "image_model": "ideogram4.5",
+                                                 "aspect": "21:9", "expect_credits": "999"})
+    assert res.status_code == 400 and res.json()["error"]["code"] == "bad_choice"
+    assert len(started) == 1
 
 
 # --- one shot's still at a time (2026-10-11; re-cut from #142) ---------------

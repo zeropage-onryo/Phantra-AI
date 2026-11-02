@@ -174,7 +174,12 @@ def test_the_evals_run_is_refused(client, studio, started, monkeypatch):
     monkeypatch.setattr(api.evalstore, "list_golden",
                         lambda *a, **k: [{"query": "q", "relevant": ["r"]}])
     monkeypatch.setattr(api, "_rag_reachable", lambda: True)
-    _refused(client.post("/api/evals/run", json={}))
+    from app.main import app
+    app.dependency_overrides[api.eval_operator] = lambda: None   # the house owner
+    try:
+        _refused(client.post("/api/evals/run", json={}))
+    finally:
+        app.dependency_overrides.pop(api.eval_operator, None)
     assert started == []
 
 

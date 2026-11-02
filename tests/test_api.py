@@ -500,7 +500,7 @@ def test_generated_media_carries_organize_fields_and_folders(tmp_db, monkeypatch
     assert wall["counts"]["all"] == 2
     assert wall["wall"] == {"image": 1, "video": 1, "starred": 1}
     assert wall["folders"] == {"bike portraits": 1}
-    assert set(wall["providers"]) == {"Nano Banana Pro", "Runway"}
+    assert set(wall["providers"]) == {"Nano Banana Pro", "Runway Gen-4.5"}
     by_id = {i["generated_id"]: i for i in wall["items"]}
     assert by_id[image_id]["folder"] == "bike portraits"
     assert by_id[image_id]["starred"] is True
@@ -510,7 +510,7 @@ def test_generated_media_carries_organize_fields_and_folders(tmp_db, monkeypatch
     assert [i["generated_id"] for i in in_folder["items"]] == [image_id]
     starred = client.get("/api/media?kind=all&scope=generated&starred=true").json()
     assert [i["generated_id"] for i in starred["items"]] == [image_id]
-    runway = client.get("/api/media?kind=all&scope=generated&provider=Runway").json()
+    runway = client.get("/api/media?kind=all&scope=generated&provider=Runway+Gen-4.5").json()
     assert [i["generated_id"] for i in runway["items"]] == [video_id]
 
     # a field left out is left alone; an empty folder clears it
@@ -850,7 +850,16 @@ def test_shot_generate_surfaces_render_failure(tmp_db, monkeypatch):
 
 # --- evals ------------------------------------------------------------------
 
-def test_golden_crud_and_seed(tmp_db):
+@pytest.fixture
+def eval_operator():
+    """The /api/evals routes take only the house account's owners
+    (api.eval_operator; tests/test_evals_operator.py checks the refusal)."""
+    app.dependency_overrides[api_mod.eval_operator] = lambda: None
+    yield
+    app.dependency_overrides.pop(api_mod.eval_operator, None)
+
+
+def test_golden_crud_and_seed(tmp_db, eval_operator):
     items = client.get("/api/evals/golden").json()["items"]
     assert items, "init should seed the golden set from eval_cases.json"
     new_id = client.post("/api/evals/golden", json={
@@ -863,7 +872,7 @@ def test_golden_crud_and_seed(tmp_db):
     assert "backlit rocks glass" not in queries
 
 
-def test_eval_run_computes_and_stores_metrics(tmp_db, monkeypatch):
+def test_eval_run_computes_and_stores_metrics(tmp_db, monkeypatch, eval_operator):
     for g in evalstore.list_golden(dsn=tmp_db):
         evalstore.delete_golden(g["id"], dsn=tmp_db)
     evalstore.add_golden("find the brief", ["prompts/brief.txt"], dsn=tmp_db)
@@ -915,7 +924,7 @@ def test_eval_run_computes_and_stores_metrics(tmp_db, monkeypatch):
     assert detail["library_fingerprint"]
 
 
-def test_eval_run_refuses_empty_golden_set(tmp_db):
+def test_eval_run_refuses_empty_golden_set(tmp_db, eval_operator):
     for g in evalstore.list_golden(dsn=tmp_db):
         evalstore.delete_golden(g["id"], dsn=tmp_db)
     assert client.post("/api/evals/run", json={}).status_code == 400

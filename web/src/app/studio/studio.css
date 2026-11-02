@@ -2077,6 +2077,11 @@ button.tag:hover {
   font-weight: 600;
   box-shadow: 0 8px 26px -14px color-mix(in srgb, var(--signal) 90%, transparent);
 }
+/* `.zps button { color: inherit }` (0,1,1) beat `.elnew` (0,1,0), so the
+   label was white on yellow (QA 2026-11-02 T5): the scoped rule wins */
+.zps .elnew {
+  color: var(--on-signal);
+}
 .elnew svg {
   width: 16px;
   height: 16px;

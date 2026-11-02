@@ -480,6 +480,18 @@ def credits_for(provider_usd_micros: int, model: Optional[str] = None) -> int:
     return max(int(cents), CREDIT_FLOOR)
 
 
+def text_credits(provider_usd, model: Optional[str] = None) -> int:
+    """Provider USD of MODEL TEXT -> credits (2026-11-02, the priced Claude
+    brains): the same markup and the same round-up-to-the-cent as `credits_for`,
+    but with a floor of ONE credit, not CREDIT_FLOOR. The floor exists so a
+    render never rounds to nothing; a chat message that cost a fifth of a cent
+    must not be charged ten."""
+    scaled = (Fraction(usd_micros(provider_usd)) * Fraction(str(markup_for(model)))
+              * CREDIT_CENTS)
+    cents = -((-scaled.numerator) // (scaled.denominator * _MICROS_PER_CENT))
+    return max(int(cents), 1)
+
+
 # --------------------------------------------------------------------------
 # the content hash -- one function, and it is timeline's
 # --------------------------------------------------------------------------
@@ -1208,7 +1220,7 @@ def display(*, account_id: Optional[int], shot: dict, shot_id: int,
             "renders": renders}
 
 
-__all__ = ["PRICING_VERSION", "CREDIT_CENTS", "MARKUP", "CREDIT_FLOOR",
+__all__ = ["PRICING_VERSION", "CREDIT_CENTS", "MARKUP", "CREDIT_FLOOR", "text_credits",
            "still_usd", "still_credits",
            "PricingRefused", "Estimate", "Quote",
            "usd_micros", "credits_for", "content_hash",
@@ -1346,6 +1358,68 @@ def _trial_credits() -> int:
 
 
 CATALOG_PATH = "web/src/content/pricing.json"
+
+
+# THE LIVE PRICE TABLE (2026-11-02, QA K1). Claude Desktop's studio server
+# runs from whatever checkout launched it, against the live database, so a
+# checkout weeks old prices with weeks-old tables: LTX 2.3 at 6 s 1080p
+# quoted 87 credits there and 116 on the site, and an approve held the old
+# price. PRICING_VERSION did not move, so it cannot tell them apart; the
+# public catalog (every price, markup and plan the site shows) can. The
+# deployed API records its fingerprint at boot (`record_live`, Fly only)
+# and every quote on the studio surface asks `live_drift` first.
+LIVE_KEY = "pricing.live"
+PRICE_CHECK_ENV = "PHANTRA_PRICE_CHECK"
+
+
+def table_fingerprint() -> str:
+    """A short hash of the public catalog: equal exactly when two
+    processes would print the same prices."""
+    body = json.dumps(public_catalog(), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(body.encode()).hexdigest()[:16]
+
+
+def record_live(dsn=None) -> Optional[dict]:
+    """Store this process's fingerprint as the live one (the shared
+    `settings` table). Run by the deployed API at boot. Never raises: a
+    failed write leaves the last record, and `live_drift` then compares
+    against the previous deploy, which is still the right direction."""
+    from datetime import datetime, timezone
+
+    from . import db
+    record = {"fingerprint": table_fingerprint(), "version": PRICING_VERSION,
+              "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+              "image": os.environ.get("FLY_IMAGE_REF") or None}
+    try:
+        with db.connect(dsn) as conn:
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES (%s, %s) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (LIVE_KEY, json.dumps(record)))
+    except Exception:
+        return None
+    return record
+
+
+def live_drift(dsn=None) -> Optional[str]:
+    """None when this process prices like the live site, when nothing is
+    recorded, or with PHANTRA_PRICE_CHECK=0; otherwise the sentence a
+    quote refuses with."""
+    from . import settings
+    if os.environ.get(PRICE_CHECK_ENV, "1") == "0":
+        return None
+    raw = settings.get_raw(LIVE_KEY, dsn=dsn)
+    try:
+        live = json.loads(raw) if raw else None
+    except ValueError:
+        return None
+    if not isinstance(live, dict) or live.get("fingerprint") in (None, table_fingerprint()):
+        return None
+    return ("Nothing was spent. This studio server's prices are not the ones phantra.ai "
+            f"charges (it runs other code; live table {live['fingerprint']} from "
+            f"{live.get('at') or 'the last deploy'}, this one {table_fingerprint()}). Update "
+            "the checkout Claude Desktop runs and restart Claude Desktop "
+            "(ops/connect-claude.md), then quote again.")
 
 
 def export_catalog(path: str = CATALOG_PATH) -> str:

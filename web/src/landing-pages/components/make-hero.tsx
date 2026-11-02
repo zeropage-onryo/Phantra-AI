@@ -72,8 +72,18 @@ function Buttons({ page, align = "center", onDark = false }: { page: MakePage; a
 }
 
 /** One hero still or clip, filling its box. */
-function Media({ tile, sizes, priority = false, className = "" }: { tile: MakeTile; sizes: string; priority?: boolean; className?: string }) {
-  if (tile.video) return <ClipPlayer tile={tile} className={className} eager />;
+// `still`: draw a clip tile as its poster. The fan shows four cards and
+// played all four clips at once (QA 2026-11-02 P3: ~10 MB before a scroll
+// on the Halloween page); now the top card -- the last, the one fully in
+// view -- plays and the rest stand.
+function Media({
+  tile,
+  sizes,
+  priority = false,
+  still = false,
+  className = "",
+}: { tile: MakeTile; sizes: string; priority?: boolean; still?: boolean; className?: string }) {
+  if (tile.video && !(still && tile.src)) return <ClipPlayer tile={tile} className={className} eager />;
   if (!tile.src) return <div aria-hidden className="absolute inset-0" style={{ background: tile.plate ?? "var(--plate-1)" }} />;
   return <Image src={tile.src} alt={tile.title} fill sizes={sizes} priority={priority} quality={75} className={`object-cover ${className}`} />;
 }
@@ -274,7 +284,7 @@ function FanHero({ page }: { page: MakePage }) {
             const f = FAN[i + Math.floor((FAN.length - media.length) / 2)] ?? FAN[i];
             return (
               <div
-                key={tile.title}
+                key={tile.video ?? tile.src ?? `${i}-${tile.title}`}
                 style={
                   {
                     "--t": `translateX(calc(-50% + ${f.x}%)) translateY(${f.y}px) rotate(${f.rotate}deg)`,
@@ -284,7 +294,7 @@ function FanHero({ page }: { page: MakePage }) {
                 className="absolute left-1/2 top-0 w-[33%] max-w-[260px] transition-transform sm:w-[38%] duration-500 ease-out [transform:var(--t)] group-hover:[transform:var(--t-open)] motion-reduce:transition-none"
               >
                 <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-card shadow-[0_24px_60px_-24px_rgba(0,0,0,0.45)]">
-                  <Media tile={tile} sizes="260px" priority={i === 1} />
+                  <Media tile={tile} sizes="260px" priority={i === 1} still={i !== media.length - 1} />
                 </div>
               </div>
             );

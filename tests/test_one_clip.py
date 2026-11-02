@@ -165,3 +165,29 @@ def test_the_scenes_frame_goes_where_the_model_draws_it():
     assert fal.shot_aspect({"ratio": "16:9"}, "seedance2") == "16:9"
     assert fal.shot_aspect({"ratio": "21:9"}, "veo3.1") == fal.DEFAULT_ASPECT
     assert fal.shot_aspect({}, "seedance2") == fal.DEFAULT_ASPECT
+
+
+# guards: app.api.approve_render -- a one-clip scene with its clip is not paid for twice
+def test_approving_a_rendered_one_clip_scene_again_is_refused(fal_keyed, monkeypatch):
+    """Its clip lands on the shot, not a part, so renders_as_one still says
+    "one clip"; before 2026-11-02 a second approve (the connector's, or a
+    stale card) rendered the whole scene again at full price."""
+    from app import api
+    from src import preprod
+    shot = {**planned(), "media_url": "https://x/whole.mp4"}
+    concept = {"id": 7, "title": "S", "shots": [shot], "picked": True}
+    monkeypatch.setattr(preprod, "get_concept", lambda cid, account_id=None, **k: concept)
+    monkeypatch.setattr(preprod, "reference_gate", lambda c: "")
+    monkeypatch.setattr(api, "_verify_tokens", lambda *a, **k: pytest.fail("a token was spent"))
+    monkeypatch.setattr(api.jobs, "start", lambda *a, **k: pytest.fail("it rendered again"))
+    with pytest.raises(api.ApproveRefused) as refused:
+        api.approve_render(7, None, {"provider": "fal", "model": "seedance2"})
+    assert refused.value.status == 409 and refused.value.code == "already_rendered"
+    # not yet rendered: the same scene goes on to the render
+    shot.pop("media_url")
+    started = []
+    monkeypatch.setattr(api, "_verify_tokens", lambda *a, **k: [])
+    monkeypatch.setattr(api.jobs, "start", lambda *a, **k: started.append(a) or {"id": 1})
+    monkeypatch.setattr(api.jobs, "update", lambda *a, **k: None)
+    api.approve_render(7, None, {"provider": "fal", "model": "seedance2"})
+    assert started

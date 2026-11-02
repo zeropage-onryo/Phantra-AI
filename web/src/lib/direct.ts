@@ -190,6 +190,16 @@ export function videoRefMode(model: Pick<VideoModel, "max_refs"> | null, count: 
   return count >= 2 || oneAsReference ? "references" : "start";
 }
 
+/** The resolutions offered for what is attached (2026-11-02): with pictures
+    held as references, only those the model renders with them (Grok 1.5
+    takes 480p or 720p), never one the quote would refuse. */
+export function videoResolutions(model: Pick<VideoModel, "resolutions" | "ref_resolutions"> | null, mode: VideoRefMode): string[] {
+  if (!model) return [];
+  if (mode !== "references" || !model.ref_resolutions) return model.resolutions;
+  const ok = model.resolutions.filter((r) => model.ref_resolutions!.includes(r));
+  return ok.length ? ok : model.resolutions;
+}
+
 /** The tags the prompt names `n` pictures by, counted on from the model's
     first ("@Image1" -> "@Image2"; "<IMAGE_0>" -> "<IMAGE_1>"). */
 export function videoRefTags(model: Pick<VideoModel, "ref_tag"> | null, n: number): string[] {
@@ -252,3 +262,59 @@ export const STARTERS = {
     "Handheld walk-and-talk through a busy market at golden hour, shallow focus",
   ],
 } as const;
+
+/* ── every picture shown, and what each one is for (2026-11-02, Mike:
+   "im not allowed to add more than one reference image") ──
+   The tray takes as many pictures as the roomiest model on the menu holds,
+   whatever model is picked; each says what the picked model does with it,
+   and a model that holds them all is one click away. Nothing switches by
+   itself: the person sees the gap and chooses. */
+
+/** How many of `count` pictures reach the picked clip model: one as a start
+    frame, up to the model's count as references, none with none. */
+export function picturesUsed(mode: VideoRefMode, model: Pick<VideoModel, "max_refs"> | null, count: number): number {
+  if (mode === "none" || count <= 0) return 0;
+  if (mode === "start") return 1;
+  return Math.min(count, Math.max(0, model?.max_refs ?? 0));
+}
+
+/** The line under a clip's pictures when some will not reach the model ("" when all do). */
+export function videoPicturesLine(model: Pick<VideoModel, "label" | "max_refs"> | null, mode: VideoRefMode, count: number): string {
+  if (!model || count <= 1) return "";
+  const left = count - picturesUsed(mode, model, count);
+  if (left <= 0) return "";
+  const them = left === 1 ? "the other picture" : `the other ${left} pictures`;
+  if (mode === "start") {
+    return model.max_refs <= 0
+      ? `${model.label} starts on the first picture only; ${them} will not reach it.`
+      : `${model.label} starts on the first picture; ${them} will not reach it.`;
+  }
+  return `${model.label} holds ${model.max_refs}; ${left === 1 ? "the last picture" : `the last ${left}`} will not reach it.`;
+}
+
+/** The model to offer in one click when the picked one cannot hold every
+    picture: of the models that hold MORE than the picked one, the cheapest
+    (its opening price) that holds all `count`, else the one that holds the
+    most. `atLeast` is the fewest a model must hold to count (2 on Video: a
+    model holding one is a start frame, not a reference). null when no
+    model does better. */
+export function roomierModel<M extends { id: string; max_refs: number; credits: number }>(
+  items: M[],
+  count: number,
+  currentId: string | null | undefined,
+  atLeast = 1,
+): M | null {
+  const now = items.find((m) => m.id === currentId)?.max_refs ?? 0;
+  const better = items.filter((m) => m.id !== currentId && m.max_refs >= atLeast && m.max_refs > now);
+  if (!better.length) return null;
+  const all = better.filter((m) => m.max_refs >= count);
+  if (all.length) return [...all].sort((a, b) => a.credits - b.credits || a.id.localeCompare(b.id))[0];
+  return [...better].sort((a, b) => b.max_refs - a.max_refs || a.credits - b.credits)[0];
+}
+
+/** How many pictures the tray takes: what the roomiest model on the menu
+    holds (a clip always takes at least its start frame). */
+export function trayCap(items: { max_refs: number }[], fallback: number): number {
+  if (!items.length) return Math.max(1, fallback);
+  return Math.max(1, ...items.map((m) => m.max_refs));
+}

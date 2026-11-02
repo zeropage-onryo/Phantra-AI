@@ -1,0 +1,58 @@
+/* Every shape (2026-11-02, every-shape.tsx). Prefixed es-; the button wears
+   the style of where it sits (.zc-act in the chat, .av-ghost in the viewer). */
+.es {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.es-chat {
+  display: contents;
+}
+.es-chat .es-line,
+.es-chat .es-list {
+  flex-basis: 100%;
+}
+.es button svg {
+  width: 14px;
+  height: 14px;
+}
+.es-viewer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.es-line {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bone-3);
+}
+.es-line.is-failed {
+  color: var(--danger-hi);
+}
+.es-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--bone);
+}
+.es-list li.is-failed {
+  color: var(--warn);
+}
+.es-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--line-hi);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.es-link:hover {
+  text-decoration-color: var(--signal);
+}

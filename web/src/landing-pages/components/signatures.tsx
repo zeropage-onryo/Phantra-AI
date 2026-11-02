@@ -7,6 +7,7 @@ import { TypeFrame } from "./type-frame";
 import { PosterType } from "./poster-type";
 import { LengthDial, SoundBoard, TierPair } from "./clips";
 import { AdTypes } from "./ad-types";
+import { SpecCompare } from "./spec-compare";
 import { SpecNumbers } from "./spec-numbers";
 import type { MakePage } from "../pages";
 
@@ -38,6 +39,8 @@ export const SIGNATURES = {
   "sound-board": SoundBoard,
   /** One product photo, six ad formats, each with how it was drawn (GPT Image 2.5). */
   "ad-types": AdTypes,
+  /** The spec sheet, the model against its neighbours, one prompt on two models (Kling 4.0). */
+  "spec-compare": SpecCompare,
   /** The model's numbers set huge, each showing its own clip (Grok Imagine). */
   "spec-numbers": SpecNumbers,
 } satisfies Record<string, ComponentType<{ page: MakePage }>>;

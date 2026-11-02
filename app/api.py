@@ -25,7 +25,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -185,6 +185,38 @@ def _create_gate(account_id: Optional[int]) -> Optional[JSONResponse]:
 def _out_of_credits(e, what: str) -> JSONResponse:
     from src import charge as charging
     return _error(402, "out_of_credits", charging.refusal(e, what))
+
+
+def _hold_text_turn(account_id, brain):
+    """(turn, refusal) for a turn on a PRICED brain (src/text_charge.py): the
+    ceiling is held BEFORE any job or model call, so an empty balance is a
+    402 here and not a failed job later. (None, None) for a free brain."""
+    from src import ledger, text_charge
+    try:
+        return text_charge.begin(account_id, brain), None
+    except ledger.InsufficientCredit as e:
+        return None, _out_of_credits(e, "this message")
+
+
+def _priced_turn(turn, run):
+    """Run `run()` under a held text turn: settle to what Claude actually cost
+    (never above the ceiling) when it returns, release the hold when it raises.
+    The result gains `spent`, the credits taken. A free turn is just run()."""
+    if turn is None:
+        return run()
+    from src import claude_client
+    try:
+        with claude_client.tally() as bill:
+            result = run()
+    except BaseException:
+        turn.release("the turn failed")
+        raise
+    spent = turn.settle(bill)
+    if isinstance(result, dict):
+        result = {**result, "spent": spent}
+        if spent and isinstance(result.get("detail"), str) and result["detail"] != "ready":
+            result["detail"] += f" · {spent} credits"
+    return result
 
 
 # --- capabilities -----------------------------------------------------------
@@ -382,6 +414,108 @@ def studio_page(studio_id: str, account_id: int = Depends(auth.current_account_i
     if page is None:
         return _error(404, "no_studio", f"no studio {studio_id!r}")
     return page
+
+
+class ProductLinkBody(BaseModel):
+    url: str
+    name: str = ""
+
+
+@router.post("/studios/product-from-link")
+def studio_product_from_link(body: ProductLinkBody, request: Request,
+                             account_id: int = Depends(auth.current_account_id)):
+    """The Ad Studio's "Paste a product link" (2026-10-27): a product page
+    -> ONE product element with its main picture and what the page says,
+    through the connector's own `add_element` (src/mcp_server.py: the page
+    read is linkrefs' one SSRF-safe fetch, the picture is fetched like any
+    public image, the element is saved through the Elements page's body,
+    no sheet drawn, nothing spent). The name defaults to the page's last
+    path word; the person can rename it on Elements."""
+    from src import mcp_server, studios
+    model_connections.mutation_header(request)
+    url = (body.url or "").strip()
+    if not url.lower().startswith(("http://", "https://")):
+        return _error(400, "bad_link", "paste the product page's address (https://...)")
+    name = " ".join((body.name or "").split()) or studios.name_from_link(url)
+
+    def add(kind, item_name, *, photo, notes="", account_id=None):
+        try:
+            return create_element(kind, item_name, account_id=account_id, notes=notes,
+                                  uploads=[photo], sheet=False, strict=True)
+        except ElementRefused as e:
+            if e.status == 402:
+                raise mcp_server.Refused(e.message) from e
+            raise ValueError(e.message) from e
+
+    try:
+        out = mcp_server.add_element("prop", name, url, create_element=add,
+                                     account_id=account_id)
+    except mcp_server.Refused as e:
+        return _error(402, "subscribe_or_top_up", str(e))
+    except ValueError as e:
+        return _error(400, "not_added", str(e))
+    element = out.get("element") or {}
+    return {"name": out.get("name") or name, "kind": "prop",
+            "photos": len(element.get("photos") or []), "page": out.get("page"),
+            "note": out.get("note")}
+
+
+@router.get("/studios/{studio_id}/insights")
+def studio_insights(studio_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What has worked for this workspace (the connector's `what_works`):
+    kept and posted, by model and preset, as lines. Read only, no model."""
+    from src import mcp_server, studios
+    if not studios.get(studio_id):
+        return _error(404, "no_studio", f"no studio {studio_id!r}")
+    try:
+        got = mcp_server.what_works(account_id=account_id)
+    except Exception:                                               # noqa: BLE001
+        return {"enough_data": False, "lines": [], "posted": []}
+    return {"enough_data": bool(got.get("enough_data")), "lines": got.get("lines") or [],
+            "posted": got.get("posted") or []}
+
+
+# --- ad results (2026-10-29, src/ad_results.py, docs/tasks/task-ad-results.md) ---
+# What a person's ads did once they ran: the ad-level report they export from
+# Meta Ads Manager or TikTok Ads Manager, dropped on the Ad Studio. Open to
+# every account (it is their own data and nothing here spends); the brain
+# reads it only inside the Ad Studio, which is the add-on.
+
+
+@router.get("/ad-results")
+def ad_results_summary(account_id: int = Depends(auth.current_account_id)):
+    """Every imported ad summed over its windows, with its render's code, its
+    variant and its rates; the variant tests and their verdicts; the imports."""
+    from src import ad_results
+    return ad_results.summary(account_id=account_id)
+
+
+@router.post("/ad-results/import")
+async def ad_results_import(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """One CSV export (multipart `file`). Upserted by ad and window, so the
+    same export twice changes nothing. 400 with the reason for a file that is
+    not an ad-level CSV; nothing is written then."""
+    model_connections.mutation_header(request)
+    from src import ad_results
+    form = await request.form()
+    upload = form.get("file")
+    if upload is None or not hasattr(upload, "read"):
+        return _error(400, "no_file", "attach the CSV you exported from your ads manager")
+    data = await upload.read(ad_results.MAX_BYTES + 1)
+    try:
+        return ad_results.import_csv(data, account_id=account_id,
+                                     filename=getattr(upload, "filename", "") or "")
+    except ad_results.ImportRefused as exc:
+        return _error(400, "bad_export", str(exc))
+
+
+@router.delete("/ad-results/imports/{import_id}")
+def ad_results_delete_import(import_id: str, request: Request,
+                             account_id: int = Depends(auth.current_account_id)):
+    """Take one import back out (an export dropped by mistake)."""
+    model_connections.mutation_header(request)
+    from src import ad_results
+    return {"deleted": ad_results.delete_import(import_id, account_id=account_id)}
 
 
 @router.get("/brains")
@@ -815,7 +949,7 @@ async def creative_guide_reply(request: Request,
     # connection is the person's own model and has no tier.
     from src import gemini_utils
     brain_raw = (form.get("brain") or "").strip().lower()
-    brain = brain_raw if brain_raw in gemini_utils.BRAINS else creative_guide.DEFAULT_BRAIN
+    brain = brain_raw if gemini_utils.brain_available(brain_raw) else creative_guide.DEFAULT_BRAIN
 
     # The assistant pill (2026-09-26, src/assistant_brain.py): a turn
     # that says which page it floats over / which step the project is on
@@ -941,8 +1075,15 @@ async def creative_guide_reply(request: Request,
     clip_pick = model_menu.video_id(form.get("clip_model"))
     clip_label = direct.video_label(clip_pick) if clip_pick else None
 
+    # A PRICED BRAIN (2026-11-02): the ceiling is held now, settled to what the
+    # turn used inside the job, released if it fails. Personal connections
+    # spend the person's own plan and never this.
+    turn, refused = (None, None) if personal else _hold_text_turn(account_id, brain)
+    if refused is not None:
+        return refused
+
     def work(job):
-        result = _guide_turn(job)
+        result = _priced_turn(turn, lambda: _guide_turn(job))
         if remember:
             _remember_turn(project["id"], conversation, result["reply"], account_id,
                            again=again)
@@ -3495,7 +3636,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # through this route at all.
     from src import gemini_utils
     brain_raw = (form.get("brain") or "").strip().lower()
-    brain = brain_raw if brain_raw in gemini_utils.BRAINS else gemini_utils.DEFAULT_BRAIN
+    brain = brain_raw if gemini_utils.brain_available(brain_raw) else gemini_utils.DEFAULT_BRAIN
 
     # The frame the scene is written for, stored on its shot so the Queue
     # card defaults to it instead of asking again. REFUSED rather than
@@ -3526,14 +3667,26 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     from src import model_menu
     render_model = model_menu.video_id(form.get("render_model"))
     render_why = model_menu.clean_why(form.get("render_model_why")) if render_model else ""
+    # one version of an ad in a test (2026-10-29, make_plan's `variant`):
+    # filed on the scene it writes, so imported ad results read as a test
+    variant = (form.get("variant") or "").strip()
+    variant_group = (form.get("variant_group") or "").strip()
+    variant_test = (form.get("variant_test") or "").strip()
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
+    # a scene written on a PRICED brain holds its ceiling here (see the Guide)
+    turn, refused = _hold_text_turn(account_id, brain)
+    if refused is not None:
+        return refused
 
     def work(job):
+        return _priced_turn(turn, lambda: _scenes_work(job))
+
+    def _scenes_work(job):
         from google import genai
 
         from src import scene_chain
@@ -3582,6 +3735,12 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                                                   account_id=account_id, why=render_why)
                 except Exception:                           # noqa: BLE001
                     pass
+        if variant and variant_group:
+            from src import ad_results
+            for s in saved:
+                ad_results.record_variant(s["concept_id"], account_id=account_id,
+                                          group_id=variant_group, label=variant,
+                                          test=variant_test)
         detail = f"{len(saved)} concept(s)"
         if brain != gemini_utils.DEFAULT_BRAIN:
             detail += f" · {brain}"
@@ -5022,6 +5181,15 @@ def approve_render(concept_id: int, account_id: Optional[int],
         # picked. (The adapters clamp internally -- that is their contract
         # with the nightly graph, which has no human to refuse to.)
         raise ApproveRefused(400, "bad_render_choice", str(e))
+    # A SCENE RENDERED AS ONE CLIP IS RENDERED (2026-11-02). Its clip lands on
+    # the shot, not on a part, so renders_as_one still says "one clip" and a
+    # second approve -- the connector's, or a stale card -- paid for the
+    # whole scene again. Refused here, before any token is spent. (A split
+    # scene needs no guard: the loop skips every shot that has its clip.)
+    if priced.get("one_clip") and shot.get("media_url"):
+        raise ApproveRefused(409, "already_rendered",
+                             "this scene is rendered already: its clip is in your "
+                             "Library. Nothing was charged.")
     # priced["signed"] is "billable AND a secret to sign with" -- exactly
     # the renders display() minted a token for, so the requirement and the
     # offer are one predicate and cannot disagree
@@ -5258,6 +5426,65 @@ def concept_refs(concept_id: int, body: ConceptRefsBody, account_id: int = Depen
         {"shots": shots, "duration": concept.get("duration")},
         warnings=concept.get("warnings") or [], account_id=account_id)
     return {"ok": True, "refs": shots[0]["refs"]}
+
+
+class SceneHookBody(BaseModel):
+    asset: str                      # gen:<id>, a video render of this account's
+    seconds: float = 2.0
+
+
+def _save_first_shot(concept_id: int, concept: dict, shots: list[dict], account_id: int) -> None:
+    """Write the shot list back exactly as it was but for the first shot,
+    carrying the warnings and duration through (as concept_refs does)."""
+    preprod.update_concept_shots(
+        concept_id, {"shots": shots, "duration": concept.get("duration"),
+                        **({"ai": concept["ai"]} if concept.get("ai") else {})},
+        warnings=concept.get("warnings") or [], account_id=account_id)
+
+
+@router.put("/scenes/{concept_id}/hook")
+def set_scene_hook(concept_id: int, body: SceneHookBody,
+                   account_id: int = Depends(auth.current_account_id)):
+    """The scene's hook (2026-10-29): a short effect clip the Final cut opens
+    on, played for `seconds` and then a hard cut into shot 1. Free: it only
+    names a clip already made (and paid for on its own card). Kept on the
+    first shot, outside its prompt and refs, so no quote goes stale."""
+    from src import render_assets
+    from src.cut import assemble as cut_assemble
+    from src.cut import doc as cut_doc
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept["shots"]:
+        return _error(404, "not_found", "no such scene")
+    parsed = cut_doc.parse_handle(body.asset)
+    if not parsed or parsed[0] != "gen":
+        return _error(400, "bad_media", "a hook is a gen:<id> clip from the Library")
+    row = render_assets.get(parsed[1], account_id=account_id)
+    if row is None or row.get("deleted_at"):
+        return _error(404, "not_found", "that clip is not in your Library")
+    if row.get("media_kind") != "video":
+        return _error(400, "bad_media", "a hook has to be a video clip")
+    if not (cut_assemble.HOOK_MIN_SECONDS <= body.seconds <= cut_assemble.HOOK_MAX_SECONDS):
+        return _error(400, "bad_seconds",
+                      f"a hook plays {cut_assemble.HOOK_MIN_SECONDS:g}-"
+                      f"{cut_assemble.HOOK_MAX_SECONDS:g} seconds")
+    shots = [dict(s) for s in concept["shots"]]
+    shots[0]["hook"] = {"asset": cut_doc.handle("gen", parsed[1]),
+                        "seconds": round(float(body.seconds), 2)}
+    _save_first_shot(concept_id, concept, shots, account_id)
+    return {"ok": True, "hook": shots[0]["hook"]}
+
+
+@router.delete("/scenes/{concept_id}/hook")
+def clear_scene_hook(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Take the hook off; the clip itself stays in the Library."""
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept["shots"]:
+        return _error(404, "not_found", "no such scene")
+    shots = [dict(s) for s in concept["shots"]]
+    had = shots[0].pop("hook", None) is not None
+    if had:
+        _save_first_shot(concept_id, concept, shots, account_id)
+    return {"ok": True, "removed": had}
 
 
 @router.get("/concepts/{concept_id}")
@@ -6682,6 +6909,52 @@ def quick_edit(body: QuickEditBody, account_id: int = Depends(auth.current_accou
     return {"job_id": job["id"], "credits": 0}
 
 
+class EveryShapeBody(BaseModel):
+    """One clip or still (gen:<id> / asset:<id>) and the shapes to make of it;
+    absent shapes means 9:16, 1:1 and 16:9 (src/cut/quick.py EVERY_SHAPES)."""
+    model_config = ConfigDict(extra="forbid")
+    source: str
+    shapes: Optional[list[str]] = None
+    project_id: Optional[int] = None
+
+
+@router.post("/every-shape")
+def every_shape(body: EveryShapeBody, account_id: int = Depends(auth.current_account_id)):
+    """Every shape an ad runs in, from one finished clip or still (2026-11-02,
+    docs/tasks/task-every-shape.md): one free reformat per missing shape,
+    each its own item in the Library. Free like /quick-edit (ffmpeg on this
+    server, no provider, no hold). Checked before the job starts (400 with
+    the reason); a shape the source already is, or one made from it before,
+    is handed back, not made again."""
+    from src.cut import quick
+    try:
+        plan = quick.plan_every_shape((body.source or "").strip(), body.shapes or quick.EVERY_SHAPES,
+                                      account_id=account_id)
+    except quick.QuickRefused as e:
+        return _error(400, "bad_edit", str(e))
+    making = [x["aspect"] for x in plan["shapes"] if x["do"] == "make"]
+
+    def work(job):
+        def tick(i, n, aspect):
+            jobs.progress(job, 0.1 + 0.85 * i / max(n, 1), f"making {aspect} · {i + 1} of {n}")
+        shapes = quick.every_shape(plan, account_id=account_id, project_id=body.project_id,
+                                   on_shape=tick)
+        made = sum(1 for x in shapes if x["status"] == "made")
+        failed = [x for x in shapes if x["status"] == "failed"]
+        for x in failed:
+            print(f"  every shape: {x['aspect']} of {plan['handle']} not made: {x['error']}",
+                  file=sys.stderr)
+        if making and not made:
+            raise RuntimeError("None of the shapes could be made. Nothing was charged.")
+        return {"detail": f"{made} new shape{'s' if made != 1 else ''} · free",
+                "shapes": [{k: v for k, v in x.items() if k != "error"} for x in shapes]}
+
+    job = jobs.start("effect", "every shape · free", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": 0, "making": making,
+            "shapes": [{"aspect": x["aspect"], "do": x["do"],
+                        **({"fit": x["fit"]} if x.get("fit") else {})} for x in plan["shapes"]]}
+
+
 def _render_failed(raw, what: str) -> str:
     """A draw that did not happen, as the job's line: the provider's own
     words go to the log (and are on the generations row), the page gets a
@@ -6905,6 +7178,26 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
 
     image_refs, ref_urls, video_refs = await _collect_refs(
         form, want_video=True, account_id=account_id)
+    # A still is never charged above the price its card showed (2026-11-02):
+    # priced here at the shape and the pictures actually sent (each picture
+    # on FLUX.2 moves it off the model's opening price), refused before the
+    # job if that is MORE than the card's number. The 409 carries the real
+    # price; the card shows it and asks again. Less (GPT Image 2 off the
+    # square) runs: the hold is the lower number.
+    if output == "image":
+        from src import direct
+        expected = _expected_credits(form)
+        if expected is None:
+            return _error(400, "missing_price", "say what the card showed: expect_credits")
+        try:
+            still = direct.image_quote(account_id, model=image_model,
+                                       aspect=aspect or "", references=len(image_refs))
+        except ValueError as e:
+            return _error(400, "bad_choice", str(e))
+        if still["credits"] > expected:
+            return _price_moved(still["credits"])
+        if image_model != NANO_IMAGE_MODEL:
+            aspect = still["aspect"]          # fal is charged at the shape it was priced at
     roles = _form_ref_roles(form)
     # what this make says about earlier outputs (src/outcomes.py): a render
     # sent back as a reference was reused, and a Variation names the still
@@ -7230,7 +7523,12 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
         if not res.get("ok"):
             raise RuntimeError(_render_failed(res.get("error"), "The clip"))
         asset = res.get("asset_id")
-        return {"detail": f"{label} · {q['seconds']}s · done",
+        # a picture that could not be fetched did not go: said, never passed
+        # off as used (the prompt may still name it by its tag)
+        reached = res.get("references")
+        short = (f" · {reached} of {len(pictures)} pictures reached it"
+                 if pictures and isinstance(reached, int) and reached < len(pictures) else "")
+        return {"detail": f"{label} · {q['seconds']}s · done{short}",
                 "output": res.get("media_url"), "media": "video",
                 "asset": f"gen:{asset}" if asset else None}
 
@@ -7650,8 +7948,21 @@ def concept_deny(concept_id: int, body: DenyBody, account_id: int = Depends(auth
 
 # --- evals ------------------------------------------------------------------
 
+def eval_operator(request: Request,
+                  account_id: int = Depends(auth.current_account_id)) -> int:
+    """The eval golden set and its runs are SHARED tables graded on the
+    operator's Gemini key, so only an owner of the house account reaches
+    them here (QA 2026-11-02 E2: any customer could list, add to and
+    delete the set, and start a billed run). The dev console's twins
+    (app/main.py, DEV_TOOLS) call these functions directly and skip it."""
+    if account_id is None or whats_new_routes._operator(request, account_id) is None:
+        raise HTTPException(403, "The eval set is the operator's.")
+    return account_id
+
+
 @router.get("/evals/golden")
-def evals_golden(account_id: int = Depends(auth.current_account_id)):
+def evals_golden(account_id: int = Depends(auth.current_account_id),
+                 _op: int = Depends(eval_operator)):
     return {"items": evalstore.list_golden()}
 
 
@@ -7662,7 +7973,8 @@ class GoldenBody(BaseModel):
 
 
 @router.post("/evals/golden")
-def evals_golden_add(body: GoldenBody, account_id: int = Depends(auth.current_account_id)):
+def evals_golden_add(body: GoldenBody, account_id: int = Depends(auth.current_account_id),
+                     _op: int = Depends(eval_operator)):
     try:
         golden_id = evalstore.add_golden(body.query, body.relevant,
                                          source=body.source)
@@ -7672,18 +7984,21 @@ def evals_golden_add(body: GoldenBody, account_id: int = Depends(auth.current_ac
 
 
 @router.delete("/evals/golden/{golden_id}")
-def evals_golden_delete(golden_id: int, account_id: int = Depends(auth.current_account_id)):
+def evals_golden_delete(golden_id: int, account_id: int = Depends(auth.current_account_id),
+                        _op: int = Depends(eval_operator)):
     evalstore.delete_golden(golden_id)
     return {"deleted": golden_id}
 
 
 @router.get("/evals/runs")
-def evals_runs(account_id: int = Depends(auth.current_account_id)):
+def evals_runs(account_id: int = Depends(auth.current_account_id),
+               _op: int = Depends(eval_operator)):
     return {"items": evalstore.list_runs()}
 
 
 @router.get("/evals/runs/{run_id}")
-def evals_run_detail(run_id: int, account_id: int = Depends(auth.current_account_id)):
+def evals_run_detail(run_id: int, account_id: int = Depends(auth.current_account_id),
+                     _op: int = Depends(eval_operator)):
     run = evalstore.get_run(run_id)
     if run is None:
         return _error(404, "not_found", "no such run")
@@ -7695,7 +8010,8 @@ class EvalRunBody(BaseModel):
 
 
 @router.post("/evals/run")
-def evals_run(body: EvalRunBody, account_id: int = Depends(auth.current_account_id)):
+def evals_run(body: EvalRunBody, account_id: int = Depends(auth.current_account_id),
+              _op: int = Depends(eval_operator)):
     """Compare one-shot retrieval with the complete CRAG retry path.
 
     Every metric is computed server-side and stored with the exact golden

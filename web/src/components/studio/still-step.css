@@ -13,8 +13,10 @@
   background: #101010;
   transition: border-color var(--t, 160ms);
 }
+/* waiting is not an error: the card is framed in the spend colour, and
+   red stays for errors only (QA 2026-11-02 T1) */
 .ss[data-state="waiting"] {
-  border-color: rgb(228 0 43 / 0.45);
+  border-color: color-mix(in srgb, var(--signal, #fee32d) 45%, transparent);
 }
 .ss-head {
   display: flex;
@@ -40,7 +42,7 @@
   letter-spacing: 0.06em;
 }
 .ss[data-state="waiting"] .ss-head em {
-  color: #ff4d6a;
+  color: var(--signal, #fee32d);
 }
 .ss[data-state="done"] .ss-head em {
   color: #3ddc84;
@@ -141,7 +143,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--signal, #fee32d);
-  color: #fff;
+  color: var(--on-signal, #0a0a0b);
   font-family: var(--body, inherit);
   font-size: 14px;
   font-weight: 600;
@@ -153,8 +155,8 @@
   filter: brightness(1.12);
 }
 .ss-go button:disabled {
-  background: #6e1a1f;
-  color: rgb(255 255 255 / 0.55);
+  background: var(--edge-lo, #262626);
+  color: var(--bone-2, #a3a3a3);
   cursor: default;
   filter: none;
 }

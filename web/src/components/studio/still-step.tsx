@@ -17,7 +17,7 @@ import type { Turn } from "@/lib/assistant";
 import { SHEET_TOOL, mediaSrc } from "@/lib/composer";
 import { shapeClash } from "@/lib/image-aspects";
 import { madeStatus } from "@/lib/made-state";
-import { modelLine, optionLabel, type ModelOption, type StepModel } from "@/lib/step-model";
+import { approveText, modelLine, optionLabel, type ModelOption, type StepModel } from "@/lib/step-model";
 import "@/components/studio/still-step.css";
 
 export type StepState = "waiting" | "running" | "done" | "failed";
@@ -70,7 +70,7 @@ export function StillStep({
   kit = "",
 }: {
   turn: Turn;
-  /** under Approve: "Nano Banana · 10 credits" */
+  /** on Approve: "Nano Banana · 10 credits"; under the status once it ran */
   line: string;
   busy: boolean;
   onApprove: () => void;
@@ -155,7 +155,7 @@ export function StillStep({
       <div className="ss-go">
         {state === "waiting" || state === "failed" ? (
           <button type="button" disabled={busy} onClick={onApprove}>
-            {state === "failed" ? "Approve again" : "Approve"}
+            {approveText(state, line)}
           </button>
         ) : (
           <span className="ss-ok">
@@ -163,7 +163,7 @@ export function StillStep({
             {state === "done" ? "Approved" : "Generating…"}
           </span>
         )}
-        {line ? <small>{line}</small> : null}
+        {line && !(state === "waiting" || state === "failed") ? <small>{line}</small> : null}
       </div>
     </div>
   );
@@ -206,7 +206,7 @@ export function SheetStep({
       <div className="ss-go">
         {state === "waiting" || state === "failed" ? (
           <button type="button" disabled={busy} onClick={onApprove}>
-            {state === "failed" ? "Approve again" : "Approve"}
+            {approveText(state, line)}
           </button>
         ) : (
           <span className="ss-ok">
@@ -214,7 +214,7 @@ export function SheetStep({
             {state === "done" ? `Saved${name ? ` ${name}` : ""} to Elements` : "Drawing…"}
           </span>
         )}
-        {line ? <small>{line}</small> : null}
+        {line && !(state === "waiting" || state === "failed") ? <small>{line}</small> : null}
       </div>
     </div>
   );

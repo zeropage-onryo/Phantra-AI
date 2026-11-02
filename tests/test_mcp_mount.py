@@ -991,7 +991,8 @@ def test_quoting_and_approving_stay_in_the_callers_account(two_people, pg, monke
     ])
     # two timed shots that fit the model: one render with the cut inside it
     assert not e4 and quoted["clip"]["one_clip"] is True and len(quoted["clip"]["renders"]) == 1
-    assert quoted["keyframes"]["stills"] == 2 and quoted["balance"] is not None
+    # ...so no stills are offered with it (2026-11-02)
+    assert quoted["keyframes"] is None and quoted["balance"] is not None
     assert quoted["scene_id"] == sid and "picked" not in quoted
     assert e5 and f"no scene {sid}" in qforeign
     assert not e6 and clip["job_id"] == 42
@@ -1015,6 +1016,8 @@ def test_keyframes_from_a_chat_need_the_quotes_token(two_people, pg, monkeypatch
     her own `quote` starts the job, capped at the stills it priced; the
     same token again is handed that job. As Bob, her token and her scene
     id are "no scene <id>" (the listing's wording for the body's not_found)."""
+    from src import timeline
+    monkeypatch.setenv(timeline.ONE_CLIP_ENV, "0")     # stills steer a split scene only
     import time
 
     from app import api, jobs
@@ -1121,6 +1124,8 @@ def test_the_claude_listing_prices_and_hands_off_but_never_renders(two_people, p
     the quote carrying the studio link and no tokens, `approve` refused as
     not a tool -- nothing reaches the approve bodies -- and Bob's view of
     her scene is 'no scene'."""
+    from src import timeline
+    monkeypatch.setenv(timeline.ONE_CLIP_ENV, "0")     # stills steer a split scene only
     from src import asset_shelf
 
     w = two_people

@@ -38,3 +38,13 @@ test('the starters are prompts, not runs', () => {
     for (const s of STARTERS[kind]) assert.ok(s.length > 20 && s.length < 200);
   }
 });
+
+import { videoResolutions } from '../src/lib/direct.ts';
+
+test('with pictures held, only the resolutions the model renders them at are offered', () => {
+  const grok = { resolutions: ['480p', '720p', '1080p'], ref_resolutions: ['480p', '720p'] };
+  assert.deepEqual(videoResolutions(grok, 'references'), ['480p', '720p']);
+  assert.deepEqual(videoResolutions(grok, 'start'), ['480p', '720p', '1080p']);
+  assert.deepEqual(videoResolutions({ ...grok, ref_resolutions: null }, 'references'), ['480p', '720p', '1080p']);
+  assert.deepEqual(videoResolutions(null, 'references'), []);
+});
