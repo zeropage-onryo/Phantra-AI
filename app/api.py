@@ -7377,7 +7377,12 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
         if not res.get("ok"):
             raise RuntimeError(_render_failed(res.get("error"), "The clip"))
         asset = res.get("asset_id")
-        return {"detail": f"{label} · {q['seconds']}s · done",
+        # a picture that could not be fetched did not go: said, never passed
+        # off as used (the prompt may still name it by its tag)
+        reached = res.get("references")
+        short = (f" · {reached} of {len(pictures)} pictures reached it"
+                 if pictures and isinstance(reached, int) and reached < len(pictures) else "")
+        return {"detail": f"{label} · {q['seconds']}s · done{short}",
                 "output": res.get("media_url"), "media": "video",
                 "asset": f"gen:{asset}" if asset else None}
 

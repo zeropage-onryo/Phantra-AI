@@ -35,6 +35,7 @@ writes a scene.
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 # the most pictures a still is sent with from the direct page, the
@@ -49,13 +50,16 @@ PROMPT_MIN = 3
 
 
 def clean_prompt(raw, video_model: Optional[str] = None) -> str:
-    """The prompt as typed, whitespace folded; ValueError when empty or
+    """The prompt as typed, spaces folded and lines kept; ValueError when empty or
     past the cap (a wall of text is refused, not cut). A clip's cap is its
     model's own (fal.prompt_max, 2026-10-25: Higgsfield's best clip ran on a
     6,487-character prompt), a still's PROMPT_MAX."""
     from . import fal
     cap = fal.prompt_max(video_model) if video_model else PROMPT_MAX
-    text = " ".join(str(raw or "").split())
+    # spaces folded, line breaks kept (2026-11-02): a pasted shot list keeps
+    # its lines; runs of blank lines become one
+    lines = [" ".join(line.split()) for line in str(raw or "").splitlines()]
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
     if not text:
         raise ValueError("type what you want to see")
     if len(text) < PROMPT_MIN:
@@ -169,6 +173,9 @@ def video_quote(account_id: Optional[int] = None, *, model: str,
     usd = float(choice["estimate_usd"])
     if references:
         usd = round(usd + float((fal.ref_spec(model) or {}).get("per_image_usd", 0)) * references, 4)
+    if start_frame:
+        # what the model bills for the picture it starts on (Grok: a cent)
+        usd = round(usd + float(fal.VIDEO_MODELS[model].get("start_frame_usd", 0)), 4)
     return {"model": model, "label": _label(model),
             "seconds": int(choice["duration"]), "resolution": choice["frame"],
             "aspect": frame, "start_frame": bool(start_frame), "references": references,
