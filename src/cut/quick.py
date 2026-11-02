@@ -265,5 +265,105 @@ def trim(planned: dict, *, account_id: Optional[int], title: Optional[str] = Non
                  project_id=project_id, dsn=dsn)
 
 
-__all__ = ["SIZES", "FITS", "FREE_NOTE", "QuickRefused", "crop_for", "plan_reformat",
+# --- every shape (2026-11-02, docs/tasks/task-every-shape.md) ---------------
+# Runway Ads resizes every variant for every placement on its own; here one
+# click makes the shapes an ad runs in from one finished clip or still, each
+# a free reformat (above), each its own gen:<id> beside the source. Crop when
+# the frame keeps at least half the picture (9:16 <-> 1:1, 16:9 <-> 1:1), pad
+# when it would not (9:16 <-> 16:9: a crop that deep is a zoom on a sliver).
+# A shape the source already is, or one already made from it and still on
+# the wall, is not made again.
+
+EVERY_SHAPES = ("9:16", "1:1", "16:9")
+SHAPE_CROP_MAX = 0.25            # per side; past it the shape is padded instead
+
+
+def _same_shape(width: int, height: int, aspect: str) -> bool:
+    w, h = SIZES[aspect]
+    return abs(width / height - w / h) <= 0.005 * (w / h)
+
+
+def _made_before(handle: str, *, account_id: Optional[int],
+                 dsn: Optional[str]) -> dict[str, dict]:
+    """{aspect: the row} for reformats of `handle` already on this account's
+    wall and not deleted."""
+    from .. import render_assets
+    out: dict[str, dict] = {}
+    for item in render_assets.list_all(dsn, account_id=account_id):
+        meta = item.get("metadata") or {}
+        if (item.get("model") == "reformat" and meta.get("source_ref") == handle
+                and meta.get("aspect") in SIZES and not item.get("deleted_at")):
+            out.setdefault(meta["aspect"], item)
+    return out
+
+
+def plan_every_shape(handle: str, shapes=EVERY_SHAPES, *, account_id: Optional[int],
+                     fps: int = d.DEFAULT_FPS, dsn: Optional[str] = None) -> dict[str, Any]:
+    """What one click would make: per shape, `make` (with its fit and the
+    planned cut), `same` (the source already is that shape) or `have` (made
+    before: its row). Raises QuickRefused for a source this cannot take or a
+    shape it does not know."""
+    shapes = list(dict.fromkeys(str(x).strip() for x in (shapes or EVERY_SHAPES)))
+    unknown = [x for x in shapes if x not in SIZES]
+    if unknown or not shapes:
+        raise QuickRefused(f"shapes are some of {list(SIZES)}, got {unknown or shapes!r}")
+    _source(handle, account_id=account_id, dsn=dsn)
+    _media, info = _measured(handle, account_id=account_id, fps=fps, dsn=dsn)
+    width, height = int(info["width"]), int(info["height"])
+    before = _made_before(handle, account_id=account_id, dsn=dsn)
+    out = []
+    for aspect in shapes:
+        if _same_shape(width, height, aspect):
+            out.append({"aspect": aspect, "do": "same"})
+            continue
+        if aspect in before:
+            out.append({"aspect": aspect, "do": "have", "row": before[aspect]})
+            continue
+        try:
+            fit = "crop" if max(crop_for(width, height, SIZES[aspect]).values()) <= SHAPE_CROP_MAX \
+                else "pad"
+        except QuickRefused:
+            fit = "pad"
+        planned = plan_reformat(handle, aspect, fit, account_id=account_id, fps=fps, dsn=dsn)
+        out.append({"aspect": aspect, "do": "make", "fit": fit, "planned": planned})
+    return {"handle": handle, "source_size": [width, height], "shapes": out}
+
+
+def every_shape(plan: dict, *, account_id: Optional[int], project_id: Optional[int] = None,
+                dsn: Optional[str] = None, on_shape=None) -> list[dict[str, Any]]:
+    """Make the planned shapes, one free reformat each. One that fails is a
+    line with its reason; the others still come. `on_shape(i, n, aspect)`
+    is told before each one is made."""
+    from .. import media as media_mod
+    todo = [x for x in plan["shapes"] if x["do"] == "make"]
+    out = []
+    for item in plan["shapes"]:
+        aspect = item["aspect"]
+        if item["do"] == "same":
+            out.append({"aspect": aspect, "status": "same", "ref": plan["handle"]})
+            continue
+        if item["do"] == "have":
+            row = item["row"]
+            out.append({"aspect": aspect, "status": "have", "ref": f"gen:{row['id']}",
+                        "asset_id": row["id"], "fit": (row.get("metadata") or {}).get("fit"),
+                        "media_url": media_mod.url_for(row.get("media_url"), account_id)
+                        if row.get("media_url") else None})
+            continue
+        if on_shape:
+            on_shape(todo.index(item), len(todo), aspect)
+        try:
+            res = reformat(item["planned"], account_id=account_id, project_id=project_id,
+                           title=f"{plan['handle']} as {aspect}", dsn=dsn)
+        except (render.RenderError, sources.SourceError, ValueError) as e:
+            out.append({"aspect": aspect, "status": "failed", "fit": item["fit"],
+                        "error": str(e)})
+            continue
+        out.append({"aspect": aspect, "status": "made", "fit": item["fit"],
+                    "ref": res.get("ref"), "asset_id": res.get("asset_id"),
+                    "media_url": res.get("media_url")})
+    return out
+
+
+__all__ = ["SIZES", "FITS", "FREE_NOTE", "EVERY_SHAPES", "QuickRefused", "crop_for",
+           "plan_every_shape", "every_shape", "plan_reformat",
            "plan_trim", "reformat", "trim"]

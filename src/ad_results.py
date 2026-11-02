@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import re
 import threading
 import uuid
@@ -315,14 +316,37 @@ def parse(data: bytes) -> dict:
 # writing
 # --------------------------------------------------------------------------
 
+_SOURCE_REF = re.compile(r"^gen:(\d+)$")
+
+
 def _owned_assets(conn, account_id: int, ids: list[int]) -> dict[int, Optional[int]]:
-    """{asset id: its scene} for the ids that are this account's outputs."""
+    """{asset id: its scene} for the ids that are this account's outputs. A
+    shape made from another output (a free reformat or trim, src/cut/quick.py,
+    which carries no scene of its own) counts toward its source's scene, so
+    the 1:1 cut of a version reads as that version (2026-11-02)."""
     if not ids or not db.table_exists(conn, "generated_assets"):
         return {}
     found = conn.execute(
-        "SELECT id, concept_id FROM generated_assets WHERE account_id = %s AND id = ANY(%s)",
-        (account_id, ids)).fetchall()
-    return {r["id"]: r.get("concept_id") for r in found}
+        "SELECT id, concept_id, metadata_json FROM generated_assets "
+        "WHERE account_id = %s AND id = ANY(%s)", (account_id, ids)).fetchall()
+    out: dict[int, Optional[int]] = {}
+    for r in found:
+        concept, meta, hops = r.get("concept_id"), r.get("metadata_json"), 0
+        while concept is None and meta and hops < 3:
+            try:
+                m = _SOURCE_REF.match(str((json.loads(meta) or {}).get("source_ref") or ""))
+            except (TypeError, ValueError):
+                m = None
+            if not m:
+                break
+            parent = conn.execute(
+                "SELECT concept_id, metadata_json FROM generated_assets "
+                "WHERE account_id = %s AND id = %s", (account_id, int(m.group(1)))).fetchone()
+            if not parent:
+                break
+            concept, meta, hops = parent.get("concept_id"), parent.get("metadata_json"), hops + 1
+        out[r["id"]] = concept
+    return out
 
 
 def import_csv(data: bytes, *, account_id: int, filename: str = "",

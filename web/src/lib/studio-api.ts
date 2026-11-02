@@ -1145,6 +1145,21 @@ export type QuickEditRequest = {
 export const runQuickEdit = (body: QuickEditRequest) =>
   apiFetch<{ job_id: number; credits: number }>("/quick-edit", { method: "POST", body: JSON.stringify(body) });
 
+/** Every shape an ad runs in, from one finished clip or still (POST
+ *  /api/every-shape, 2026-11-02): one free reformat per missing shape, as a
+ *  job whose result lists each shape (lib/every-shape.ts). */
+export type EveryShapeStart = {
+  job_id: number;
+  credits: number;
+  making: string[];
+  shapes: { aspect: string; do: "make" | "same" | "have"; fit?: string }[];
+};
+export const runEveryShape = (source: string, shapes?: string[]) =>
+  apiFetch<EveryShapeStart>("/every-shape", {
+    method: "POST",
+    body: JSON.stringify(shapes ? { source, shapes } : { source }),
+  });
+
 /* ── the account switch and sign-out live at the API root ── */
 /** POST /account/{slug} THROUGH THE PROXY (API_URL is empty in production,
  *  so this is our own origin and the `phantra_account` cookie lands

@@ -42,6 +42,7 @@ import { renderDownloadHref, sceneHref } from "@/lib/studio-api";
 import { assetId, continueActions, split, type ContinueAction, type ContinueKind } from "@/lib/continue";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
 import { PostPanel } from "@/components/studio/post-panel";
+import { EveryShape } from "@/components/studio/every-shape";
 import { TopUpLink } from "@/components/studio/top-up-link";
 import { NOT_SENT, NOT_SENT_CREDITS } from "@/lib/out-of-credits";
 import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@/lib/composer";
@@ -479,6 +480,8 @@ function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
               <Clapperboard strokeWidth={1.6} /> Edit the cut
             </OpenInEditor>
           ) : null}
+          {/* every placement's shape, free (2026-11-02, lib/every-shape.ts) */}
+          {cut.asset ? <EveryShape source={cut.asset} look="chat" /> : null}
         </div>
       ) : null}
       {trimOpen && cut.status === "done" && cut.asset ? (

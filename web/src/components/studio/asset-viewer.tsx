@@ -54,6 +54,7 @@ import {
   type MediaItem,
 } from "@/lib/studio-api";
 import { adCode } from "@/lib/ad-results";
+import { EveryShape } from "@/components/studio/every-shape";
 import "./asset-viewer.css";
 
 /* SHARE (2026-10-20, src/shares.py): a public page for this one render --
@@ -580,6 +581,10 @@ export function AssetViewer({
                   <dt>Ad code</dt>
                   <dd>
                     <AdCodeRow id={item.generated_id} key={`code-${item.generated_id}`} />
+                  </dd>
+                  <dt>Shapes</dt>
+                  <dd>
+                    <EveryShape source={`gen:${item.generated_id}`} look="viewer" key={`shapes-${item.generated_id}`} />
                   </dd>
                 </>
               ) : null}
