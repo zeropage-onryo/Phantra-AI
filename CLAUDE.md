@@ -37,6 +37,12 @@ What a signed-in person has:
   `prompts/studios/`. A paid flat add-on (`src/addons.py`, OWNED `account_addons`,
   `pricing.ADDONS`): its Stripe events are routed before any plan branch; the page is open to
   all, the brief reaches the brain only with the add-on.
+  **Results and versions** (2026-10-29, `docs/tasks/task-ad-results.md`): a dropped Meta /
+  TikTok ad-level CSV (`src/ad_results.py`, OWNED `ad_results`) is tied to renders by the ad
+  code in the ad's name (`PH<generated_assets.id>`, shown in the Library viewer); a plan's scene
+  steps may be labelled versions of one ad (`make_plan` `variant` / `test`, OWNED
+  `ad_variants`), read back as a test with a verdict; Ad Studio turns and `what_works` are told
+  the numbers.
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
   Veo, Seedance, LTX, Wan). The priced button on the card is the only place a clip is paid for.
 - **Elements** (`/studio/elements`): the characters, products and places a scene is held to,

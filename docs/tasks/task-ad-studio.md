@@ -131,5 +131,5 @@ carrying the pick and `skill=ugc` with both photos attached.
   add-on is priced against "included".
 - Create the Stripe Price and set `STRIPE_PRICE_STUDIOS`; until then grant by hand.
 - Approve the example picks per format.
-- Next: variants as one plan, ad QC on the card, ad-account publishing. Film and Fashion wait on
-  usage.
+- Next: ad QC on the card, ad-account publishing. Variants as one plan and ad results were built
+  2026-10-29 (`docs/tasks/task-ad-results.md`). Film and Fashion wait on usage.

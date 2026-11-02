@@ -457,6 +457,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 result_refs.note(named),
                                 skills.picked_note(picked),
                                 studios.turn_note(studio),
+                                studios.results_note(studio, account_id),
                                 autonomy_note(autonomy),
                                 clip_model_note(clip_model) if "make_video" in offered else ""))
     _attach_kit(contents, brand_kit)

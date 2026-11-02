@@ -46,6 +46,10 @@ export type PlanStep = {
   uses: number[];
   /** keyframes / render: the scene step it acts on */
   scene?: number;
+  /** scene, in a test of versions of one ad: the one thing this version
+      changes ("Hook: the spill"); filed on the scene it writes so imported ad
+      results read as a test (src/ad_results.py, 2026-10-29) */
+  variant?: string;
   status: StepStatus;
   /** why it failed or was skipped, or what it did */
   note?: string;
@@ -72,6 +76,8 @@ export type PlanStep = {
 export type Plan = {
   id: string;
   summary: string;
+  /** versions of one ad: what they test (with a `variant` on each scene step) */
+  test?: string;
   steps: PlanStep[];
   /** steps approved ahead of their turn */
   approved: number[];
@@ -105,7 +111,7 @@ const int = (v: unknown) => (typeof v === "number" && Number.isInteger(v) ? v : 
     ({summary, steps: [{n, do, args, why, uses, scene}]}). null when it is
     not a plan a card can draw: fewer than two steps a card knows. */
 export function planOf(raw: unknown, id: string): Plan | null {
-  const a = (raw ?? {}) as { summary?: unknown; steps?: unknown };
+  const a = (raw ?? {}) as { summary?: unknown; steps?: unknown; test?: unknown };
   if (!Array.isArray(a.steps)) return null;
   const steps: PlanStep[] = [];
   for (const item of a.steps.slice(0, MAX_STEPS)) {
@@ -116,6 +122,7 @@ export function planOf(raw: unknown, id: string): Plan | null {
     const args = s.args && typeof s.args === "object" && !Array.isArray(s.args) ? (s.args as Record<string, unknown>) : {};
     const uses = (Array.isArray(s.uses) ? s.uses : []).map(int).filter((u): u is number => u !== null && u >= 1 && u < n);
     const scene = int(s.scene);
+    const variant = doing === "scene" ? str(s.variant) : "";
     steps.push({
       n,
       do: doing,
@@ -123,14 +130,23 @@ export function planOf(raw: unknown, id: string): Plan | null {
       args,
       uses: [...new Set(uses)],
       ...(scene !== null && scene >= 1 && scene < n ? { scene } : {}),
+      ...(variant ? { variant } : {}),
       status: "pending",
     });
   }
   if (steps.length < MIN_STEPS) return null;
-  return { id, summary: str(a.summary), steps, approved: [] };
+  const test = steps.some((s) => s.variant) ? str(a.test) : "";
+  return { id, summary: str(a.summary), ...(test ? { test } : {}), steps, approved: [] };
 }
 
 export const stepAt = (plan: Plan, n: number) => plan.steps.find((s) => s.n === n) ?? null;
+
+/** What a version's scene is filed as (POST /api/scenes/run `variant`,
+    `variant_group`, `variant_test`), or null for a step that is no version. */
+export function variantOf(plan: Plan, s: PlanStep): { label: string; group: string; test: string } | null {
+  if (s.do !== "scene" || !s.variant) return null;
+  return { label: s.variant, group: plan.id.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64) || "plan", test: plan.test ?? "" };
+}
 
 /** The scene step a keyframes / render step acts on. */
 export const sceneOf = (plan: Plan, s: PlanStep) => (s.scene ? stepAt(plan, s.scene) : null);

@@ -50,6 +50,15 @@ LABEL = "Run this plan"
 MAX_STEPS = 8
 MAX_SUMMARY = 300
 MAX_WHY = 160
+# VARIANTS (2026-10-29, docs/tasks/task-ad-results.md): an Ad Studio plan may
+# write several versions of one ad, each changing ONE thing. A scene step's
+# `variant` names that thing ("Hook: the spill"), the plan's `test` names
+# what the versions test ("which opening stops the scroll"); the studio
+# files each written scene as one version (src/ad_results.record_variant)
+# so imported ad results read as a test. Labels only: nothing is priced or
+# run differently, and a render still waits for its own button.
+MAX_VARIANT = 60
+MAX_TEST = 120
 
 DOES = ("image", "scene", "sheet", "keep", "keyframes", "render")
 # what a step used to be called, read as what it is now
@@ -93,13 +102,18 @@ SPEC = {
         "first frame of each shot of an earlier scene step: scene), render (render the "
         "clip of an earlier scene step -- it is priced once the scene exists and always "
         "waits for the person's own Approve: scene). Write every prompt as the finished "
-        "work, exactly as you would for that tool on its own."),
+        "work, exactly as you would for that tool on its own. For VERSIONS of one ad "
+        "(an A/B test), write one scene step per version, each the same ad with ONE "
+        "thing changed, give each a `variant` naming that thing and the plan a `test`."),
     "input_schema": {
         "type": "object",
         "properties": {
             "summary": {"type": "string",
                         "description": "One line the person reads above the plan: what "
                                        "it makes, in their words."},
+            "test": {"type": "string",
+                     "description": "Only for versions of ONE ad: what the versions test, "
+                                    "in a few words (which hook, which offer line)."},
             "steps": {
                 "type": "array",
                 "description": "The steps, in the order they run. Two to eight.",
@@ -129,6 +143,10 @@ SPEC = {
                                                 "picture this step is held to."},
                         "why": {"type": "string",
                                 "description": "One short line: what this step is for."},
+                        "variant": {"type": "string",
+                                    "description": "scene, only for versions of ONE ad: "
+                                                   "the one thing this version changes, "
+                                                   "a few words (\"Hook: the spill\")."},
                         "model": {"type": "string",
                                   "description": "image / scene: optional, the id of the "
                                                  "model to make it on, exactly as "
@@ -211,10 +229,23 @@ def check(args: dict) -> dict:
         uses = item.get("uses") if isinstance(item.get("uses"), list) else []
         earlier = {s["n"] for s in steps if s["do"] in DRAWS}
         step["uses"] = sorted({u for u in map(_int, uses) if u in earlier})
+        # a version's label rides on a scene step only; anywhere else it is dropped
+        variant = _line(item.get("variant"), MAX_VARIANT) if doing == "scene" else ""
+        if variant:
+            if guide_tools._URL.search(variant):
+                raise refuse(f"`{TOOL}` does not take a URL")
+            step["variant"] = variant
         steps.append(step)
 
+    labels = [s["variant"] for s in steps if s.get("variant")]
+    if len(labels) != len(set(x.lower() for x in labels)):
+        raise refuse("two versions have the same `variant`: each must say what it changes")
     summary = _line((args or {}).get("summary"), MAX_SUMMARY)
-    return {"summary": summary or default_summary(steps), "steps": steps}
+    plan = {"summary": summary or default_summary(steps), "steps": steps}
+    test = _line((args or {}).get("test"), MAX_TEST) if labels else ""
+    if test and not guide_tools._URL.search(test):
+        plan["test"] = test
+    return plan
 
 
 def costs(doing: str) -> bool:

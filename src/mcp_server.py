@@ -824,7 +824,9 @@ DESCRIPTIONS["what_works"] = (
     "What has worked for you, read off your own studio: how many outputs you "
     "made and kept (downloaded, cut, starred, used again), per model; which "
     "camera presets you tried and kept; how many tries a keeper takes; and "
-    "what you posted with a scene behind it, with its latest numbers. Said "
+    "what you posted with a scene behind it, with its latest numbers; and, "
+    "once you have dropped an ad report on the Ad Studio, what each ad spent "
+    "and what each result cost, with the verdict of every A/B test. Said "
     "plainly in `lines`, and `enough_data` says when there is too little to "
     "mean anything yet. Nothing is called and nothing is spent. Read-only."
 )
@@ -3531,6 +3533,14 @@ def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -
                    "views": r.get("views"), "likes": r.get("likes"),
                    "comments": r.get("comments"), "saves": r.get("saves"),
                    "shares": r.get("shares")} for r in posted[:20]]
+    # what their ads did once they ran (src/ad_results.py): the person's own
+    # ad-account export, their own money in their own currency
+    from . import ad_results
+    ads = ad_results.summary(account_id=account_id, dsn=dsn)        # never raises
+    ads_out = [{k: a[k] for k in ("code", "ad_name", "platform", "variant", "currency", "spend",
+                                  "results", "cpa", "ctr", "roas")} for a in ads["ads"][:20]]
+    tests_out = [{"test": t["test"], "winner": t["winner"], "verdict": t["verdict"]}
+                 for t in ads["tests"][:10]]
     enough = made >= INSIGHT_MIN_OUTPUTS
     lines: list[str] = []
     if not enough:
@@ -3546,6 +3556,11 @@ def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -
             lines.append(f"a keeper takes {tries['average']} tries on average")
     for p in presets_out[:5]:
         lines.append(f"camera preset {p['preset']}: tried {p['tried']}, kept {p['kept']}")
+    for a in sorted((x for x in ads_out if x["cpa"] is not None), key=lambda x: x["cpa"])[:3]:
+        money = " ".join(filter(None, (f"{a['cpa']:.2f}", a["currency"])))
+        lines.append(f"ad {a['code'] or a['ad_name']}: {a['results']:g} results at {money} each")
+    for t in tests_out[:3]:
+        lines.append(f"ad test{(': ' + t['test']) if t['test'] else ''} -- {t['verdict']}")
     if posted_out:
         for r in posted_out[:5]:
             views = r["views"] if r["views"] is not None else "no numbers yet"
@@ -3561,6 +3576,8 @@ def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -
                     "discards": summary.get("discards") or []},
         "presets": presets_out,
         "posted": posted_out,
+        "ads": ads_out,
+        "ad_tests": tests_out,
         "lines": lines,
         "note": ("read off what you kept, downloaded, cut, starred or posted; nothing here "
                  "calls a model, and credits are credits"),
