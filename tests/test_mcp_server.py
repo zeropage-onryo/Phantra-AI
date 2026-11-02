@@ -616,20 +616,26 @@ def test_write_scene_saves_the_timed_shots_without_a_model_call(studio):
     assert out["shots_written"] == 1 and "timeline" not in shot and shot["seconds"] == 8
 
 
-def test_quote_prices_the_stills_and_the_clip_and_says_what_is_affordable(studio):
+def test_quote_prices_the_stills_and_the_clip_and_says_what_is_affordable(studio, monkeypatch):
+    from src import timeline
     path, _ = studio
     with pytest.raises(ValueError, match="no scene 424242"):
         mcp_server.quote_render(424242, dsn=path)
     sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
     q = mcp_server.quote_render(sid, dsn=path)
     assert q["scene_id"] == sid and q["status"] == "written" and "picked" not in q
-    assert q["keyframes"]["stills"] == 2 and q["keyframes"]["credits"] > 0
-    # two timed shots that fit the model: one render, the cut inside it
+    # two timed shots that fit the model: one render, the cut inside it, and
+    # no keyframes offered -- that clip goes out on the photos (2026-11-02)
     assert q["clip"]["one_clip"] is True and len(q["clip"]["renders"]) == 1
     assert q["clip"]["signed"] is False and q["clip"]["renders"][0]["token"] is None
-    assert q["credits_needed"] == q["keyframes"]["credits"] + q["clip"]["credits"]
+    assert q["keyframes"] is None and q["credits_needed"] == q["clip"]["credits"]
     # the unowned pool has no balance to check, so nothing is refused here
     assert q["balance"] is None and q["affordable"] is True
+    # split shot by shot, each shot starts on its still: those are priced
+    monkeypatch.setenv(timeline.ONE_CLIP_ENV, "0")
+    q = mcp_server.quote_render(sid, dsn=path)
+    assert q["keyframes"]["stills"] == 2 and q["keyframes"]["credits"] > 0
+    assert q["credits_needed"] == q["keyframes"]["credits"] + q["clip"]["credits"]
     with pytest.raises(ValueError, match="bad renderer choice"):
         mcp_server.quote_render(sid, model="no-such-model", dsn=path)
 
@@ -639,6 +645,8 @@ def test_quote_hands_out_the_stills_token_only_where_an_approve_can_take_it(stud
     """The stills' price has always been on the quote; since 2026-10-11 so is
     the signed token `approve` needs for them -- on the listing that has an
     `approve`, and only where this server can sign."""
+    from src import timeline
+    monkeypatch.setenv(timeline.ONE_CLIP_ENV, "0")     # stills steer a split scene only
     from src import pricing, scene_chain
 
     path, _ = studio

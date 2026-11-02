@@ -190,6 +190,26 @@ export function videoRefMode(model: Pick<VideoModel, "max_refs"> | null, count: 
   return count >= 2 || oneAsReference ? "references" : "start";
 }
 
+/** The resolutions offered for what is attached (2026-11-02): with pictures
+    held as references, only those the model renders with them (Grok 1.5
+    takes 480p or 720p), never one the quote would refuse. */
+export function videoResolutions(model: Pick<VideoModel, "resolutions" | "ref_resolutions"> | null, mode: VideoRefMode): string[] {
+  if (!model) return [];
+  if (mode !== "references" || !model.ref_resolutions) return model.resolutions;
+  const ok = model.resolutions.filter((r) => model.ref_resolutions!.includes(r));
+  return ok.length ? ok : model.resolutions;
+}
+
+/** Pictures a newly picked model cannot take, said when they are taken off
+    (2026-11-02): "LTX 2.3 starts on one picture, so the other 3 were taken off." */
+export function refsTrimmedLine(model: Pick<VideoModel, "label" | "max_refs">, attached: number): string {
+  const keep = Math.max(1, model.max_refs);
+  const gone = attached - keep;
+  if (gone <= 0) return "";
+  const what = model.max_refs <= 0 ? "starts on one picture" : `holds up to ${keep} pictures`;
+  return `${model.label} ${what}, so the other ${gone === 1 ? "one was" : `${gone} were`} taken off.`;
+}
+
 /** The tags the prompt names `n` pictures by, counted on from the model's
     first ("@Image1" -> "@Image2"; "<IMAGE_0>" -> "<IMAGE_1>"). */
 export function videoRefTags(model: Pick<VideoModel, "ref_tag"> | null, n: number): string[] {

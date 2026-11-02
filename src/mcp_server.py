@@ -1908,7 +1908,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             raise ValueError(str(e)) from e
     except ValueError as e:
         raise ValueError(f"bad renderer choice: {e}") from e
-    keyframes = _quoted_keyframes(concept, account_id, listing)
+    # a scene rendered as ONE clip goes out on its photos, and its keyframes
+    # would not steer it: no stills are offered or priced (2026-11-02)
+    keyframes = (None if (clip or {}).get("one_clip")
+                 else _quoted_keyframes(concept, account_id, listing))
     exempt = bool(account_id is not None and accounts.is_credit_exempt(account_id, dsn=dsn))
     # the ledger's tables exist wherever the app booted; a bare database
     # (stdio on a fresh clone, a test schema) gets them here, once per

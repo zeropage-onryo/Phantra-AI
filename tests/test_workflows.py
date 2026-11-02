@@ -761,6 +761,32 @@ def test_a_config_the_endpoint_rejects_still_renders(tmp_db, tmp_path, monkeypat
     assert [c["config"] for c in fake.calls] == [None]    # the retry landed
 
 
+def test_a_refused_size_keeps_the_shape_that_was_picked(tmp_db, tmp_path, monkeypatch):
+    """2026-11-02: the retry drops the size first and keeps the aspect the
+    person picked; before, it dropped both and a 9:16 still came back in
+    whatever shape the model chose."""
+    from src import nano_banana
+
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr(nano_banana, "RENDER_DIR", tmp_path / "nano")
+    monkeypatch.setattr("src.storage.configured", lambda: False)
+    fake = FakeGeminiImageClient()
+    inner = fake.models.generate_content
+
+    def no_2k(model, contents, config=None):
+        if config is not None and config.image_config.image_size:
+            raise RuntimeError("400 INVALID_ARGUMENT: image_size not supported")
+        return inner(model, contents, config=config)
+
+    fake.models = SimpleNamespace(generate_content=no_2k)
+    result = nano_banana.generate_from_prompt("a red bike", db_path=tmp_db, client=fake,
+                                              image_size="2K", aspect_ratio="9:16")
+    assert result["ok"], result["error"]
+    (landed,) = fake.calls
+    assert landed["config"].image_config.aspect_ratio == "9:16"
+    assert not landed["config"].image_config.image_size
+
+
 def test_a_real_failure_is_not_swallowed_by_the_shape_retry(tmp_db, tmp_path,
                                                             monkeypatch):
     """Only INVALID_ARGUMENT degrades. Anything else still surfaces —
