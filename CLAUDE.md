@@ -572,7 +572,7 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
 Three plans (`pricing.PLANS`), monthly and yearly (yearly is a schedule released monthly, never a
 twelve-month lot), top-ups, Stripe Checkout and portal (`app/billing.py`, `src/billing.py`), grants
 through `/billing/webhook` (at `https://api.phantra.ai/billing/webhook`). Renders and stills cost
-credits; writing scenes and the brain's text cost none on a plan, but `charge.create_refusal`
+credits; writing scenes and the brain's text cost none on a plan (the one exception: the two Claude brains in the picker are priced per message, held at a ceiling and settled to what the turn used, `src/text_charge.py`), but `charge.create_refusal`
 refuses model-text routes (402 `subscribe_or_top_up`) for an account with no plan and no balance,
 and a trial's model text is capped once (`pricing.trial_thinking_usd`, 402
 `trial_thinking_used`). The studio shows credits, never dollars, except a plan's price

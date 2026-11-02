@@ -267,8 +267,15 @@ def test_an_invented_tier_writes_a_cheap_scene(tmp_db, monkeypatch):
     assert asked["model"] == gemini_utils.FAST_MODEL
 
 
-def test_the_menu_is_a_projection_of_the_one_table(tmp_db):
-    from src import gemini_utils
+def test_the_menu_is_a_projection_of_the_one_table(tmp_db, monkeypatch):
+    from src import claude_client, gemini_utils
+    # The Claude rows are in the table but offered only when switched on and
+    # keyed (2026-11-02); with them off the menu is the Gemini tiers.
+    monkeypatch.delenv(gemini_utils.CLAUDE_BRAINS_ENV, raising=False)
+    body = client.get("/api/brains").json()
+    assert [b["id"] for b in body["brains"]] == ["fast", "reasoning"]
+    monkeypatch.setenv(gemini_utils.CLAUDE_BRAINS_ENV, "1")
+    monkeypatch.setenv(claude_client.KEY_ENV, "sk-test")
     body = client.get("/api/brains").json()
     assert [b["id"] for b in body["brains"]] == list(gemini_utils.BRAINS)
     assert body["default"] == gemini_utils.DEFAULT_BRAIN

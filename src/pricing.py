@@ -480,6 +480,18 @@ def credits_for(provider_usd_micros: int, model: Optional[str] = None) -> int:
     return max(int(cents), CREDIT_FLOOR)
 
 
+def text_credits(provider_usd, model: Optional[str] = None) -> int:
+    """Provider USD of MODEL TEXT -> credits (2026-11-02, the priced Claude
+    brains): the same markup and the same round-up-to-the-cent as `credits_for`,
+    but with a floor of ONE credit, not CREDIT_FLOOR. The floor exists so a
+    render never rounds to nothing; a chat message that cost a fifth of a cent
+    must not be charged ten."""
+    scaled = (Fraction(usd_micros(provider_usd)) * Fraction(str(markup_for(model)))
+              * CREDIT_CENTS)
+    cents = -((-scaled.numerator) // (scaled.denominator * _MICROS_PER_CENT))
+    return max(int(cents), 1)
+
+
 # --------------------------------------------------------------------------
 # the content hash -- one function, and it is timeline's
 # --------------------------------------------------------------------------
@@ -1208,7 +1220,7 @@ def display(*, account_id: Optional[int], shot: dict, shot_id: int,
             "renders": renders}
 
 
-__all__ = ["PRICING_VERSION", "CREDIT_CENTS", "MARKUP", "CREDIT_FLOOR",
+__all__ = ["PRICING_VERSION", "CREDIT_CENTS", "MARKUP", "CREDIT_FLOOR", "text_credits",
            "still_usd", "still_credits",
            "PricingRefused", "Estimate", "Quote",
            "usd_micros", "credits_for", "content_hash",

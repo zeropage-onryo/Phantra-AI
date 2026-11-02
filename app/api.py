@@ -187,6 +187,38 @@ def _out_of_credits(e, what: str) -> JSONResponse:
     return _error(402, "out_of_credits", charging.refusal(e, what))
 
 
+def _hold_text_turn(account_id, brain):
+    """(turn, refusal) for a turn on a PRICED brain (src/text_charge.py): the
+    ceiling is held BEFORE any job or model call, so an empty balance is a
+    402 here and not a failed job later. (None, None) for a free brain."""
+    from src import ledger, text_charge
+    try:
+        return text_charge.begin(account_id, brain), None
+    except ledger.InsufficientCredit as e:
+        return None, _out_of_credits(e, "this message")
+
+
+def _priced_turn(turn, run):
+    """Run `run()` under a held text turn: settle to what Claude actually cost
+    (never above the ceiling) when it returns, release the hold when it raises.
+    The result gains `spent`, the credits taken. A free turn is just run()."""
+    if turn is None:
+        return run()
+    from src import claude_client
+    try:
+        with claude_client.tally() as bill:
+            result = run()
+    except BaseException:
+        turn.release("the turn failed")
+        raise
+    spent = turn.settle(bill)
+    if isinstance(result, dict):
+        result = {**result, "spent": spent}
+        if spent and isinstance(result.get("detail"), str) and result["detail"] != "ready":
+            result["detail"] += f" · {spent} credits"
+    return result
+
+
 # --- capabilities -----------------------------------------------------------
 
 def _gemini_key(account_id: Optional[int] = None) -> Optional[str]:
@@ -917,7 +949,7 @@ async def creative_guide_reply(request: Request,
     # connection is the person's own model and has no tier.
     from src import gemini_utils
     brain_raw = (form.get("brain") or "").strip().lower()
-    brain = brain_raw if brain_raw in gemini_utils.BRAINS else creative_guide.DEFAULT_BRAIN
+    brain = brain_raw if gemini_utils.brain_available(brain_raw) else creative_guide.DEFAULT_BRAIN
 
     # The assistant pill (2026-09-26, src/assistant_brain.py): a turn
     # that says which page it floats over / which step the project is on
@@ -1043,8 +1075,15 @@ async def creative_guide_reply(request: Request,
     clip_pick = model_menu.video_id(form.get("clip_model"))
     clip_label = direct.video_label(clip_pick) if clip_pick else None
 
+    # A PRICED BRAIN (2026-11-02): the ceiling is held now, settled to what the
+    # turn used inside the job, released if it fails. Personal connections
+    # spend the person's own plan and never this.
+    turn, refused = (None, None) if personal else _hold_text_turn(account_id, brain)
+    if refused is not None:
+        return refused
+
     def work(job):
-        result = _guide_turn(job)
+        result = _priced_turn(turn, lambda: _guide_turn(job))
         if remember:
             _remember_turn(project["id"], conversation, result["reply"], account_id,
                            again=again)
@@ -3597,7 +3636,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # through this route at all.
     from src import gemini_utils
     brain_raw = (form.get("brain") or "").strip().lower()
-    brain = brain_raw if brain_raw in gemini_utils.BRAINS else gemini_utils.DEFAULT_BRAIN
+    brain = brain_raw if gemini_utils.brain_available(brain_raw) else gemini_utils.DEFAULT_BRAIN
 
     # The frame the scene is written for, stored on its shot so the Queue
     # card defaults to it instead of asking again. REFUSED rather than
@@ -3639,8 +3678,15 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
+    # a scene written on a PRICED brain holds its ceiling here (see the Guide)
+    turn, refused = _hold_text_turn(account_id, brain)
+    if refused is not None:
+        return refused
 
     def work(job):
+        return _priced_turn(turn, lambda: _scenes_work(job))
+
+    def _scenes_work(job):
         from google import genai
 
         from src import scene_chain

@@ -140,7 +140,7 @@ def pick_brain(requested, stage: str = "", last_message: str = "") -> str:
     from . import gemini_utils
 
     requested = str(requested or "").strip().lower()
-    if requested in gemini_utils.BRAINS:
+    if gemini_utils.brain_available(requested):
         return requested
     if clean_stage(stage) in WRITING_STAGES or _WRITE_ASK.search(last_message or ""):
         return "reasoning"

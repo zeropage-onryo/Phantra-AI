@@ -159,6 +159,17 @@ DEFAULT_PRICES: dict[str, dict[str, float]] = {
     # charge (Gemini API pricing, read 2026-10-08). Metered since that day;
     # rag.embed_texts reports the tokens (see there for when it estimates).
     "gemini-embedding-001":     {"input": 0.15, "output": 0.0, "cached": 0.15},
+    # The Claude brains (src/claude_client.py), read off
+    # platform.claude.com/docs/en/about-claude/pricing on 2026-11-02, per 1M
+    # tokens. `cached` is the cache-READ rate. A cache WRITE bills at 1.25x
+    # input and is priced here as plain input (usage reports it inside the
+    # prompt count), so a first turn reads a little LOW -- the estimate the
+    # page already says every figure here is. Thinking is inside the output
+    # count, so it is not added again. Haiku's row is its <=100K-prompt tier.
+    "claude-sonnet-5-5":        {"input": 2.00, "output": 10.00, "cached": 0.10},
+    "claude-opus-5-5":          {"input": 4.00, "output": 20.00, "cached": 0.20},
+    "claude-haiku-5-5":         {"input": 0.10, "output": 0.50, "cached": 0.01},
+    "claude-fable-5-1":         {"input": 10.00, "output": 50.00, "cached": 0.25},
 }
 
 
