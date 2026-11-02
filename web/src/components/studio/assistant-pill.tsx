@@ -78,6 +78,7 @@ import {
 import { useShell } from "@/components/studio/shell";
 import { useAssistantThread } from "@/components/studio/assistant-thread";
 import {
+  ApiError,
   announceBalanceChange,
   getConceptDetail,
   getImageModels,
@@ -350,12 +351,13 @@ export function AssistantPill() {
     const kept = loadImageModel();
     return models?.items.some((m) => m.id === kept) ? kept : (models?.default ?? "");
   };
-  const stillLine = (modelId?: string) => {
+  // `quoted`: the route's price for this still's shape and pictures, once it said so
+  const stillLine = (modelId?: string, quoted?: number) => {
     if (!stillModels) return "";
     const id = modelId || stillModel(stillModels);
     const m = stillModels.items.find((x) => x.id === id) ?? stillModels.items[0];
     if (!m) return "";
-    return `${m.label} · ${balance?.exempt ? "not charged" : `${m.credits.toLocaleString()} credits`}`;
+    return `${m.label} · ${balance?.exempt ? "not charged" : `${(quoted ?? m.credits).toLocaleString()} credits`}`;
   };
 
   function openDock() {
@@ -588,6 +590,10 @@ export function AssistantPill() {
     const model = stillModel(models);
     const frame = aspect && IMAGE_ASPECTS.some((a) => a.id === aspect) ? aspect : IMAGE_ASPECTS[0].id;
     const refs = [...composer.uploads.map((u) => u.url), ...composer.picked];
+    // the price the card showed: the route's own, once it re-priced this
+    // still on the last Approve, else the model's opening price
+    const shown =
+      t.made?.quoted != null && t.made.model === model ? t.made.quoted : models?.items.find((m) => m.id === model)?.credits;
     const made: Made = {
       id: newMadeId(),
       output: "image",
@@ -609,6 +615,7 @@ export function AssistantPill() {
       form.append("output", "image");
       form.append("aspect", frame);
       if (model) form.append("image_model", model);
+      if (typeof shown === "number") form.append("expect_credits", String(shown));
       // inside a project's workspace the still takes the project's brand kit
       if (projectId) form.append("project_id", String(projectId));
       else if (composer.brand_kit_id) form.append("brand_kit_id", String(composer.brand_kit_id));
@@ -626,6 +633,13 @@ export function AssistantPill() {
       if (!image) toast(job.detail || "Saved, but no image came back.", "err");
       arrived("Your still is ready");
     } catch (e) {
+      // more than the card said (pictures, a shape): nothing ran, and the
+      // card shows the real price for the next Approve
+      if (e instanceof ApiError && e.code === "price_changed" && typeof e.credits === "number") {
+        const said = `With these pictures at ${frame} this still costs ${e.credits.toLocaleString()} credits, more than was shown. Nothing was charged. Approve again to draw it.`;
+        patch({ status: "failed", detail: said, quoted: e.credits });
+        return;
+      }
       const said = e instanceof Error ? e.message : "The still was not drawn.";
       patch({ status: "failed", detail: said });
       toast(said, "err");
@@ -1042,7 +1056,7 @@ export function AssistantPill() {
                           {isStillStep(t) && i !== tableStill ? (
                             <StillStep
                               turn={t}
-                              line={stillLine(t.made?.model)}
+                              line={stillLine(t.made?.model, t.made?.quoted)}
                               busy={busy}
                               onApprove={() => void approveStill(i)}
                               showImage
@@ -1132,7 +1146,7 @@ export function AssistantPill() {
                     {tableStill >= 0 ? (
                       <StillStep
                         turn={turns[tableStill]}
-                        line={stillLine(turns[tableStill].made?.model)}
+                        line={stillLine(turns[tableStill].made?.model, turns[tableStill].made?.quoted)}
                         busy={busy}
                         onApprove={() => void approveStill(tableStill)}
                         showImage

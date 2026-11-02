@@ -7023,6 +7023,26 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
 
     image_refs, ref_urls, video_refs = await _collect_refs(
         form, want_video=True, account_id=account_id)
+    # A still is never charged above the price its card showed (2026-11-02):
+    # priced here at the shape and the pictures actually sent (each picture
+    # on FLUX.2 moves it off the model's opening price), refused before the
+    # job if that is MORE than the card's number. The 409 carries the real
+    # price; the card shows it and asks again. Less (GPT Image 2 off the
+    # square) runs: the hold is the lower number.
+    if output == "image":
+        from src import direct
+        expected = _expected_credits(form)
+        if expected is None:
+            return _error(400, "missing_price", "say what the card showed: expect_credits")
+        try:
+            still = direct.image_quote(account_id, model=image_model,
+                                       aspect=aspect or "", references=len(image_refs))
+        except ValueError as e:
+            return _error(400, "bad_choice", str(e))
+        if still["credits"] > expected:
+            return _price_moved(still["credits"])
+        if image_model != NANO_IMAGE_MODEL:
+            aspect = still["aspect"]          # fal is charged at the shape it was priced at
     roles = _form_ref_roles(form)
     # what this make says about earlier outputs (src/outcomes.py): a render
     # sent back as a reference was reused, and a Variation names the still

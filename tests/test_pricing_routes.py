@@ -358,7 +358,7 @@ def test_the_composers_video_branch_sends_a_billable_render_to_the_queue(signing
     assert not started
     # an image is cents on the operator's Gemini key and is not quoted
     res = client.post("/api/generate/run", data={"prompt": "a man laces his boots",
-                                                 "output": "image"})
+                                                 "output": "image", "expect_credits": "100"})
     assert res.status_code == 200 and started
 
 

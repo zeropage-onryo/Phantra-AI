@@ -161,18 +161,18 @@ def test_a_still_with_a_picked_kit_is_dressed_and_its_scene_keeps_the_kit(as_min
 
     monkeypatch.setattr(nano_banana, "generate_from_prompt", fake)
     job = _wait(client.post("/api/generate/run", data={
-        "prompt": "a summer ad", "output": "image",
+        "prompt": "a summer ad", "output": "image", "expect_credits": "100",
         "brand_kit_id": str(k["kit"]["id"])}).json()["job_id"])
     assert job["status"] == "done", job
     assert "BRAND LOOK (Gygler)" in prompts[0]
     assert brand_kits.for_concept(job["ref_id"], k["pg"], account_id=k["mine"])["id"] == k["kit"]["id"]
     # no pick: as before
     job = _wait(client.post("/api/generate/run", data={
-        "prompt": "a summer ad", "output": "image"}).json()["job_id"])
+        "prompt": "a summer ad", "output": "image", "expect_credits": "100"}).json()["job_id"])
     assert "BRAND LOOK" not in prompts[1]
     assert brand_kits.for_concept(job["ref_id"], k["pg"], account_id=k["mine"]) is None
     # another account's kit is a 404, before any job
-    r = client.post("/api/generate/run", data={"prompt": "x", "output": "image",
+    r = client.post("/api/generate/run", data={"prompt": "x", "output": "image", "expect_credits": "100",
                                                "brand_kit_id": str(k["other"]["id"])})
     assert r.status_code == 404
 

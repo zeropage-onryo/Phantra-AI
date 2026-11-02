@@ -17,10 +17,13 @@ export class ApiError extends Error {
   status: number;
   /** the route's own `error.code` (e.g. "trial_thinking_used"), when it sent one */
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** what it costs now, on a 409 `price_changed` (the card shows it and asks again) */
+  credits?: number;
+  constructor(message: string, status: number, code?: string, credits?: number) {
     super(message);
     this.status = status;
     this.code = code;
+    this.credits = credits;
   }
 }
 
@@ -40,14 +43,16 @@ export async function apiFetch<T>(
   if (!res.ok) {
     let message = res.statusText || `request failed (${res.status})`;
     let code: string | undefined;
+    let credits: number | undefined;
     try {
       const body = await res.clone().json();
       message = body?.error?.message ?? body?.detail ?? message;
       code = body?.error?.code;
+      if (typeof body?.credits === "number") credits = body.credits;
     } catch {
       // not JSON -- keep the fallback
     }
-    throw new ApiError(message, res.status, code);
+    throw new ApiError(message, res.status, code, credits);
   }
 
   if (res.status === 204) return undefined as T;
