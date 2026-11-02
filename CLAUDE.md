@@ -43,6 +43,10 @@ What a signed-in person has:
   steps may be labelled versions of one ad (`make_plan` `variant` / `test`, OWNED
   `ad_variants`), read back as a test with a verdict; Ad Studio turns and `what_works` are told
   the numbers.
+  **Every shape** (2026-11-02, `docs/tasks/task-every-shape.md`): one click under the Final cut or
+  in the Library viewer makes 9:16, 1:1 and 16:9 from a finished item (`POST /api/every-shape`,
+  `quick.plan_every_shape` / `every_shape`: free reformats, crop when it keeps half the picture,
+  else pad; a shape it already is or already has is not made again).
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
   Veo, Seedance, LTX, Wan). The priced button on the card is the only place a clip is paid for.
 - **Elements** (`/studio/elements`): the characters, products and places a scene is held to,

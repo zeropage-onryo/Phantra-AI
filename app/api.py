@@ -6863,6 +6863,52 @@ def quick_edit(body: QuickEditBody, account_id: int = Depends(auth.current_accou
     return {"job_id": job["id"], "credits": 0}
 
 
+class EveryShapeBody(BaseModel):
+    """One clip or still (gen:<id> / asset:<id>) and the shapes to make of it;
+    absent shapes means 9:16, 1:1 and 16:9 (src/cut/quick.py EVERY_SHAPES)."""
+    model_config = ConfigDict(extra="forbid")
+    source: str
+    shapes: Optional[list[str]] = None
+    project_id: Optional[int] = None
+
+
+@router.post("/every-shape")
+def every_shape(body: EveryShapeBody, account_id: int = Depends(auth.current_account_id)):
+    """Every shape an ad runs in, from one finished clip or still (2026-11-02,
+    docs/tasks/task-every-shape.md): one free reformat per missing shape,
+    each its own item in the Library. Free like /quick-edit (ffmpeg on this
+    server, no provider, no hold). Checked before the job starts (400 with
+    the reason); a shape the source already is, or one made from it before,
+    is handed back, not made again."""
+    from src.cut import quick
+    try:
+        plan = quick.plan_every_shape((body.source or "").strip(), body.shapes or quick.EVERY_SHAPES,
+                                      account_id=account_id)
+    except quick.QuickRefused as e:
+        return _error(400, "bad_edit", str(e))
+    making = [x["aspect"] for x in plan["shapes"] if x["do"] == "make"]
+
+    def work(job):
+        def tick(i, n, aspect):
+            jobs.progress(job, 0.1 + 0.85 * i / max(n, 1), f"making {aspect} · {i + 1} of {n}")
+        shapes = quick.every_shape(plan, account_id=account_id, project_id=body.project_id,
+                                   on_shape=tick)
+        made = sum(1 for x in shapes if x["status"] == "made")
+        failed = [x for x in shapes if x["status"] == "failed"]
+        for x in failed:
+            print(f"  every shape: {x['aspect']} of {plan['handle']} not made: {x['error']}",
+                  file=sys.stderr)
+        if making and not made:
+            raise RuntimeError("None of the shapes could be made. Nothing was charged.")
+        return {"detail": f"{made} new shape{'s' if made != 1 else ''} · free",
+                "shapes": [{k: v for k, v in x.items() if k != "error"} for x in shapes]}
+
+    job = jobs.start("effect", "every shape · free", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": 0, "making": making,
+            "shapes": [{"aspect": x["aspect"], "do": x["do"],
+                        **({"fit": x["fit"]} if x.get("fit") else {})} for x in plan["shapes"]]}
+
+
 def _render_failed(raw, what: str) -> str:
     """A draw that did not happen, as the job's line: the provider's own
     words go to the log (and are on the generations row), the page gets a
