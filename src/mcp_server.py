@@ -2167,6 +2167,12 @@ def approval_gate(usd: float, quote_token: str, *, tool: str, args: dict, what: 
     Single use is the caller's (`start_approved`), which claims the
     token before the job starts."""
     from . import ledger, pricing
+    # A server on an old checkout prices with old tables (QA 2026-11-02
+    # K1): neither its quote nor its approve may stand.
+    drift = pricing.live_drift(dsn)
+    if drift:
+        return ({"ok": False, "refused": "stale_prices", "note": drift}, None,
+                {"credits": None, "usd": None})
     # `model`: a clip's video model, which carries its own markup
     # (pricing.markup_for, 2026-10-27); None for stills, sheets and effects
     credits = ledger.charge_credits(usd, model=model)

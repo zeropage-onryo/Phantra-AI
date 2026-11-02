@@ -460,6 +460,10 @@ def _spend_line(p: dict) -> str:
                    if q.get("balance") is not None else "")
         return f"Quote: {q.get('credits')} credits{balance}. Waiting for a yes; approve with quote_token."
     if state == "refused":
+        # a refusal that is not about credits says its own reason (QA
+        # 2026-11-02: a stale studio server read "needs None credits")
+        if p.get("refused") not in (None, True, "insufficient_credits") and p.get("note"):
+            return f"Refused: {p['note']}"
         return (f"Refused: needs {p.get('needs')} credits, the balance is "
                 f"{p.get('available')}. Top up first; do not retry.")
     if state == "already_used":
