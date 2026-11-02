@@ -70,3 +70,22 @@ def test_the_api_records_only_on_fly(monkeypatch):
     import app.main as app_main
     src = inspect.getsource(app_main.lifespan)
     assert "FLY_APP_NAME" in src and "pricing.record_live()" in src
+
+
+def test_the_line_an_agent_reads_says_why(pg):
+    """Run through the stdio server (2026-11-02), the refusal's text line
+    read "needs None credits ... Top up first": the out-of-credits wording,
+    for a refusal that has nothing to do with credits."""
+    from src import mcp_shapes
+    _record(pg, "0123456789abcdef")
+    stop, _, _ = _gate(pg)
+    said = mcp_shapes.line("generate_image", mcp_shapes.jsonable(mcp_shapes.enrich("generate_image", stop)))
+    assert "Top up" not in said and "None" not in said
+    assert "restart Claude Desktop" in said
+
+
+def test_a_short_balance_still_says_top_up():
+    from src import mcp_shapes
+    short = {"ok": False, "refused": "insufficient_credits", "needs": 10, "available": 0}
+    said = mcp_shapes.line("generate_image", mcp_shapes.enrich("generate_image", short))
+    assert said.startswith("Refused: needs 10 credits, the balance is 0. Top up first")
