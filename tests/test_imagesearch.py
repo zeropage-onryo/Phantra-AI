@@ -230,3 +230,14 @@ def test_the_second_address_is_stored_and_redeemed(tmp_db):
     cid = imagesearch._cid("openverse", "https://live.staticflickr.com/a.jpg")
     row = imagesearch.get(cid, dsn=tmp_db)
     assert row["fallback_url"] == "https://api.openverse.org/v1/images/a/thumb/"
+
+
+def test_the_answer_passes_its_own_output_shape(tmp_db, stock):
+    """The stdio server checks a tool's answer against src/mcp_shapes.py.
+    `sources` was declared a list while find_images hands back the lanes
+    as a dict, so every `images_for` call failed with a message-less
+    error (QA 2026-11-02 K2)."""
+    from src import mcp_shapes
+    for query in ("cold light on wet tile", ""):
+        out = mcp_server.find_images(query, dsn=tmp_db)
+        mcp_shapes.SHAPES["images_for"].model_validate(out)

@@ -640,6 +640,36 @@ def test_quote_prices_the_stills_and_the_clip_and_says_what_is_affordable(studio
         mcp_server.quote_render(sid, model="no-such-model", dsn=path)
 
 
+def test_quote_refuses_a_removed_scene(studio):
+    """A removed scene was priced and handed an approve link (QA 2026-11-02 K4)."""
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+    preprod.set_archived(sid, dsn=path, account_id=None)
+    with pytest.raises(ValueError, match="was removed"):
+        mcp_server.quote_render(sid, dsn=path)
+    with pytest.raises(ValueError, match="was removed"):
+        mcp_server.quote_render(sid, dsn=path, listing="claude")
+
+
+def test_quote_says_when_the_model_renders_another_length(studio):
+    """A 4 s scene on ltx2.3 was priced at 6 s with nothing said (QA
+    2026-11-02 K3). The quote now says the length it prices."""
+    path, _ = studio
+    one_take = SCENE.replace("(0-4s) ", "").replace("(4-10s) ", "")
+    sid = mcp_server.write_scene(one_take, seconds=4, refs=[FACE], dsn=path)["scene_id"]
+    q = mcp_server.quote_render(sid, model="ltx2.3", dsn=path)
+    assert q["clip"]["durations"] == [6]
+    said = q["clip"]["length_note"]
+    assert "written to 4 s" in said and "renders 6 s" in said
+    assert q["note"].startswith(said)
+    listed = mcp_server.quote_render(sid, model="ltx2.3", dsn=path, listing="claude")
+    assert listed["clip"]["length_note"] == said and listed["note"].startswith(said)
+    # a length the model renders as written says nothing
+    sid = mcp_server.write_scene(one_take, seconds=6, refs=[FACE], dsn=path)["scene_id"]
+    q = mcp_server.quote_render(sid, model="ltx2.3", dsn=path)
+    assert "length_note" not in q["clip"]
+
+
 def test_quote_hands_out_the_stills_token_only_where_an_approve_can_take_it(studio,
                                                                            monkeypatch):
     """The stills' price has always been on the quote; since 2026-10-11 so is

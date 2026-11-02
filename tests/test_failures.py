@@ -61,3 +61,11 @@ def test_a_charge_already_said_is_never_contradicted_and_a_voice_is_a_voice():
     assert failures.plain(said, "The effect") == said
     assert "voice service" in failures.plain("HTTP 503", "The voice")
     assert "image service" not in failures.plain("boom", "The talking photo")
+
+
+def test_a_voice_that_was_paid_for_is_not_told_nothing_was_charged():
+    """run_voice's filing failure after its settle (QA 2026-11-02 E5): the
+    job said "Nothing was charged." while the ledger showed hold -> settle."""
+    said = "the voice was made and paid for but could not be filed (ffprobe failed)"
+    assert failures.plain(said, "The voice") == said
+    assert failures.NOT_CHARGED not in failures.plain(said, "The voice")
