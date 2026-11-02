@@ -48,6 +48,8 @@ import {
   refsCountLine,
   reuseOf,
   videoRefMode,
+  videoResolutions,
+  refsTrimmedLine,
   videoRefTags,
   secondsChoices,
   videoPickFor,
@@ -253,16 +255,26 @@ function Generator({ kind }: { kind: Kind }) {
   const refMode = video ? videoRefMode(vModel, refs.length, oneAsRef) : "none";
   const hasStart = refMode === "start";
   const held = refMode === "references" ? refs.length : 0;
+  // with pictures held, only the resolutions the model renders them at; a
+  // pick outside them is priced and sent at the highest one, and that is said
+  const resolutions = videoResolutions(vModel, refMode);
+  const vRes =
+    vPick && resolutions.length && !resolutions.includes(vPick.resolution) ? resolutions[resolutions.length - 1] : vPick?.resolution;
+  const vSend = vPick && vRes ? { ...vPick, resolution: vRes } : vPick;
+  const resNote =
+    vModel && vPick && vRes !== vPick.resolution
+      ? `${vModel.label} renders ${resolutions.join(" or ")} with pictures, so this is ${vRes}.`
+      : "";
 
   /* ── the price of exactly what is on screen ── */
   const pick = video ? vPick : iPick;
-  const priceKey = pick ? JSON.stringify(video ? [vPick, hasStart, held, nonce] : [iPick, refs.length, nonce]) : "";
+  const priceKey = pick ? JSON.stringify(video ? [vSend, hasStart, held, nonce] : [iPick, refs.length, nonce]) : "";
   useEffect(() => {
     if (!priceKey) return;
     let live = true;
     const t = window.setTimeout(() => {
       const ask = video
-        ? quoteDirectVideo({ ...(vPick as VideoPick), start_frame: hasStart, references: held })
+        ? quoteDirectVideo({ ...(vSend as VideoPick), start_frame: hasStart, references: held })
         : quoteDirectImage({ ...(iPick as ImagePick), references: refs.length });
       ask
         .then((q) => live && setPriced({ key: priceKey, quote: { credits: q.credits, charged: q.charged }, error: "" }))
@@ -287,7 +299,10 @@ function Generator({ kind }: { kind: Kind }) {
       const model = vMenu.items.find((m) => m.id === id);
       if (!model) return;
       const next = videoPickFor(model, vPick);
-      setPickNote(keptLine(model, vPick, next));
+      // pictures past what the model takes come off, and that is said
+      const trimmed = refsTrimmedLine(model, refs.length);
+      if (trimmed) setRefs((was) => was.slice(0, Math.max(1, model.max_refs)));
+      setPickNote([keptLine(model, vPick, next), trimmed].filter(Boolean).join(" "));
       setVPick(next);
       writeStore(PICK_KEY.video, JSON.stringify(next));
     } else if (iMenu) {
@@ -394,7 +409,7 @@ function Generator({ kind }: { kind: Kind }) {
     if (video && vPick) {
       form.set("model", vPick.model);
       form.set("seconds", String(vPick.seconds));
-      form.set("resolution", vPick.resolution);
+      form.set("resolution", vSend?.resolution ?? vPick.resolution);
       form.set("aspect", vPick.aspect);
       if (refMode === "references") form.set("ref_mode", "references");
     } else if (iPick) {
@@ -484,7 +499,7 @@ function Generator({ kind }: { kind: Kind }) {
   const goLabel = sending ? "Starting…" : buttonLabel(quote, pricing, exempt);
   const notes = (
     <>
-      {pickNote ? <p className="dg-kept">{pickNote}</p> : null}
+      {pickNote || resNote ? <p className="dg-kept">{[pickNote, resNote].filter(Boolean).join(" ")}</p> : null}
       {quoteError ? <p className="dg-note err">{quoteError}</p> : null}
       {menuError ? <p className="dg-note err">{menuError}</p> : null}
       {(video ? vMenu : iMenu) && !ready && !menuError ? (
@@ -739,12 +754,12 @@ function Generator({ kind }: { kind: Kind }) {
                   open={menu === "res"}
                   onOpen={() => setMenu(menu === "res" ? null : "res")}
                   onClose={() => setMenu(null)}
-                  value={vPick.resolution}
-                  items={vModel.resolutions.map((r) => ({ id: r, name: r, note: "", right: "" }))}
-                  picked={vPick.resolution}
+                  value={vRes}
+                  items={resolutions.map((r) => ({ id: r, name: r, note: "", right: "" }))}
+                  picked={vRes ?? ""}
                   onPick={(r) => setVideo({ resolution: r })}
                   title="Resolution"
-                  disabled={vModel.resolutions.length < 2}
+                  disabled={resolutions.length < 2}
                 />
                 {hasStart ? (
                   <span className="dgv-follow">Frame follows the picture</span>
