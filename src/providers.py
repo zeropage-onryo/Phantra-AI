@@ -232,6 +232,9 @@ BANDS: dict[tuple[str, str], Band] = {
     ("fal", "seedance2"): Band("creator"),
     ("fal", "seedance2.5"): Band("creator"),
     ("fal", "veo3.1"): Band("premium", max_seconds=8),
+    # Veo 3.1 Fast (2026-11-02): $0.15/s, Kling 3 Turbo's rate, so it sits with
+    # the standard models; Veo's 8-second ceiling all the same
+    ("fal", "veo3.1-fast"): Band("standard", max_seconds=8),
     # the parked Kling 4.0 slot (fal.SLOTS, 2026-10-22): banded with Kling
     # ahead of its day so it is never quotable on every plan by omission
     ("fal", "kling4"): Band("creator"),

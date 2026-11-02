@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LEGAL_CONTACT, LegalPage, type LegalSection } from "@/components/legal-page";
-import { CATALOG } from "@/lib/catalog";
+import { CATALOG, monthsLabel } from "@/lib/catalog";
 import { pageMeta } from "@/lib/page-meta";
 
 // Plain-language terms. A first draft written 2026-09-17 alongside
@@ -58,7 +58,9 @@ const SECTIONS: LegalSection[] = [
           or not you like the result.
         </p>
         <p>
-          Every grant expires {CATALOG.expiry_months} months after it lands. A yearly plan is billed
+          A plan&apos;s monthly allowance expires {monthsLabel(CATALOG.expiry_months)} after it lands;
+          credit bought as a top-up, and trial credit, expires {monthsLabel(CATALOG.topup_expiry_months)}{" "}
+          after it lands. A yearly plan is billed
           once and released month by month, each month on its own clock. You can change or cancel a
           plan at any time from the billing portal; a cancelled plan stays active to the end of the
           period you paid for, and any allowance remaining from it ends with it. Credits have no

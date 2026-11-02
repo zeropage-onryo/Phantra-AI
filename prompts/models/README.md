@@ -14,7 +14,7 @@ What each model's own vendor says about writing prompts for it, one file per mod
 
 | File | Our model keys | Kind |
 |---|---|---|
-| [veo.md](veo.md) | `veo3.1` | video + audio |
+| [veo.md](veo.md) | `veo3.1`, `veo3.1-fast` | video + audio |
 | [kling.md](kling.md) | `kling3-turbo-pro`, `kling4` | video (+ audio on 4.0) |
 | [seedance.md](seedance.md) | `seedance2-fast`, `seedance2`, `seedance2.5` | video + audio |
 | [ltx.md](ltx.md) | `ltx2.3`, `ltx2.5-fast`, `ltx2.5` | video + audio |

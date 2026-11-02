@@ -171,7 +171,7 @@ def test_a_scene_prices_only_the_shots_still_without_a_clip(fal_keyed):
     one = pricing.estimate(account_id=None, shot=shot, part=2, provider="fal",
                            model="ltx2.3")
     assert shown["estimate_usd"] == pytest.approx(2 * one.usd)
-    assert shown["credits"] == 2 * pricing.credits_for(one.provider_usd_micros)
+    assert shown["credits"] == 2 * pricing.credits_for(one.provider_usd_micros, model="ltx2.3")
 
 
 def test_an_unplanned_timed_scene_prices_the_windows_its_prompt_carries(fal_keyed, shot_by_shot):
@@ -294,13 +294,13 @@ def test_the_same_model_quotes_differently_at_720p_and_1080p(fal_keyed):
     assert (at_720.frame, at_1080.frame) == ("720p", "1080p")
     assert at_720.provider_usd_micros == 3_034_000
     assert at_1080.provider_usd_micros == 6_820_000
-    # seedance2 carries its own markup since 2026-10-27 (MARKUP_BY_MODEL)
-    assert at_720.credits == 456                    # ceil(303.4 * 1.5)
-    assert at_1080.credits == 1023                  # ceil(682 * 1.5)
+    # seedance2 carries its own markup (MARKUP_BY_MODEL; 1.4x since 2026-11-02)
+    assert at_720.credits == 425                    # ceil(303.4 * 1.4)
+    assert at_1080.credits == 955                   # ceil(682 * 1.4)
     assert providers.band_for("fal", "seedance2", "720p").tier == "creator"
     assert providers.band_for("fal", "seedance2", "1080p").tier == "premium"
     # every plan renders it (2026-10-20): a creator-tier account prices 1080p too
-    assert pricing.quote(frame="1080p", tier="creator", **ask).credits == 1023
+    assert pricing.quote(frame="1080p", tier="creator", **ask).credits == 955
     # 720p is the default resolution where a model offers it
     assert pricing.quote(**ask).frame == "720p"
 
@@ -340,11 +340,14 @@ def test_every_per_model_markup_is_a_real_model_between_the_floor_and_markup():
 # guards: credits_for with no model is MARKUP, exactly as before -- stills,
 # effects and every caller that names no model are unchanged
 def test_no_model_is_the_old_markup_and_a_listed_model_is_its_own():
-    assert pricing.markup_for(None) == pricing.markup_for("ltx2.3") == pricing.MARKUP
+    assert pricing.markup_for(None) == pricing.markup_for("not-a-model") == pricing.MARKUP
     assert pricing.credits_for(1_000_000) == 240
-    assert pricing.credits_for(1_000_000, model="ltx2.3") == 240
-    assert pricing.credits_for(1_000_000, model="seedance2.5") == 150
-    assert pricing.credits_for(2_311_000, model="seedance2.5") == 347      # 5s at 720p
+    # the two markups of 2026-11-02: thin on Seedance and Veo, 2.0x on LTX
+    assert pricing.credits_for(1_000_000, model="ltx2.3") == 200
+    assert pricing.credits_for(1_000_000, model="seedance2.5") == 140
+    assert pricing.credits_for(2_365_000, model="seedance2.5") == 332      # 5s at 720p
+    assert pricing.credits_for(2_400_000, model="veo3.1") == 276           # 6s at 720p
+    assert pricing.credits_for(900_000, model="veo3.1-fast") == 135        # 6s at 720p
     assert pricing.credits_for(1_000_000, model="grok1.5-lite") == 173
     assert ledger.charge_credits(1.00, model="kling4") == 150
     assert ledger.charge_credits(1.00) == 240
@@ -365,7 +368,7 @@ def test_an_unquoted_charge_holds_at_its_models_markup(monkeypatch):
     monkeypatch.setattr(billing, "release_due", lambda *a, **k: None)
     c = charging.Charge(7, provider="fal", ref="r1", estimate_usd=1.00, model="veo3.1")
     c.take()
-    assert held["credits"] == c.held == 150
+    assert held["credits"] == c.held == 115                  # Veo 3.1 at 1.15x
     plain = charging.Charge(7, provider="fal", ref="r2", estimate_usd=1.00)
     held.clear()
     plain.take()

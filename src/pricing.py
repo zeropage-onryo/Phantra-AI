@@ -91,7 +91,12 @@ from . import ledger, providers, timeline
 # v4 (2026-10-27): video is marked up PER MODEL (MARKUP_BY_MODEL below), so
 # a v3 token for a clip carries a price this version would not show; v3 is
 # retired the same way, and every open card re-quotes once.
-PRICING_VERSION = "2026-10-27-fal-v4"
+#
+# v5 (2026-11-02): two markups (Mike, "make the costs of seedance and veo
+# more competitive"): thin on the brand-name models people come for
+# (Seedance 1.4x, Veo 3.1 1.15x), 2.0x on LTX, Veo 3.1 Fast added at 1.5x.
+# A v4 token carries a price this version would not show; v4 is retired.
+PRICING_VERSION = "2026-11-02-fal-v5"
 # A token minted under a version not listed here is refused as
 # `retired_pricing`: prices changed, re-quote. Retire a version by removing
 # it, never by changing what it means.
@@ -110,27 +115,44 @@ CREDIT_FLOOR = 10
 # THE MARKUP PER VIDEO MODEL (2026-10-27, Mike: "for video models it's way
 # too expensive at the current rates"; docs/tasks/task-video-markup.md).
 # Video at 2.4x put Seedance 2.5 at about 4x Higgsfield's on-screen price
-# for the same clip, read off their Generate button 2026-10-27. Each model
-# here is priced at no more than 1.3x Higgsfield's list price where that
-# still leaves MIN_MARKUP over fal's rate card, else at MIN_MARKUP; a model
-# not listed (LTX, images, effects, stills) keeps MARKUP. Strings, through
-# Fraction, for MARKUP's reason. Keyed by fal.VIDEO_MODELS' ids.
+# for the same clip, read off their Generate button 2026-10-27; v4 took
+# every model to 1.5x. A model not listed (images, effects, stills) keeps
+# MARKUP. Strings, through Fraction, for MARKUP's reason. Keyed by
+# fal.VIDEO_MODELS' ids.
+#
+# TWO MARKUPS SINCE 2026-11-02 (Mike: "make the costs of seedance and veo
+# more competitive"; docs/tasks/task-competitive-pricing.md). Higgsfield
+# sells the closed models near cost (its CEO puts their margin at 20-30%)
+# and earns on cheap models it steers people to. So: Seedance at 1.4x and
+# Veo 3.1 Standard at 1.15x (Higgsfield sells Veo at about Google's list
+# price); Kling, Wan and Grok unchanged at their v4 numbers, Veo 3.1 Fast new
+# at 1.5x;
+# LTX, which Higgsfield does not carry, at 2.0x (down from MARKUP). On fal
+# Seedance still costs twice ByteDance's own price; a second host is the
+# next step, not this table.
 MARKUP_BY_MODEL: dict[str, str] = {
-    "seedance2.5": "1.5",
-    "seedance2": "1.5",
-    "seedance2-fast": "1.5",
+    "seedance2.5": "1.4",
+    "seedance2": "1.4",
+    "seedance2-fast": "1.4",
     "kling3-turbo-pro": "1.5",
     "kling4": "1.5",
-    "veo3.1": "1.5",
+    "veo3.1": "1.15",
+    "veo3.1-fast": "1.5",
     "wan3": "1.5",
     "grok1.5": "1.64",
     "grok1.5-lite": "1.73",
+    "ltx2.3": "2.0",
+    "ltx2.5-fast": "2.0",
+    "ltx2.5": "2.0",
 }
-# The least any model may be marked up: below it a yearly subscriber who
-# spends every credit leaves under 10% after Stripe and the assistant
-# (the margin model in Claude outputs/Phantra_video_pricing_2026-10-27.xlsx).
-# tests/test_pricing.py fails a table entry under it.
-MIN_MARKUP = "1.5"
+# The least any model may be marked up. It was 1.5 (v4: below it a yearly
+# subscriber who spends every credit leaves under 10% after Stripe and the
+# assistant). 1.15 is Mike's call of 2026-11-02, for Veo 3.1 Standard:
+# such a subscriber spending everything on Seedance and Veo is now about
+# break-even, and the margin is carried by the cheaper models, credit that
+# expires unspent, and plan revenue. tests/test_pricing.py fails a table
+# entry under it.
+MIN_MARKUP = "1.15"
 
 
 def markup_for(model: Optional[str] = None) -> str:
@@ -193,8 +215,8 @@ def trial_thinking_usd() -> float:
 
 # --- the plans --------------------------------------------------------------
 # What a person buys. `credits` is the monthly allowance, granted as ONE
-# subscription lot per paid invoice (ledger.EXPIRY_MONTHS governs its
-# life); `tier` is the highest band the plan may render (providers.TIERS).
+# subscription lot per paid invoice (ledger.expiry_months("subscription")
+# governs its life: one month since 2026-11-02); `tier` is the highest band the plan may render (providers.TIERS).
 # `price_env` names the Stripe Price id the checkout uses -- the dollars
 # here are what the site prints and what tests/test_plans.py pins, the
 # Stripe Price is what is actually charged, and the two are kept equal by
@@ -1253,6 +1275,7 @@ CATALOG_MODELS: tuple[tuple[str, str, str, str], ...] = (
     ("fal", "seedance2", "Seedance 2.0", "Seedance at full quality, up to 1080p."),
     ("fal", "seedance2.5", "Seedance 2.5", "ByteDance's newest, with sound, up to 30 seconds and 1080p."),
     ("fal", "veo3.1", "Veo 3.1", "Google's top model, with sound."),
+    ("fal", "veo3.1-fast", "Veo 3.1 Fast", "Veo 3.1's quick tier, with sound, at about a third of the price."),
     ("fal", "grok1.5", "Grok Imagine 1.5", "xAI's video model, with sound, 1 to 15 seconds, seven frame shapes."),
     ("fal", "grok1.5-lite", "Grok Imagine 1.5 Lite", "Grok's quick tier, with sound, up to 1080p."),
 )
@@ -1306,7 +1329,11 @@ def public_catalog() -> dict:
         "markup": MARKUP,
         "markup_by_model": dict(MARKUP_BY_MODEL),
         "credit_floor": CREDIT_FLOOR,
-        "expiry_months": ledger.EXPIRY_MONTHS,
+        # plan credit lives a month (2026-11-02); top-ups, the trial and
+        # every other grant keep EXPIRY_MONTHS
+        "expiry_months": ledger.expiry_months("subscription"),
+        "topup_expiry_months": ledger.expiry_months("purchase"),
+        "trial_expiry_months": ledger.expiry_months("promo"),
         "clip_seconds": CATALOG_CLIP_SECONDS,
         "tiers": list(providers.TIERS),
         "yearly_discount": YEARLY_DISCOUNT,

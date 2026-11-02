@@ -86,11 +86,16 @@ def test_a_webhook_delivered_twice_grants_once(led):
     assert len(ledger.lots(account, dsn)) == 1
 
 
-def test_a_grant_defaults_to_two_months(led):
+def test_a_plan_grant_lives_one_month_and_a_top_up_two(led):
+    """Plan credit expires monthly since 2026-11-02; a top-up keeps two months."""
     dsn, account = led
     ledger.grant(account, 100, "subscription", granted_at="2026-09-08T12:00:00+00:00",
                  dsn=dsn)
-    assert ledger.lots(account, dsn)[0]["expires_at"].startswith("2026-11-08")
+    ledger.grant(account, 100, "purchase", granted_at="2026-09-08T12:00:00+00:00",
+                 source_ref="pi_x", dsn=dsn)
+    by_kind = {lot["kind"]: lot["expires_at"] for lot in ledger.lots(account, dsn)}
+    assert by_kind["subscription"].startswith("2026-10-08")
+    assert by_kind["purchase"].startswith("2026-11-08")
 
 
 def test_the_expiry_month_arithmetic_clamps_the_day(led):
@@ -414,17 +419,24 @@ def test_expire_due_sweeps_past_date_lots_and_leaves_a_trail(led):
     assert ledger.expire_due(dsn=dsn) == 0            # idempotent
 
 
-def test_expiry_two_months_out_is_the_policy(led):
-    """The rule changed to two months on 2026-09-08. A lot granted
-    nine weeks ago is gone; one granted seven weeks ago is not."""
+def test_expiry_is_one_month_for_plan_credit_and_two_for_the_rest(led):
+    """Two months from 2026-09-08; plan credit one month from 2026-11-02.
+    A plan lot from five weeks ago is gone, one from three weeks ago is not;
+    a top-up from nine weeks ago is gone, one from seven weeks ago is not."""
     dsn, account = led
     assert ledger.EXPIRY_MONTHS == 2
-    old = ledger.grant(account, 400, "subscription", granted_at=_stamp(-63), dsn=dsn)
-    fresh = ledger.grant(account, 100, "subscription", granted_at=_stamp(-49), dsn=dsn)
-    assert ledger.expire_due(dsn=dsn) == 400
+    assert ledger.expiry_months("subscription") == 1
+    assert ledger.expiry_months("purchase") == ledger.expiry_months("promo") == 2
+    old = ledger.grant(account, 400, "subscription", granted_at=_stamp(-35), dsn=dsn)
+    fresh = ledger.grant(account, 100, "subscription", granted_at=_stamp(-21), dsn=dsn)
+    old_top = ledger.grant(account, 40, "purchase", source_ref="pi_old",
+                           granted_at=_stamp(-63), dsn=dsn)
+    fresh_top = ledger.grant(account, 10, "purchase", source_ref="pi_new",
+                             granted_at=_stamp(-49), dsn=dsn)
+    assert ledger.expire_due(dsn=dsn) == 440
     remaining = {lot["id"]: lot["credits_remaining"] for lot in ledger.lots(account, dsn)}
-    assert remaining[old] == 0
-    assert remaining[fresh] == 100
+    assert remaining[old] == 0 and remaining[old_top] == 0
+    assert remaining[fresh] == 100 and remaining[fresh_top] == 10
 
 
 def test_a_lapse_expires_subscription_purchase_and_promo_and_spares_refund(led):
@@ -920,5 +932,5 @@ def test_reap_settles_a_video_render_at_its_models_markup(led):
                 extra={"model": "seedance2.5"})
     result = ledger.reap(datetime.now(timezone.utc) + timedelta(minutes=1), dsn=dsn)
     assert result["settled"] == [hold_id]
-    assert pricing.markup_for("seedance2.5") == "1.5"
-    assert ledger.available(account, dsn) == 1000 - ledger.charge_credits(2.50, model="seedance2.5") == 625
+    assert pricing.markup_for("seedance2.5") == "1.4"
+    assert ledger.available(account, dsn) == 1000 - ledger.charge_credits(2.50, model="seedance2.5") == 650

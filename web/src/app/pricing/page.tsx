@@ -8,7 +8,7 @@ import { PlanButton } from "@/components/site/plan-button";
 import { PlanCards } from "@/components/site/plan-cards";
 import { CheckoutNotice } from "@/components/site/checkout-notice";
 import { FaqList } from "@/components/site/faq-list";
-import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, num, usd } from "@/lib/catalog";
+import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, monthsLabel, num, usd } from "@/lib/catalog";
 import { pageMeta } from "@/lib/page-meta";
 
 export const metadata: Metadata = pageMeta({
@@ -141,8 +141,10 @@ const BILLING_FAQ = [
     q: "Do credits roll over or expire?",
     a: (
       <p>
-        Every grant is its own lot with its own clock: credit expires {CATALOG.expiry_months} months after it
-        lands, and your monthly allowance is spent before any credit you bought as a top-up. If a subscription
+        Every grant is its own lot with its own clock. Your plan&apos;s allowance expires{" "}
+        {monthsLabel(CATALOG.expiry_months)} after it lands, when the next month&apos;s arrives; credit you
+        bought as a top-up lasts {monthsLabel(CATALOG.topup_expiry_months)}, and your monthly allowance is
+        spent before it. If a subscription
         ends, its remaining allowance ends with it.
       </p>
     ),
@@ -163,8 +165,8 @@ const BILLING_FAQ = [
       <p>
         You pay for twelve months at once, {discount()}% off. The first month&apos;s credits land
         immediately and each following month&apos;s allowance lands on the same day of the month, with its
-        own {CATALOG.expiry_months}-month clock — so a year&apos;s credit never expires before you can
-        use it. Cancelling stops the months that haven&apos;t landed yet.
+        own clock of {monthsLabel(CATALOG.expiry_months)} — so a year&apos;s credit never expires before you
+        can use it. Cancelling stops the months that haven&apos;t landed yet.
       </p>
     ),
   },

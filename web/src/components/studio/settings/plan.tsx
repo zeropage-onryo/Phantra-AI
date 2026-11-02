@@ -20,6 +20,7 @@ import { useState } from "react";
 import { ArrowUpRight, Check, CircleSlash, Clapperboard, Image as ImageIcon, PenLine } from "lucide-react";
 import {
   CATALOG,
+  monthsLabel,
   MODELS,
   PLANS,
   TOPUP,
@@ -376,7 +377,8 @@ export function PlanSection() {
           })}
         </div>
         <p className="zset-note zset-plans-note">
-          Credits expire {CATALOG.expiry_months} months after they land. Paying, changing and cancelling all happen on
+          Plan credits expire {monthsLabel(CATALOG.expiry_months)} after they land, top-ups after{" "}
+          {monthsLabel(CATALOG.topup_expiry_months)}. Paying, changing and cancelling all happen on
           Stripe.{" "}
           <a href="/pricing" target="_blank" rel="noopener">
             Compare plans in full

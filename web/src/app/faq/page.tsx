@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { PageIntro } from "@/components/site/page-intro";
 import { FaqList, type Faq } from "@/components/site/faq-list";
-import { CATALOG } from "@/lib/catalog";
+import { CATALOG, monthsLabel } from "@/lib/catalog";
 import { pageMeta } from "@/lib/page-meta";
 
 export const metadata: Metadata = pageMeta({
@@ -129,8 +129,9 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "Do credits expire?",
         a: (
           <p>
-            {CATALOG.expiry_months} months after they land. Your monthly allowance is spent before any credit
-            you bought.
+            Yes. Your plan&apos;s monthly allowance expires {monthsLabel(CATALOG.expiry_months)} after it lands;
+            credit you bought as a top-up lasts {monthsLabel(CATALOG.topup_expiry_months)}. Your monthly
+            allowance is spent before any credit you bought.
           </p>
         ),
       },

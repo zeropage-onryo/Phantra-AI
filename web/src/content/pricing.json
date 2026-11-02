@@ -1,20 +1,26 @@
 {
-  "pricing_version": "2026-10-27-fal-v4",
+  "pricing_version": "2026-11-02-fal-v5",
   "credit_cents": 1,
   "markup": "2.4",
   "markup_by_model": {
-    "seedance2.5": "1.5",
-    "seedance2": "1.5",
-    "seedance2-fast": "1.5",
+    "seedance2.5": "1.4",
+    "seedance2": "1.4",
+    "seedance2-fast": "1.4",
     "kling3-turbo-pro": "1.5",
     "kling4": "1.5",
-    "veo3.1": "1.5",
+    "veo3.1": "1.15",
+    "veo3.1-fast": "1.5",
     "wan3": "1.5",
     "grok1.5": "1.64",
-    "grok1.5-lite": "1.73"
+    "grok1.5-lite": "1.73",
+    "ltx2.3": "2.0",
+    "ltx2.5-fast": "2.0",
+    "ltx2.5": "2.0"
   },
   "credit_floor": 10,
-  "expiry_months": 2,
+  "expiry_months": 1,
+  "topup_expiry_months": 2,
+  "trial_expiry_months": 2,
   "clip_seconds": 5,
   "tiers": [
     "standard",
@@ -79,7 +85,7 @@
       "tier": "standard",
       "max_seconds": null,
       "seconds": 6,
-      "credits": 116,
+      "credits": 96,
       "frame": "1080p"
     },
     {
@@ -90,7 +96,7 @@
       "tier": "standard",
       "max_seconds": null,
       "seconds": 6,
-      "credits": 130,
+      "credits": 108,
       "frame": "720p"
     },
     {
@@ -101,7 +107,7 @@
       "tier": "standard",
       "max_seconds": null,
       "seconds": 6,
-      "credits": 173,
+      "credits": 144,
       "frame": "720p"
     },
     {
@@ -134,7 +140,7 @@
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 182,
+      "credits": 170,
       "frame": "720p"
     },
     {
@@ -145,7 +151,7 @@
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 228,
+      "credits": 213,
       "frame": "720p"
     },
     {
@@ -156,7 +162,7 @@
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 355,
+      "credits": 332,
       "frame": "720p"
     },
     {
@@ -167,7 +173,18 @@
       "tier": "premium",
       "max_seconds": 8,
       "seconds": 6,
-      "credits": 360,
+      "credits": 276,
+      "frame": "720p"
+    },
+    {
+      "provider": "fal",
+      "model": "veo3.1-fast",
+      "name": "Veo 3.1 Fast",
+      "blurb": "Veo 3.1's quick tier, with sound, at about a third of the price.",
+      "tier": "standard",
+      "max_seconds": 8,
+      "seconds": 6,
+      "credits": 135,
       "frame": "720p"
     },
     {
