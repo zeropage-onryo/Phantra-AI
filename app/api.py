@@ -5081,6 +5081,15 @@ def approve_render(concept_id: int, account_id: Optional[int],
         # picked. (The adapters clamp internally -- that is their contract
         # with the nightly graph, which has no human to refuse to.)
         raise ApproveRefused(400, "bad_render_choice", str(e))
+    # A SCENE RENDERED AS ONE CLIP IS RENDERED (2026-11-02). Its clip lands on
+    # the shot, not on a part, so renders_as_one still says "one clip" and a
+    # second approve -- the connector's, or a stale card -- paid for the
+    # whole scene again. Refused here, before any token is spent. (A split
+    # scene needs no guard: the loop skips every shot that has its clip.)
+    if priced.get("one_clip") and shot.get("media_url"):
+        raise ApproveRefused(409, "already_rendered",
+                             "this scene is rendered already: its clip is in your "
+                             "Library. Nothing was charged.")
     # priced["signed"] is "billable AND a secret to sign with" -- exactly
     # the renders display() minted a token for, so the requirement and the
     # offer are one predicate and cannot disagree
