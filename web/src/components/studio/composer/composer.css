@@ -101,6 +101,12 @@
 .zc .zc-box:focus-within {
   border-color: var(--zc-line-hi);
 }
+/* keyboard focus in the box shows (QA 2026-11-02 T8): the border change
+   alone was a few shades on a dark panel */
+.zc .zc-box:has(textarea:focus-visible) {
+  outline: 2px solid var(--zc-ink-2);
+  outline-offset: 2px;
+}
 .zc .zc-box.drop {
   border-color: var(--signal);
   border-style: dashed;

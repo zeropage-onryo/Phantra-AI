@@ -63,7 +63,7 @@ const AFTER = [
 const isVideoPage = isVideoModelPage;
 
 const ITEM =
-  "inline-flex h-9 items-center rounded-md px-3 text-[13.5px] tracking-[-0.005em] text-[var(--nav-fg)] transition-colors outline-none hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground";
+  "inline-flex h-9 items-center rounded-md px-3 text-[13.5px] tracking-[-0.005em] text-[var(--nav-fg)] transition-colors outline-none hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60 focus-visible:text-foreground";
 
 export function SiteHeader() {
   const bar = useRef<HTMLElement>(null);
@@ -113,7 +113,7 @@ export function SiteHeader() {
                 <Menu.Link
                   render={<Link href="/make" />}
                   closeOnClick
-                  className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                  className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60"
                 >
                   <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">All use cases</span>
                   <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
@@ -127,7 +127,7 @@ export function SiteHeader() {
                       <Menu.Link
                         render={<Link href={makePath(page)} />}
                         closeOnClick
-                        className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                        className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60"
                       >
                         <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">{page.menu}</span>
                       </Menu.Link>
@@ -150,7 +150,7 @@ export function SiteHeader() {
                 <Menu.Link
                   render={<Link href="/models" />}
                   closeOnClick
-                  className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                  className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60"
                 >
                   <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">All models</span>
                   <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
@@ -172,7 +172,7 @@ export function SiteHeader() {
                             <Menu.Link
                               render={<Link href={makePath(page)} />}
                               closeOnClick
-                              className="block rounded-md px-3 py-2 text-[14px] font-medium tracking-[-0.005em] text-foreground transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                              className="block rounded-md px-3 py-2 text-[14px] font-medium tracking-[-0.005em] text-foreground transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60"
                             >
                               {pageLabel(page)}
                             </Menu.Link>
@@ -204,7 +204,7 @@ export function SiteHeader() {
                         target="_blank"
                         rel="noopener noreferrer"
                         closeOnClick
-                        className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                        className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60"
                       >
                         <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-foreground">
                           <SocialIcon kind={social.icon} />
@@ -286,9 +286,9 @@ export function SiteHeader() {
 // same as the bar's. The wrapper has no transform or filter, so the fixed
 // sheet still covers the screen.
 const ROW =
-  "flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-[17px] font-medium tracking-[-0.01em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary";
+  "flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-[17px] font-medium tracking-[-0.01em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60";
 const SUB =
-  "block rounded-lg px-3 py-2.5 text-[15px] font-medium tracking-[-0.005em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary";
+  "block rounded-lg px-3 py-2.5 text-[15px] font-medium tracking-[-0.005em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60";
 
 function MobileMenu() {
   const [open, setOpen] = useState(false);
@@ -378,7 +378,7 @@ function MobileMenu() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={close}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium tracking-[-0.005em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium tracking-[-0.005em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60"
                 >
                   <SocialIcon kind={social.icon} className="size-[18px] shrink-0" />
                   <span>{social.label}</span>
@@ -397,7 +397,7 @@ function MobileMenu() {
       <Dialog.Trigger
         ref={trigger}
         aria-label="Open menu"
-        className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+        className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60 md:hidden"
       >
         <MenuIcon aria-hidden className="size-5" strokeWidth={1.75} />
       </Dialog.Trigger>
@@ -410,7 +410,7 @@ function MobileMenu() {
           <div className="flex h-[60px] shrink-0 items-center gap-3 border-b border-border px-6">
             <Dialog.Close
               aria-label="Close menu"
-              className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground/60"
             >
               <X aria-hidden className="size-5" strokeWidth={1.75} />
             </Dialog.Close>
