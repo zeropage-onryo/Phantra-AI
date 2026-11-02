@@ -1089,9 +1089,22 @@
    of a long form, off screen while you typed. Both now ride just above the
    bar, and drop to the keyboard while you type (the bar steps aside). */
 @media (max-width: 720px) {
+  /* pinned from the first frame (2026-10-29, Higgsfield's): Video's box, and
+     Image's, which takes the same shape on a phone */
   .dg .dgv-dock {
+    position: fixed;
+    left: 12px;
+    right: 12px;
     bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 30;
+    margin: 0;
     box-shadow: 0 12px 0 4px var(--ground);
+  }
+  .dg.view {
+    padding-bottom: calc(var(--ph-dock, 180px) + 20px);
+  }
+  .dg.dgi > .dg-panel {
+    display: none;
   }
   /* the panel scrolls itself on a desktop; on a phone it is as tall as its
      fields and the page scrolls, so the sticky button follows the page */
@@ -1112,8 +1125,7 @@
     background: color-mix(in srgb, var(--signal) 40%, var(--panel));
     color: color-mix(in srgb, var(--on-signal) 55%, var(--panel));
   }
-  .zps:has(textarea:focus) .dg .dgv-dock,
-  .zps:has(textarea:focus) .dg.dgi .dg-go {
+  .zps:has(textarea:focus) .dg .dgv-dock {
     bottom: 8px;
   }
   .dg.dgi .dg-prompt {
@@ -1157,5 +1169,13 @@
     max-height: calc(100dvh - 60px - 72px - 24px - env(safe-area-inset-bottom));
     overscroll-behavior: contain;
     border-radius: 22px;
+  }
+}
+
+/* Image's phone box (direct-generator.tsx, 2026-10-29) is a phone's only:
+   above 720px the panel holds the prompt */
+@media (min-width: 721px) {
+  .dg .dgi-dock {
+    display: none;
   }
 }
