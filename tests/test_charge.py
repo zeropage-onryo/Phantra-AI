@@ -151,7 +151,7 @@ def test_a_chosen_length_and_resolution_are_held_sent_and_banked(studio, tmp_pat
     (body,) = studio["submits"]
     assert body["duration"] == 10 and body["resolution"] == "1440p"
     assert ledger.available(studio["account_id"], studio["dsn"]) == \
-        5000 - ledger.charge_credits(usd)
+        5000 - ledger.charge_credits(usd, model="ltx2.3")
     assert banked[0]["media_kind"] == "video" and banked[0]["model"] == "ltx2.3"
     with db.connect(studio["dsn"]) as conn:
         params = json.loads(conn.execute(
@@ -348,7 +348,7 @@ def test_without_a_quote_the_estimate_is_still_the_fallback(studio, tmp_path, mo
     result = fal.generate_from_prompt(PROMPT, db_path=studio["dsn"],
                                          account_id=studio["account_id"])
     assert result["ok"] is True, result
-    price = ledger.charge_credits(fal.estimate_cost(1))
+    price = ledger.charge_credits(fal.estimate_cost(1), model=fal.DEFAULT_MODEL)
     assert ledger.available(studio["account_id"], studio["dsn"]) == 1000 - price
 
 
