@@ -1876,7 +1876,10 @@ def _length_note(shot: dict, clip: Optional[dict]) -> Optional[str]:
         return None
     parts = " + ".join(f"{d:g}" for d in durations)
     how = f"{parts} = {billed:g} s" if len(durations) > 1 else f"{billed:g} s"
-    return (f"The scene is written to {written:g} s; {clip.get('model') or 'this model'} "
+    from . import model_menu
+    model = clip.get("model")
+    name = (model_menu.label_for(model) or model) if model else "this model"
+    return (f"The scene is written to {written:g} s; {name} "
             f"renders {how}, so that is the length priced and made.")
 
 

@@ -661,6 +661,8 @@ def test_quote_says_when_the_model_renders_another_length(studio):
     assert q["clip"]["durations"] == [6]
     said = q["clip"]["length_note"]
     assert "written to 4 s" in said and "renders 6 s" in said
+    # by the model's name, never its id (seen running it, 2026-11-02)
+    assert "LTX 2.3 renders" in said and "ltx2.3" not in said
     assert q["note"].startswith(said)
     listed = mcp_server.quote_render(sid, model="ltx2.3", dsn=path, listing="claude")
     assert listed["clip"]["length_note"] == said and listed["note"].startswith(said)
