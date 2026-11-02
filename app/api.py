@@ -5023,6 +5023,10 @@ def scene_render_state(concept_id: int, account_id: int = Depends(auth.current_a
     card["blocked"] = preprod.reference_gate(concept) or ""
     card["render_default"] = providers.render_default(card.get("tool"), account_id, ctx,
                                                       model=card.get("render_model"))
+    # Seedance refuses a real person's photo on every host (2026-11-02,
+    # src/people_refs.py): the card says so for whichever model is picked
+    from src import people_refs
+    card.update(people_refs.card_fields(concept["shots"][0]))
     card["quote"] = _card_quote(concept, account_id, ctx=ctx)
     # what a look at each landed clip saw (src/render_qc.py), by shot
     from src import render_qc
@@ -5049,11 +5053,18 @@ def scene_quote(concept_id: int, provider: Optional[str] = None,
     if concept is None or not concept.get("shots"):
         return _error(404, "not_found", "no such concept")
     try:
-        return pricing.display(account_id=account_id, shot=concept["shots"][0],
-                               shot_id=concept_id, provider=provider, model=model,
-                               seconds=duration, frame=frame)
+        shown = pricing.display(account_id=account_id, shot=concept["shots"][0],
+                                shot_id=concept_id, provider=provider, model=model,
+                                seconds=duration, frame=frame)
     except ValueError as e:
         return _error(400, "bad_render_choice", str(e))
+    # advice, never a lock: Seedance refuses a real person's photo (src/people_refs.py)
+    from src import people_refs
+    note = people_refs.note_for(shown.get("model") if isinstance(shown, dict) else None,
+                                concept["shots"][0])
+    if note and isinstance(shown, dict):
+        shown = {**shown, "people_note": note}
+    return shown
 
 
 @router.post("/scenes/{concept_id}/approve")

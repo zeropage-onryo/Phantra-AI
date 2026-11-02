@@ -460,6 +460,12 @@ export type Concept = {
   /** the Render card and Renders: why the reference gate refuses this
    *  scene ("" when it can be rendered). Shown, never approvable. */
   blocked?: string;
+  /** a person is among the references (a subject role or a character's photo),
+   *  the models that refuse a real person's photo, and the sentence the Render
+   *  card shows when one of them is picked (src/people_refs.py, 2026-11-02) */
+  holds_person?: boolean;
+  people_refusers?: string[];
+  people_note?: string;
   /** where each reference came from, parallel to `refs` (app/api.py _ref_sources) */
   ref_sources?: import("./refs").RefSource[];
   /** the drawable size of each reference, parallel to `refs` (app/api.py

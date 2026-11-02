@@ -48,6 +48,11 @@ _CAUSES = (
      "{service} turned the studio away. That is ours to fix, not yours"),
     (re.compile(r"(?i)\b429\b|rate.?limit|too many requests|resource_exhausted|overloaded"),
      "{service} is busy. Try again in a minute"),
+    # Seedance refusing a real person's photo as a reference (2026-11-02,
+    # src/people_refs.py): rewording the prompt cannot help, a model can
+    (re.compile(r"(?i)likeness(es)? of real people|partner_validation"),
+     "{model} won't take a photo of a real person as a reference. Render this shot on "
+     "Kling 4.0 or Veo 3.1 instead"),
     (re.compile(r"(?i)content.?policy|safety|nsfw|moderat|prohibited|blocked by"),
      "{model} declined this prompt. Reword it and try again"),
     (re.compile(r"(?i)timed? ?out|\b50[0234]\b|unavailable|connection|temporar"),
