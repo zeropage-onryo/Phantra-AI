@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote, keyframeCount, keyframePrice, keyframeButton, keyframeCeilingNote, oneClipNote } from '../src/lib/render-choice.ts';
+import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote, keyframeCount, keyframePrice, keyframeButton, keyframeCeilingNote, keyframesOnSale, oneClipNote } from '../src/lib/render-choice.ts';
 
 const choices = (values, d) => ({ kind: 'choices', values, default: d });
 const renderers = {
@@ -228,4 +228,12 @@ test('a prompt naming another shape than the scene renders is said; vertical or 
   assert.equal(shapeAsked('(0-3s) close-up; (3-6s) wide'), '');
   assert.equal(shapeAsked(''), '');
   assert.equal(shapeAsked(null), '');
+});
+
+test('a scene rendered as one clip is not sold keyframes; a pick that splits it is', () => {
+  const q = { stills: 3, credits: 30 };
+  assert.equal(keyframesOnSale({ oneClip: true }, q), null);
+  assert.equal(keyframesOnSale({ oneClip: false }, q), q);
+  assert.equal(keyframesOnSale(null, q), q);
+  assert.equal(keyframesOnSale({ oneClip: false }, undefined), null);
 });

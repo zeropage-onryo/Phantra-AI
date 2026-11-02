@@ -1826,11 +1826,17 @@ function Composer() {
   };
 
   /* A scene's keyframes are priced once the scene exists: the step reads
-     its quote here, and is done already when every shot has its frame. */
+     its quote here, and is done already when every shot has its frame. A
+     scene that renders as ONE clip skips them (2026-11-02): that clip goes
+     out on the scene's photos, and the stills would not steer it. */
   async function priceKeyframes(plan: Plan, st: PlanStep): Promise<Partial<PlanStep>> {
     const scene = sceneOf(plan, st);
     if (!scene?.conceptId) return { status: "failed", note: "there is no scene to draw them for" };
     try {
+      const card = (await sceneRender(scene.conceptId)).scene;
+      if (card.quote && !card.quote.error && card.quote.one_clip) {
+        return { status: "skipped", credits: 0, stills: 0, note: "it renders as one clip from its photos, so keyframes would not steer it" };
+      }
       const quote = (await getConceptDetail(scene.conceptId)).keyframes;
       if (!quote || !quote.stills) {
         return { status: "done", credits: 0, stills: 0, note: "every shot already has its first frame" };
@@ -2014,7 +2020,7 @@ function Composer() {
         if ((st.do === "keyframes" || st.do === "render") && typeof st.credits !== "number") {
           const priced = st.do === "render" ? await priceRender(plan, st) : await priceKeyframes(plan, st);
           applyPlan(id, (p) => patchStep(p, n, priced));
-          if (priced.status === "done") continue;
+          if (priced.status === "done" || priced.status === "skipped") continue;
           if (priced.status === "failed") break;
           st = { ...st, ...priced };
         }

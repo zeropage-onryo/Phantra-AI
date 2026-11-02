@@ -69,6 +69,7 @@ import {
   oneClipNote,
   shotsText,
   keyframePrice,
+  keyframesOnSale,
   legalDuration,
   liveJobFor,
   pickFor,
@@ -215,10 +216,14 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   const parts = partsOf(scene);
   const checks = checkLines(scene.checks);
   const done = renderedOf(scene.media_url, parts);
-  const oneAtATime = shotsToDraw(parts, scene.keyframes?.stills);
   const r = pick ? renderers[pick.provider] : undefined;
   const spec = pick ? specOf(catalogue, pick.provider, pick.model) : null;
   const plan = pick && spec ? planFor(spec, pick, scene.timeline ? parts : null, quote) : null;
+  // A scene rendered as ONE clip (2026-11-02) goes out on its photos, not its
+  // keyframes: on a reference model they are never sent, elsewhere only shot
+  // 1's is. So its stills are not sold here; a pick that splits it sells them.
+  const stills = keyframesOnSale(plan, scene.keyframes);
+  const oneAtATime = stills ? shotsToDraw(parts, stills.stills) : [];
   const noKey = r && !r.available ? `${r.label} is not configured` : "";
   const badLength = !!(pick && spec && plan && !plan.timed && !plan.oneClip && !legalDuration(spec.duration as AxisLike, Number(pick.duration)));
   const short = !!plan && plan.credits !== null && charged && plan.credits > balance!.available;
@@ -304,7 +309,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
     const modelName = pick ? (r?.models || []).find((m) => m.id === pick.model)?.label || pick.model : "";
     const ready = !disabled && !!plan;
     const approveLabel = ready ? `Approve · ${modelName} · ${SCENE_SHAPE} · ${shotsText(plan!)} · ${priceText(plan!, exempt)}` : label;
-    const kf = !locked && done.state !== "done" && (scene.keyframes || drawing) ? scene.keyframes : null;
+    const kf = !locked && done.state !== "done" && (stills || drawing) ? stills : null;
     // the prompt asking for a shape the scene does not render in is said, never fixed
     const asked = done.state !== "done" && !locked ? shapeAsked(scene.prompt) : "";
     return (
@@ -424,7 +429,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
         </Link>
       ) : null}
 
-      {!locked && done.state !== "done" && (scene.keyframes || drawing) ? (
+      {!locked && done.state !== "done" && (stills || drawing) ? (
         // nothing is drawn until this is pressed (2026-09-29): a still costs credits
         <button
           type="button"
@@ -444,8 +449,8 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
         </button>
       ) : null}
       {/* a price that is a ceiling says why it may come in lower (2026-10-11) */}
-      {!locked && done.state !== "done" && !drawing && keyframeCeilingNote(scene.keyframes) ? (
-        <p className={NOTE}>{keyframeCeilingNote(scene.keyframes)}</p>
+      {!locked && done.state !== "done" && !drawing && keyframeCeilingNote(stills) ? (
+        <p className={NOTE}>{keyframeCeilingNote(stills)}</p>
       ) : null}
       {!locked && done.state !== "done" && oneAtATime.length ? (
         // one shot's still on its own (2026-10-11): a shot worth looking at
