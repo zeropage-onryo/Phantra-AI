@@ -1859,6 +1859,30 @@ def _card_fields(concept: dict, shot: dict, account_id: Optional[int]) -> dict[s
     return out
 
 
+def _length_note(shot: dict, clip: Optional[dict]) -> Optional[str]:
+    """A sentence when the clip is priced at another length than the scene
+    is written to: a model renders only its own legal lengths, fitted UP
+    (fal.VIDEO_MODELS), and a 4 s scene on ltx2.3 was priced at 6 s with
+    nothing said (QA 2026-11-02 K3)."""
+    try:
+        written = float(shot.get("seconds") or 0)
+    except (TypeError, ValueError):
+        return None
+    durations = [d for d in (clip or {}).get("durations") or [] if d]
+    if not written or not durations:
+        return None
+    billed = sum(durations)
+    if abs(billed - written) < 0.5:
+        return None
+    parts = " + ".join(f"{d:g}" for d in durations)
+    how = f"{parts} = {billed:g} s" if len(durations) > 1 else f"{billed:g} s"
+    from . import model_menu
+    model = clip.get("model")
+    name = (model_menu.label_for(model) or model) if model else "this model"
+    return (f"The scene is written to {written:g} s; {name} "
+            f"renders {how}, so that is the length priced and made.")
+
+
 def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
                  duration: Optional[int] = None, frame: Optional[str] = None,
                  dsn: Optional[str] = None,
@@ -1875,6 +1899,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
     concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if concept is None:
         raise ValueError(f"no scene {scene_id}")
+    if concept.get("archived"):
+        # a removed scene was priced and handed an approve link (QA 2026-11-02 K4)
+        raise ValueError(f"scene {scene_id} was removed, so it is not priced -- the person "
+                         "restores it in the studio first, or `write_scene` writes a new one")
     shot = (concept.get("shots") or [None])[0]
     if not shot or not (shot.get("prompt") or "").strip():
         raise ValueError(f"scene {scene_id} has no scene prompt yet -- `write_scene` first")
@@ -1908,6 +1936,9 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             raise ValueError(str(e)) from e
     except ValueError as e:
         raise ValueError(f"bad renderer choice: {e}") from e
+    said = _length_note(shot, clip)
+    if said:
+        clip["length_note"] = said
     # a scene rendered as ONE clip goes out on its photos, and its keyframes
     # would not steer it: no stills are offered or priced (2026-11-02)
     keyframes = (None if (clip or {}).get("one_clip")
@@ -1946,8 +1977,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
                 "show the person this price and wait for a yes before `approve`")
             if clip is not None and listing == "render":
                 out["note"] += "." + CARD_NOTE
+        if said:
+            out["note"] = f"{said} {out['note']}"
         return out
-    return {
+    out = {
         "scene_id": int(scene_id),
         "status": _status_of(concept),
         "keyframes": keyframes,
@@ -1961,6 +1994,9 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             "every shot already has a clip" if clip is None else
             "this server signs no quotes; `approve` takes the renderer choice alone")),
     }
+    if said:
+        out["note"] = f"{said} {out['note']}"
+    return out
 
 
 # --- the studio surface: images, video and effects, quoted in chat ----------

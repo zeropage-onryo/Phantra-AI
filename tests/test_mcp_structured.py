@@ -105,8 +105,11 @@ def test_the_catalogues_are_typed(studio_db):
 
 
 def test_image_search_is_typed(studio_db, monkeypatch):
+    # `sources` as find_images really returns it: the lanes by name (a list
+    # here hid that every real call failed its shape, QA 2026-11-02 K2)
     monkeypatch.setattr(mcp_server, "find_images", lambda *a, **k: {
-        "query": "wet tile", "sources": ["openverse"], "count": 1, "note": "",
+        "query": "wet tile", "sources": {"openverse": True, "google": False},
+        "count": 1, "note": "",
         "images": [{"id": "c1", "shows": "tile", "source": "openverse", "credit": "cc0"}]})
     data, line = _check(_call(_server(studio_db), "images_for", {"query": "wet tile"}),
                         "images_for")

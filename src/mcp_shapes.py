@@ -245,7 +245,9 @@ class ImageSearch(_Open):
     query: str
     count: int
     images: list[ImageCandidate]
-    sources: list[Any] = []
+    # which lanes can run, by name (imagesearch.sources()); a list here
+    # failed every call's output check (QA 2026-11-02 K2)
+    sources: dict[str, Any] = {}
     note: Optional[str] = None
 
 
