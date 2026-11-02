@@ -1823,3 +1823,17 @@
     animation: none;
   }
 }
+
+/* The Create home's news tab (front.css .cf-peek) sits on the box's top edge,
+   right where Vesper peeks: there he peeks over the TAB instead, from behind
+   its top left, so the two never crowd each other (2026-11-02). 61px is how
+   much of the tab shows above the box (its height less its -42px tuck);
+   7% is its inset (it is 86% of the box's width, centred). */
+.zc .cf-peek + .zc-dock .zc-vesper {
+  bottom: calc(100% + 61px);
+  left: calc(7% + 16px);
+}
+.zc .cf-peek + .zc-dock .vv-peek {
+  bottom: calc(100% + 72px);
+  left: calc(7% + 86px);
+}
