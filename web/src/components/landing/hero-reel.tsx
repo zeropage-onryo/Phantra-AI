@@ -57,9 +57,11 @@ function ReelTile({ clip, still }: { clip: ReelClip; still: boolean }) {
         aria-hidden
         className="block size-full object-cover"
       />
-      <span className="absolute left-3 top-3 rounded-[5px] bg-black/45 px-[7px] py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white">
-        {clip.model}
-      </span>
+      {clip.model && (
+        <span className="absolute left-3 top-3 rounded-[5px] bg-black/45 px-[7px] py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white">
+          {clip.model}
+        </span>
+      )}
     </div>
   );
 }

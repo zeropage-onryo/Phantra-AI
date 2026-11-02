@@ -149,7 +149,7 @@ export function ShowcaseTile({
 }: {
   mp4: string;
   poster: string;
-  model: string;
+  model?: string;
   caption: string;
   ar: string;
 }) {
@@ -192,7 +192,7 @@ export function ShowcaseTile({
     <PrefillButton
       text={caption}
       className="vh-sh"
-      label={`${caption} · ${model}. Use this line`}
+      label={`${caption}${model ? ` · ${model}` : ""}. Use this line`}
       dataPlaying={playing}
     >
       <span className="vh-tile" style={{ "--ar": ar } as CSSProperties}>
@@ -209,7 +209,7 @@ export function ShowcaseTile({
           tabIndex={-1}
           style={{ opacity: playing ? 1 : 0 }}
         />
-        <span className="vh-tag">{model}</span>
+        {model && <span className="vh-tag">{model}</span>}
         <span className="vh-glyph" aria-hidden>
           <span>
             <svg viewBox="0 0 16 16" fill="#fff">
