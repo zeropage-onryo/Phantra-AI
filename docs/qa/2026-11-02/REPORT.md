@@ -11,13 +11,18 @@ file and finding id it comes from.
 | [`02-studio-ui.md`](02-studio-ui.md) | studio signed in (throwaway DB), 33 routes × 3 widths, flows, timings | T1–T20: 0 blocker, 6 major, 9 minor, 5 cosmetic |
 | [`03-backend-e2e.md`](03-backend-e2e.md) + [`e2e_routes.py`](e2e_routes.py) + [`openapi.json`](openapi.json) | 332 routes: auth, tenancy, bad input, ledger, jobs, Stripe | E1–E12: 2 major, 5 minor, 5 cosmetic; 0 × 500; ledger PASS |
 | [`04-connector.md`](04-connector.md) | every tool on `/mcp/claude`, `/mcp`, stdio `phantra-ai`, quote-only | K1–K13: 2 major, 3 minor, 6 cosmetic, 2 info |
-| [`05-live-render.md`](05-live-render.md) | the gated real render | **not run** (waiting on Mike) |
+| [`05-live-render.md`](05-live-render.md) | the gated real render (Mike: "Yes, cap 100") | still + 5 s clip + Final Cut through the studio UI, 28 credits, settled = quoted; L1–L3 |
 | [`06-competitors.md`](06-competitors.md) (+ `06a`, `06b`) | Phantra vs Higgsfield, Runway, LTX Studio, Krea, invideo, Magnific | F1–F6 for Phantra |
 
-**Spend: zero.** No priced button was clicked, nothing was approved, no media was generated.
-Credits before → after: workspace 5 (`/mcp/claude`) **343 → 343**, workspace 1 (`/mcp`, Mike's)
-**8,133 → 8,133**, 0 held on both (00, 04); the throwaway studio account 500 → 500 (02); the
-throwaway backend accounts only moved inside the stubbed ledger test, as designed (03).
+**Spend: 28 credits, all in step 5, on Mike's yes.** The QA itself (steps 0–4 and 6) clicked no
+priced button, approved nothing and generated no media. Credits after those steps: workspace 5
+(`/mcp/claude`) **343 → 343**, workspace 1 (`/mcp`, Mike's) **8,133 → 8,133**, 0 held on
+either (00, 04); the throwaway studio account 500 → 500 (02); the throwaway backend accounts
+moved only inside the stubbed ledger test, as designed (03). Step 5 then spent **28 of the
+100-credit cap** in workspace 5: a FLUX.2 Pro still (10), a Grok Imagine 1.5 Lite 5 s 480p
+clip (18) and a free join. Workspace 5 is at **343 → 315**, 0 held. Each hold settled at
+exactly its button price, and no `fal_requests` row is left open (05). Workspace 1 was not
+touched.
 
 **Suites on `8ba89087`** (00): ruff clean; web `node --test` 439/439, typecheck and build pass;
 pytest **5,127 passed, 5 xfailed, 0 failed** (53 min, serial as CI).
@@ -33,7 +38,7 @@ pytest **5,127 passed, 5 xfailed, 0 failed** (53 min, serial as CI).
 | 5 | **major** | **The Render card names models by raw id + platform**, on the Approve button itself: "Approve · kling3-turbo-pro (kling) · … 105 cr", "ltx2.3 (ltx)", while the line above says "Kling 3 Turbo Pro". | 02 T2 (`src/providers.py:172`) |
 | 6 | **major** | **The Create composer's "Which model renders" menu prints a price on every model** ("· 116 credits a clip"), against the rule "no prices in model pickers, price only on the button". The direct generators comply. | 02 T3 (`create-view.tsx:4073`) |
 | 7 | **major** | **Page weight on phones**: the new Halloween try-on page moves **28.9 MB on load** (four spin MP4s eager, `make-hero.tsx:76`); `lena.mp4` is still 9.45 MB (talking-photo page 18.6 MB after a scroll, OmniHuman page 23.1 MB); `/` is 5.0 MB on load at 390 with a 2.5 s LCP, the slowest on the site and the slowest of four sites measured. | 01 P1, P2, P3; 06a §3 |
-| 8 | **major** | **Provenance labels a visitor or customer reads as offered models**: the home reel still says **"Runway Gen-4 Turbo"** (and "Seedance 2 Fast"); the home model strip omits Kling 4.0 and Grok; the Library's provider filter shows **"Fal · 3"**, "Kling" for Kling 4.0 and **"Runway"**. | 01 P5–P8 (`hero-reel.ts:45,50`, `vesper-content.ts:220-231`); 02 T4 (`src/render_assets.py:116-137`) |
+| 8 | **major** | **Provenance labels a visitor or customer reads as offered models**: the home reel still says **"Runway Gen-4 Turbo"** (and "Seedance 2 Fast"); the home model strip omits Kling 4.0 and Grok; the Library's provider filter shows **"Fal · 3"**, "Kling" for Kling 4.0 and **"Runway"**. | 01 P5–P8 (`hero-reel.ts:45,50`, `vesper-content.ts:220-231`); 02 T4 (`src/render_assets.py:116-137`); confirmed on live rows by 05 L1 (today's FLUX.2 still filed as "Fal image" / provider "Fal", the clip beside it named by model) |
 | 9 | **major (WCAG)** | **Keyboard focus is invisible** on the public header (1.04:1 pill, no outline, every page) and on the composer textarea (D7, still open); "New element" is still **white on yellow** because `.zps button { color: inherit }` beats `.elnew`. | 01 P4 (`site-header.tsx:66`); 02 T8, T5 |
 | 10 | **major** | **`images_for` is dead** on the stdio server and on `origin/main`: every call fails with a message-less error; `ImageSearch.sources` is typed `list[Any]` but `imagesearch.sources()` returns a dict. | 04 K2 (`src/mcp_shapes.py:248`, `src/imagesearch.py:126`) |
 
@@ -191,9 +196,11 @@ from outside, signed out (06).
 
 ## Needs Mike
 
-1. Step 5 (one real render, ~40–70 credits on the review workspace, cap proposed 100): yes or no (05).
+1. ~~Step 5~~: run on your "Yes, cap 100". It spent 28 credits and settled exactly (05). The
+   one new lead is a timing: 9 s pass between the click on a clip and the fal submit (05 L3).
 2. Which red rule wins: "red only on the one spend" (`vesper.css`) or "red only for errors" (01 P17, 02 T19).
 3. The credit economics in 06 (Seedance price, expiry, trial shape) — each changes a recorded decision.
 4. The Resolve installer live on `/download` (01 P15).
-5. Delete the QA rows in workspace 5 (04).
+5. Delete the QA rows in workspace 5: project 8, scene 464 and feedback 8 (04). Step 5's
+   gen:302–304 and cut `8a570f0b-…` are paid outputs, so they are kept unless you say otherwise (05).
 6. Pick which changes above become task files. Nothing here is built until you say so.

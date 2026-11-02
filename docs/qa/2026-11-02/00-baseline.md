@@ -54,3 +54,7 @@ No failures, so no `test_env_posture` / local-only triage was needed.
 |---|---|---|---|
 | `/mcp/claude` | 5 | 343 available, 0 held | **343 available, 0 held** |
 | `/mcp` | 1 | 8,133 available, 0 held | **8,133 available, 0 held** |
+
+After step 5, run on Mike's "Yes, cap 100" (17:16–17:25 UTC): workspace 5 went **343 → 315**,
+0 held (28 credits: still 10 + clip 18 + free join; see `05-live-render.md`). Workspace 1 was
+not touched: 8,133.
