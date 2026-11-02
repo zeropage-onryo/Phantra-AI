@@ -465,7 +465,8 @@ def test_the_composers_image_door_draws_on_the_picked_fal_model(client, studio, 
     import google.genai as genai_mod
     monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
     _fund(studio)
-    form = {"prompt": "a still", "output": "image", "expect_credits": "100", "image_model": "seedream4.5", "aspect": "4:5"}
+    form = {"prompt": "a still", "output": "image", "expect_credits": "100",
+            "image_model": "seedream4.5", "aspect": "4:5"}
     # no fal key: refused before the job, no enhance paid for
     monkeypatch.delenv("FAL_KEY", raising=False)
     res = client.post("/api/generate/run", data=form)

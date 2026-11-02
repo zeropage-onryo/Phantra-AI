@@ -82,6 +82,12 @@ wrong: the PixVerse camera-move price matches fal's page ($0.15 / $0.15 / $0.20 
 
 ## Found, not fixed (ranked)
 
+Items 1-3 were fixed on 2026-11-02 (branch `claude/one-clip-and-still-price`): the Create still is
+refused before the job when its real price is above its card's (`expect_credits`, 409 with the real
+price, which the card then shows); a one-clip scene is not sold keyframes (the Render card and a
+plan's keyframes step); and approving a one-clip scene that has its clip is refused (409
+`already_rendered`).
+
 1. **The Create still is not held to the price its card showed.**
    - The card shows the model's base price, but `/api/generate/run` charges at the shape and
      picture count actually sent.
