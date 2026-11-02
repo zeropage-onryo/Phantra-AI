@@ -43,6 +43,7 @@ import {
   Clapperboard,
   Coins,
   FolderKanban,
+  Handshake,
   House,
   ImageIcon,
   Layers,
@@ -232,6 +233,11 @@ function MenuTail({ close }: { close: () => void }) {
       </Link>
       <Link href={SETTINGS_HOME} role="menuitem" onClick={close}>
         <Settings strokeWidth={1.6} /> Settings
+      </Link>
+      {/* The public partner program page (phantra.ai/affiliates): terms,
+          the apply form, and an approved partner's link and numbers. */}
+      <Link href="/affiliates" role="menuitem" onClick={close}>
+        <Handshake strokeWidth={1.6} /> Affiliate Program
       </Link>
       <button type="button" role="menuitem" onClick={signOut}>
         <LogOut strokeWidth={1.6} /> Sign out

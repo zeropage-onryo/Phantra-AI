@@ -3,13 +3,14 @@ The affiliate program (2026-10-26, src/affiliates.py + app/affiliate_routes.py).
 
 Every Stripe event is a fixture (the suite blocks the network); time is
 passed in (`now=`), never slept. Guards:
-- the tiers pay what the terms say (25%/3, 30%/6, 35%/12) and a tier is
+- the tiers pay what the terms say (25%/6, 30%/6, 35%/12) and a tier is
   LOCKED on a referral at its first payment
 - a commission is on what the customer paid before tax; free pays nothing
 - a yearly payment earns the same as the months it covers, never the year
 - the same invoice twice books once
 - nothing is paid before the 60-day hold; a refund inside it voids/scales
-- credits are a 12-month promo lot, once; cash waits for Mike
+- cash is the default and waits for Mike; credits (a 12-month promo lot, once) are a per-partner switch
+- an application is approved on the spot (a channel link and the terms box)
 - no self-referral (same account or same person), no re-attribution,
   none after a first payment, none to an unapproved partner
 - a failure in this module can never stop the customer's credit
@@ -91,7 +92,7 @@ def commissions(dsn, partner_acct):
 
 def test_the_terms_are_mikes_numbers():
     t = {x.key: (x.rate_bp, x.window_months, x.min_paying) for x in affiliates.TIERS}
-    assert t == {"starter": (2500, 3, 0), "pro": (3000, 6, 10), "partner": (3500, 12, 50)}
+    assert t == {"starter": (2500, 6, 0), "pro": (3000, 6, 10), "partner": (3500, 12, 50)}
     assert affiliates.tier_for_count(0).key == "starter"
     assert affiliates.tier_for_count(9).key == "starter"
     assert affiliates.tier_for_count(10).key == "pro"
@@ -99,7 +100,7 @@ def test_the_terms_are_mikes_numbers():
     assert affiliates.tier_for_count(50).key == "partner"
     pub = affiliates.public_terms()
     assert [x["percent"] for x in pub["tiers"]] == [25.0, 30.0, 35.0]
-    assert pub["hold_days"] == 60 and pub["buyer_discount_percent"] == 20
+    assert pub["hold_days"] == 60 and pub["buyer_discount_percent"] == 10
 
 
 # --- applying and approving ---------------------------------------------------
@@ -119,7 +120,22 @@ def test_apply_is_one_per_account_and_validated(world):
     again = affiliates.apply(acct, channel_url="https://x.com/other", audience="z", plan="z",
                              accept_terms=True, dsn=world)
     assert first["id"] == again["id"] and again["channel_url"] == "https://x.com/a"
-    assert first["status"] == "pending" and first["code"] is None
+    assert first["status"] == "approved" and first["code"] == "ana" and first["payout_mode"] == "cash"
+    assert first["audience"] == "a" and first["reviewed_at"] is not None
+
+
+def test_the_form_is_a_channel_and_the_terms_box_and_review_can_be_switched_back_on(world, monkeypatch):
+    acct = make_account(world, "short")
+    p = affiliates.apply(acct, channel_url="https://x.com/s", accept_terms=True, dsn=world)
+    assert p["status"] == "approved" and p["audience"] == "" and p["plan"] == ""
+    named = affiliates.apply(make_account(world, "named"), channel_url="https://x.com/n",
+                             accept_terms=True, full_name="  Ana  Ruiz ", country="Spain", dsn=world)
+    assert named["full_name"] == "Ana Ruiz" and named["country"] == "Spain"
+    monkeypatch.setenv(affiliates.AUTO_APPROVE_ENV, "0")
+    held_back = affiliates.apply(make_account(world, "slow"), channel_url="https://x.com/t",
+                                 accept_terms=True, dsn=world)
+    assert held_back["status"] == "pending" and held_back["code"] is None
+    assert affiliates.approve("slow", dsn=world)["status"] == "approved"
 
 
 def test_approval_mints_a_code_from_the_slug_and_codes_are_unique(world):
@@ -176,12 +192,12 @@ def test_buyer_discount_is_first_monthly_payment_only(world):
 
 # --- earning ------------------------------------------------------------------
 
-def test_starter_earns_20_percent_for_three_months_then_stops(world):
+def test_starter_earns_25_percent_for_six_months_then_stops(world):
     partner, _, buyer = referral(world)
-    for n in range(1, 6):
+    for n in range(1, 9):
         affiliates.on_invoice_paid(buyer, invoice(n), now=T0 + timedelta(days=30 * n), dsn=world)
     rows = commissions(world, partner)
-    assert [r["commission_cents"] for r in rows] == [725, 725, 725]       # 25% of $29, 3 times
+    assert [r["commission_cents"] for r in rows] == [725] * 6           # 25% of $29, 6 times
     assert all(r["status"] == "held" for r in rows)
     assert rows[0]["hold_until"] == T0 + timedelta(days=30) + timedelta(days=60)
 
@@ -191,7 +207,7 @@ def test_commission_is_on_the_amount_paid_before_tax(world):
     affiliates.on_invoice_paid(buyer, {"id": "in_t", "amount_paid": 2900 + 290,
                                        "total_excluding_tax": 2900}, now=T0, dsn=world)
     assert commissions(world, partner)[0]["commission_cents"] == 725
-    # a 20%-off first month pays on what was paid
+    # a 10%-off first month pays on what was paid
     b2 = make_account(world, "cy2")
     affiliates.attribute(b2, "ana", dsn=world)
     affiliates.on_invoice_paid(b2, {"id": "in_d", "amount_paid": 2320, "total_excluding_tax": 2320},
@@ -217,10 +233,10 @@ def test_a_yearly_payment_earns_the_months_it_covers_not_the_year(world):
     r = affiliates.on_invoice_paid(buyer, {"id": "in_y", "amount_paid": 27840,
                                            "total_excluding_tax": 27840},
                                    months_covered=12, now=T0, dsn=world)
-    # Starter: 3 of 12 months at 25% = 27840 * 0.25 * 3/12
-    assert r["commission_cents"] == 1740
+    # Starter: 6 of 12 months at 25% = 27840 * 0.25 * 6/12
+    assert r["commission_cents"] == 3480
     row = commissions(world, partner)[0]
-    assert (row["months_covered"], row["months_counted"]) == (12, 3)
+    assert (row["months_covered"], row["months_counted"]) == (12, 6)
     # and the window is spent: next year's renewal earns nothing at Starter
     again = affiliates.on_invoice_paid(buyer, {"id": "in_y2", "amount_paid": 27840,
                                                "total_excluding_tax": 27840},
@@ -281,6 +297,7 @@ def test_a_refund_inside_the_hold_voids_or_scales_the_commission(world):
 
 def test_nothing_is_paid_before_the_hold_and_credits_land_once_after(world):
     partner, _, buyer = referral(world)
+    affiliates.set_payout_mode("ana", "credits", dsn=world)
     affiliates.on_invoice_paid(buyer, invoice(1), now=T0, dsn=world)
     assert affiliates.release_due(now=T0 + timedelta(days=59), dsn=world) == {
         "credited": 0, "cash_payable": 0, "skipped": 0}
@@ -415,9 +432,10 @@ def test_routes_apply_summarise_and_attribute(world):
         r = client.post("/api/affiliates/apply", json={
             "channel_url": "https://tiktok.com/@n", "audience": "bartenders", "plan": "reels",
             "accept_terms": True})
-        assert r.status_code == 200 and r.json()["status"] == "pending"
+        assert r.status_code == 200 and r.json()["status"] == "approved"
+        assert r.json()["link"].endswith("?ref=newbie")
         r = client.get("/api/affiliates/me")
-        assert r.json()["status"] == "pending" and r.json()["link"] is None
+        assert r.json()["status"] == "approved" and r.json()["payout_mode"] == "cash"
         r = client.post("/api/affiliates/attribute", json={"code": "ana"})
         assert r.json() == {"attributed": True, "reason": "ok"}
         r = client.post("/api/affiliates/attribute", json={"code": "ana"})
@@ -449,20 +467,22 @@ def test_the_public_page_prints_the_terms_the_code_pays():
 def test_test_mode_walkthrough_signup_to_credits(world):
     """The whole money path the way a Stripe test-mode purchase drives it:
     referred sign-up -> four monthly invoice.paid webhooks (one redelivered)
-    -> Starter pays the first three only -> nothing before day 60 -> the
-    partner's credits land once after it."""
+    -> Starter pays all four (its window is six months) -> nothing before day
+    60 -> the partner's credits land once after it (a partner switched to
+    credits; cash is the default)."""
     partner, _, buyer = referral(world)
+    affiliates.set_payout_mode("ana", "credits", dsn=world)
     for n in (1, 2, 3, 4):
         billing.handle_event(_paid_event(buyer, f"in_tm{n}"), dsn=world)
     billing.handle_event(_paid_event(buyer, "in_tm2"), dsn=world)       # redelivery
     rows = commissions(world, partner)
-    assert [r["commission_cents"] for r in rows] == [725, 725, 725]     # 25% x 3 months
+    assert [r["commission_cents"] for r in rows] == [725] * 4           # 25% x the 4 months paid
     assert all(r["status"] == "held" for r in rows)
     assert affiliates.release_due(now=datetime.now(timezone.utc) + timedelta(days=30),
                                   dsn=world)["credited"] == 0
     assert ledger.available(partner, world) == 0
     done = affiliates.release_due(now=datetime.now(timezone.utc) + timedelta(days=61), dsn=world)
-    assert done["credited"] == 3
-    assert ledger.available(partner, world) == 2175
+    assert done["credited"] == 4
+    assert ledger.available(partner, world) == 2900
     assert affiliates.release_due(now=datetime.now(timezone.utc) + timedelta(days=62),
                                   dsn=world)["credited"] == 0

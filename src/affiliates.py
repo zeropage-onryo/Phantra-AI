@@ -4,19 +4,24 @@ program up and ready by the morning"; docs/AFFILIATES.md has the terms in
 plain words and the launch checklist).
 
 THE SHAPE, IN ONE PARAGRAPH. A creator applies (`apply`), Mike reads the
-channel and approves (`approve`, a CLI), and the creator gets a code and a
-link (`phantra.ai/?ref=<code>`). A visitor who arrives on that link and
+channel URL, and (2026-11-02) is approved on the spot: `apply` mints the code
+and the link (`phantra.ai/?ref=<code>`) in the same call. `approve` is still
+the CLI for a re-approval, and AFFILIATE_AUTO_APPROVE=0 puts every
+application back in the queue for Mike to read. A visitor who arrives on that link and
 signs up is ATTRIBUTED to the creator (`attribute`). When that account
 pays a subscription invoice, the Stripe webhook calls `on_invoice_paid`,
 which books a COMMISSION that is HELD for 60 days (the refund window). A
-commission still standing after the hold is paid (`release_due`): as
-credits on the partner's own account by default, as cash only when Mike
-turns that on for a partner. Cash is paid by hand (`python -m
-src.affiliates payouts`, then `mark-paid`); nothing here moves money.
+commission still standing after the hold is paid (`release_due`): as CASH
+by default (2026-11-02, Mike: "lets just do cash"), or as credits on the
+partner's own account when Mike switches a partner to credits. Cash is
+paid by hand (`python -m src.affiliates payouts`, then `mark-paid`);
+nothing here moves money. Because a link no longer waits for a human, the
+review happens where the money leaves: Mike reads the channel and the
+referrals before he sends anyone's first payout.
 
 THE TIERS (Mike, 2026-10-26). Rate and window are by tier:
 
-    starter   25% for 3 months    everyone, on approval
+    starter   25% for 6 months    everyone, on approval
     pro       30% for 6 months    10 paying referrals
     partner   35% for 12 months   50 paying referrals
 
@@ -29,7 +34,7 @@ thresholds (10 and 50) are the build's assumption -- Mike gave only "at
 least 50" for Partner -- and are the two numbers in TIERS below.
 
 WHAT A COMMISSION IS PAID ON. The invoice's amount actually paid, before
-tax (`invoice_net_cents`): a 20%-off first month pays on the discounted
+tax (`invoice_net_cents`): a 10%-off first month pays on the discounted
 amount, a free invoice pays nothing, tax is never commissionable. Only
 SUBSCRIPTION invoices count; a top-up pack is not commissionable. A yearly
 invoice covers 12 months in one payment, so the window is counted in
@@ -83,12 +88,14 @@ HOLD_DAYS = 60                  # a commission waits this long (refund window)
 COOKIE_DAYS = 60                # how long a visit to a partner's link is remembered
 CREDIT_EXPIRY_MONTHS = 12       # earned credits last a year (a plan's credits last two months)
 MIN_CASH_PAYOUT_CENTS = 5000    # cash is paid out in batches of at least $50
-BUYER_DISCOUNT_PERCENT = 20     # off the referred buyer's first MONTHLY payment
-COUPON_ENV = "STRIPE_AFFILIATE_COUPON"   # the Stripe coupon id: 20% off, duration once
+BUYER_DISCOUNT_PERCENT = 10     # off the referred buyer's first MONTHLY payment
+COUPON_ENV = "STRIPE_AFFILIATE_COUPON"   # the Stripe coupon id: 10% off, duration once
 
 PAYOUT_MODES = ("credits", "cash")
+DEFAULT_PAYOUT = "cash"         # 2026-11-02: cash first; credits are a per-partner switch
 STATUSES = ("pending", "approved", "rejected", "suspended")
 CODE_MIN, CODE_MAX = 3, 40
+AUTO_APPROVE_ENV = "AFFILIATE_AUTO_APPROVE"   # "0" puts applications back in Mike's queue
 MAX_TEXT = 600
 MAX_URL = 300
 
@@ -107,7 +114,7 @@ class Tier:
 
 
 TIERS = (
-    Tier("starter", "Starter", 2500, 3, 0),
+    Tier("starter", "Starter", 2500, 6, 0),
     Tier("pro", "Pro", 3000, 6, 10),
     Tier("partner", "Partner", 3500, 12, 50),
 )
@@ -146,7 +153,6 @@ def public_terms() -> dict:
         "hold_days": HOLD_DAYS,
         "cookie_days": COOKIE_DAYS,
         "buyer_discount_percent": BUYER_DISCOUNT_PERCENT,
-        "credit_expiry_months": CREDIT_EXPIRY_MONTHS,
         "min_cash_payout_dollars": MIN_CASH_PAYOUT_CENTS // 100,
     }
 
@@ -175,7 +181,7 @@ CREATE TABLE IF NOT EXISTS affiliate_partners (
     account_id    BIGINT NOT NULL,
     code          TEXT,
     status        TEXT NOT NULL DEFAULT 'pending',
-    payout_mode   TEXT NOT NULL DEFAULT 'credits',
+    payout_mode   TEXT NOT NULL DEFAULT 'cash',
     channel_url   TEXT NOT NULL DEFAULT '',
     audience      TEXT NOT NULL DEFAULT '',
     plan          TEXT NOT NULL DEFAULT '',
@@ -184,6 +190,8 @@ CREATE TABLE IF NOT EXISTS affiliate_partners (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     reviewed_at   TIMESTAMPTZ
 );
+ALTER TABLE affiliate_partners ADD COLUMN IF NOT EXISTS full_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE affiliate_partners ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT '';
 CREATE UNIQUE INDEX IF NOT EXISTS affiliate_partners_account_idx
     ON affiliate_partners (account_id);
 CREATE UNIQUE INDEX IF NOT EXISTS affiliate_partners_code_idx
@@ -344,16 +352,26 @@ def get_partner(account_id: int, *, dsn: Optional[str] = None) -> Optional[dict]
         return dict(row) if row else None
 
 
-def apply(account_id: int, *, channel_url: str, audience: str, plan: str,
-          accept_terms: bool, dsn: Optional[str] = None) -> dict:
-    """Record an application. One per account: applying again returns the
-    existing one untouched (a rejected application is final until Mike
-    reopens it by hand). Raises AffiliateError on a bad form."""
+def auto_approve() -> bool:
+    return (os.environ.get(AUTO_APPROVE_ENV) or "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def apply(account_id: int, *, channel_url: str, audience: str = "", plan: str = "",
+          accept_terms: bool, full_name: str = "", country: str = "",
+          dsn: Optional[str] = None) -> dict:
+    """Record an application, and approve it at once unless auto-approval is
+    off. The form is a channel link and the terms box; `full_name`, `country`,
+    `audience` and `plan` are optional (a name and country are what a cash
+    payout needs). One per account: applying again returns the existing
+    row untouched (a rejected application is final until Mike reopens it by
+    hand). Raises AffiliateError on a bad form."""
     if not accept_terms:
         raise AffiliateError("terms_required", "accept the program terms to apply")
     url = _clean_url(channel_url)
-    audience = _clean_text(audience, "audience", required=True)
-    plan = _clean_text(plan, "plan", required=True)
+    full_name = _clean_text(full_name, "name")[:120]
+    country = _clean_text(country, "country")[:80]
+    audience = _clean_text(audience, "audience")
+    plan = _clean_text(plan, "plan")
     ensure(dsn)
     with db.connect(dsn) as conn:
         conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"affiliate-apply:{account_id}",))
@@ -362,10 +380,20 @@ def apply(account_id: int, *, channel_url: str, audience: str, plan: str,
         if row:
             return dict(row)
         row = conn.execute(
-            "INSERT INTO affiliate_partners (account_id, channel_url, audience, plan, terms_version) "
-            "VALUES (%s, %s, %s, %s, %s) RETURNING *",
-            (account_id, url, audience, plan, TERMS_VERSION)).fetchone()
-        return dict(row)
+            "INSERT INTO affiliate_partners (account_id, channel_url, audience, plan, "
+            "terms_version, payout_mode, full_name, country) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            (account_id, url, audience, plan, TERMS_VERSION, DEFAULT_PAYOUT,
+             full_name, country)).fetchone()
+        row = dict(row)
+    # approved after the insert commits: `approve` takes its own lock and
+    # connection, and a failure here leaves a pending row Mike can approve
+    if auto_approve():
+        try:
+            return approve(str(row["id"]), dsn=dsn)
+        except AffiliateError as e:
+            _log(f"auto-approve failed for partner #{row['id']}: {e}")
+    return row
 
 
 def _resolve_partner(conn, who: str) -> dict:
@@ -808,7 +836,7 @@ def report(*, dsn: Optional[str] = None) -> dict:
     with db.connect(dsn) as conn:
         rows = conn.execute(
             "SELECT p.id, p.account_id, p.code, p.status, p.payout_mode, p.channel_url, "
-            "p.audience, p.plan, p.created_at, a.slug, "
+            "p.full_name, p.country, p.audience, p.plan, p.created_at, a.slug, "
             "(SELECT count(*) FROM affiliate_referrals r WHERE r.account_id = p.account_id "
             "  AND r.partner_id = p.id) AS signups, "
             "(SELECT count(*) FROM affiliate_referrals r WHERE r.account_id = p.account_id "
@@ -855,7 +883,7 @@ def main(argv: Optional[list[str]] = None) -> None:
     sp = sub.add_parser("suspend")
     sp.add_argument("who")
     sp.add_argument("--note", default="")
-    po = sub.add_parser("set-payout", help="credits (default) or cash, per partner")
+    po = sub.add_parser("set-payout", help="cash (default) or credits, per partner")
     po.add_argument("who")
     po.add_argument("mode", choices=PAYOUT_MODES)
     sub.add_parser("release", help="pay every commission whose 60-day hold has ended")

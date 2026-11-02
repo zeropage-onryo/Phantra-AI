@@ -5,7 +5,7 @@
       "key": "starter",
       "label": "Starter",
       "percent": 25.0,
-      "months": 3,
+      "months": 6,
       "min_paying": 0
     },
     {
@@ -25,7 +25,6 @@
   ],
   "hold_days": 60,
   "cookie_days": 60,
-  "buyer_discount_percent": 20,
-  "credit_expiry_months": 12,
+  "buyer_discount_percent": 10,
   "min_cash_payout_dollars": 50
 }
