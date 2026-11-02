@@ -58,7 +58,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { API_URL, ApiError, goToSignIn, signOut } from "@/lib/api";
+import { API_URL, ApiError, REACH_EVENT, UNREACHABLE, goToSignIn, signOut } from "@/lib/api";
 import {
   BALANCE_EVENT,
   getBalance,
@@ -272,6 +272,14 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // What's new (2026-10-25): how many live announcements this person has not
   // seen, a dot on Create; the wall clears it once it has drawn them
   const [unseen, setUnseen] = useState(0);
+  // the API stopped answering (lib/api.ts REACH_EVENT, QA 2026-11-02 T11):
+  // said above every page, so an outage never reads as an empty account
+  const [down, setDown] = useState(false);
+  useEffect(() => {
+    const onReach = (e: Event) => setDown(!(e as CustomEvent<{ up: boolean }>).detail.up);
+    window.addEventListener(REACH_EVENT, onReach);
+    return () => window.removeEventListener(REACH_EVENT, onReach);
+  }, []);
   // per toast: its timer and its deferred half, outside React state so the
   // page-leave flush below can reach them synchronously
   const toastTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -735,6 +743,14 @@ export function StudioShell({ children }: { children: ReactNode }) {
               </span>
             </span>
           </header>
+          {down ? (
+            <div className="zoutage" role="alert">
+              <span>{UNREACHABLE}</span>
+              <button type="button" className="zbtn" onClick={() => window.location.reload()}>
+                Try again
+              </button>
+            </div>
+          ) : null}
           {stage ? <div className="stage">{children}</div> : children}
         </div>
         <PhoneTabs caps={caps} unseen={unseen} />

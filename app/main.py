@@ -389,7 +389,16 @@ def r2_fallback(key: str, request: Optional[Request] = None, thumb: bool = False
                             headers={"Cache-Control": "private, no-store"})
 
 
-app = FastAPI(lifespan=lifespan)
+def docs_urls(dev_tools: bool) -> dict:
+    """FastAPI's /docs, /redoc and /openapi.json only with DEV_TOOLS
+    (QA 2026-11-02 E11: production served the whole route map)."""
+    if dev_tools:
+        return {"docs_url": "/docs", "redoc_url": "/redoc",
+                "openapi_url": "/openapi.json"}
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
+app = FastAPI(lifespan=lifespan, **docs_urls(DEV_TOOLS))
 
 # CORS: only needed once the frontend is on a different origin than this
 # API (e.g. a Vercel-hosted refine app calling the Fly-hosted API). Same-

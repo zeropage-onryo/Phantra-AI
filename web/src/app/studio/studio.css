@@ -904,6 +904,20 @@ button.tag:hover {
 .stateline.err {
   color: var(--danger);
 }
+/* the shell's line when the API is not answering (lib/api.ts REACH_EVENT) */
+.zoutage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  color: var(--danger);
+  font-size: 13px;
+}
 .vhead {
   display: flex;
   align-items: center;
