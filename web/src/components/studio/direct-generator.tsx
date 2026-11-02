@@ -74,6 +74,7 @@ import {
   type MediaItem,
 } from "@/lib/studio-api";
 import "@/components/studio/direct-generator.css";
+import { ModelPins } from "@/components/studio/model-pins";
 /* eslint-disable @next/next/no-img-element */
 
 /** A still's `thumb` names where its 480px derivative WOULD be, not that R2
@@ -584,19 +585,22 @@ function Generator({ kind }: { kind: Kind }) {
         >
           <div className="dg-field">
             <span className="dg-lab">Model</span>
-            <ModelMenu
+            <ModelPins
+              kind="image"
               open={menu === "model"}
               onOpen={() => setMenu(menu === "model" ? null : "model")}
               onClose={() => setMenu(null)}
-              label={current?.label ?? (menuError ? "Unavailable" : "Loading…")}
-              sub={current?.note ?? ""}
               items={modelItems}
               picked={iPick?.model ?? ""}
-              onPick={chooseModel}
+              onPick={(id) => {
+                chooseModel(id);
+                setMenu(null);
+              }}
               title={`${items.length} image models`}
-              foot="The price is for one still at this shape. Switching keeps your prompt and your pictures."
+              foot="Switching keeps your prompt and your pictures."
               disabled={!items.length}
             />
+            {current?.note ? <p className="dg-hint">{current.note}</p> : null}
           </div>
 
           <label className="dg-field">
@@ -699,19 +703,21 @@ function Generator({ kind }: { kind: Kind }) {
           </div>
           {notes}
           <div className="dgv-dock-bar">
-            <ChipMenu
-              name="Model"
+            <ModelPins
+              kind="image"
+              up
               open={menu === "dock-model"}
               onOpen={() => setMenu(menu === "dock-model" ? null : "dock-model")}
               onClose={() => setMenu(null)}
-              strong
-              value={current?.label ?? (menuError ? "Unavailable" : "Loading…")}
               items={modelItems}
               picked={iPick?.model ?? ""}
-              onPick={chooseModel}
+              onPick={(id) => {
+                chooseModel(id);
+                setMenu(null);
+              }}
               title={`${items.length} image models`}
               foot="Switching keeps your prompt and your pictures."
-              wide
+              disabled={!items.length}
             />
             {iMenu && iPick ? (
               <ChipMenu
@@ -787,21 +793,25 @@ function Generator({ kind }: { kind: Kind }) {
           {refMode === "references" && tags.length ? (
             <p className="dg-hint">The clip is held to these pictures. Name them in the prompt; tap a tag to put it there.</p>
           ) : null}
-          <div className="dgv-dock-bar">
-            <ChipMenu
-              name="Model"
+          <div className="dgv-pins">
+            <ModelPins
+              kind="video"
+              up
               open={menu === "model"}
               onOpen={() => setMenu(menu === "model" ? null : "model")}
               onClose={() => setMenu(null)}
-              strong
-              value={current?.label ?? (menuError ? "Unavailable" : "Loading…")}
               items={modelItems}
               picked={vPick?.model ?? ""}
-              onPick={chooseModel}
+              onPick={(id) => {
+                chooseModel(id);
+                setMenu(null);
+              }}
               title={`${items.length} video models`}
               foot="Switching keeps your prompt. A length or frame the new model does not take moves to its own, and a line says so."
-              wide
+              disabled={!items.length}
             />
+          </div>
+          <div className="dgv-dock-bar">
             {vModel && vPick ? (
               <>
                 <ChipMenu

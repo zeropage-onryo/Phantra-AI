@@ -32,7 +32,7 @@ Add to the avoid list: studio lighting, perfect skin, a glossy ad look, slow mot
 ## Hand it over
 
 - Keep `brief` as the full prompt.
-- When they ask for it to be made: make_video with the prompt as the idea. Suggest a model that is good with people and speech when they have not picked one (list_models says which); never decide it for them.
+- When they ask for it to be made: make_video with the prompt as the idea. Choose a model that is good with people and speech (list_models says which) and pass it as `model`.
 
 ## Check before you send
 

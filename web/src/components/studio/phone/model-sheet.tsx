@@ -51,18 +51,25 @@ export function PhoneModelSheet(p: Props) {
         <button type="button" className="ph-scrim" aria-label="Close" onClick={p.onClose} />
         <section className="ph-sheet" role="dialog" aria-modal="true" aria-label={p.output === "video" ? "Video settings" : "Image settings"}>
           <span className="ph-grab" aria-hidden />
-          <h2>Model</h2>
-          <div className="ph-models" role="radiogroup" aria-label="Model">
-            {p.models.map((m) => (
-              <button key={m.id || "auto"} type="button" role="radio" aria-checked={p.model === m.id} onClick={() => p.onModel(m.id)}>
-                <span>
-                  <b>{m.label}</b>
-                  {m.note ? <small>{m.note}</small> : null}
-                </span>
-                {p.model === m.id ? <Check strokeWidth={2.6} aria-hidden /> : null}
-              </button>
-            ))}
-          </div>
+          {/* Create passes no models (2026-11-02): Vesper chooses there */}
+          {p.models.length ? (
+            <>
+              <h2>Model</h2>
+              <div className="ph-models" role="radiogroup" aria-label="Model">
+                {p.models.map((m) => (
+                  <button key={m.id || "auto"} type="button" role="radio" aria-checked={p.model === m.id} onClick={() => p.onModel(m.id)}>
+                    <span>
+                      <b>{m.label}</b>
+                      {m.note ? <small>{m.note}</small> : null}
+                    </span>
+                    {p.model === m.id ? <Check strokeWidth={2.6} aria-hidden /> : null}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <h2>Settings</h2>
+          )}
           {p.frames.length ? (
             <>
               <h3>{p.output === "video" ? "Frame" : "Shape"}</h3>

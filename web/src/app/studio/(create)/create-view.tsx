@@ -178,15 +178,11 @@ import {
   type QuickTool,
   isMake,
   isPlanTool,
-  loadImageModel,
-  loadVideoModel,
   loadOutput,
   matchCommands,
   mediaSrc,
   newMadeId,
   pollJob,
-  saveImageModel,
-  saveVideoModel,
   saveOutput,
   type Made,
   type MadeStatus,
@@ -253,10 +249,7 @@ import { variantsPlan, type NextStep } from "@/lib/next-steps";
 import { Storyboard } from "@/components/studio/storyboard";
 import {
   beginTalk,
-  isTalkModelPick,
   photoChoices,
-  TALK_MODEL_OPTION,
-  talkModelOffered,
   talkRequest,
   voiceSeconds,
   type TalkMenu,
@@ -584,20 +577,15 @@ function Composer() {
   // the clip models a scene can be proposed for (GET /api/clip-models): only
   // for naming the one the brain proposed -- the Render card picks
   const [clipModels, setClipModels] = useState<ModelOption[]>([]);
+  // Create has no model picker (2026-11-02, Mike): Vesper chooses the model
+  // every still and scene is made on (prompts/creative_guide_models.txt), and
+  // a person who wants to pick one uses the Image and Video pages. This is
+  // only the still model a step falls back to when Vesper names none: the
+  // menu's own default, never a remembered pick.
   const [imageModel, setImageModelState] = useState("");
-  const setImageModel = (id: string) => {
-    setImageModelState(id);
-    saveImageModel(id);
-  };
-  // which clip model a scene renders on (2026-10-22): "" is Auto -- the
-  // brain may propose one and the Render card opens on it -- and an id is
-  // the person's own pick, sent with every scene and told to the brain
-  const [videoModel, setVideoModelState] = useState("");
-  const setVideoModel = (id: string) => {
-    setVideoModelState(id);
-    saveVideoModel(id);
-  };
-  const pinnedClip = videoModel && clipModels.some((m) => m.id === videoModel) ? videoModel : "";
+  // no clip model is pinned here any more: each scene's Render card opens on
+  // the model Vesper proposed for it
+  const pinnedClip: string = "";
   // whether a still waits on its card's Approve; read after mount, like the output
   const [generateChoice, setGenerateState] = useState<GenerateMode>("ask");
   useEffect(() => {
@@ -763,8 +751,6 @@ function Composer() {
     getClipModels()
       .then((r) => {
         setClipModels(r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits })));
-        const kept = loadVideoModel();
-        setVideoModelState(r.items.some((m) => m.id === kept) ? kept : "");
       })
       .catch(() => setClipModels([]));
     apiFetch<{ items: { id: string; label: string; note: string; credits: number; references?: boolean }[]; default: string }>("/image-models")
@@ -772,8 +758,7 @@ function Composer() {
         // no price in the picker (2026-10-27): the send button and the card's Approve show it
         const items = r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits, references: m.references }));
         setImageModels(items);
-        const kept = loadImageModel();
-        setImageModelState(items.some((m) => m.id === kept) ? kept : r.default);
+        setImageModelState(r.default);
       })
       .catch(() => setImageModels([]));
     apiFetch<SceneLengths>("/scene-lengths")
@@ -3457,16 +3442,12 @@ function Composer() {
       setIdea(prompt ? `Remix this: ${prompt}` : "Remix this");
       textarea.current?.focus();
     },
-    // a new model's tile (What's new, 2026-10-25): the model on the settings
-    // line, the switch on its output; nothing is sent
+    // a new model's tile (What's new, 2026-10-25): Create has no model
+    // picker (2026-11-02), so the tile opens the model on its own page --
+    // Video or Image -- where it is picked; nothing is sent
     onModel: (id) => {
-      if (clipModels.some((m) => m.id === id)) {
-        setOutput("video");
-        setVideoModel(id);
-      } else if (imageModels.some((m) => m.id === id)) {
-        setOutput("image");
-        setImageModel(id);
-      }
+      if (clipModels.some((m) => m.id === id)) router.push(`/studio/video?model=${encodeURIComponent(id)}`);
+      else if (imageModels.some((m) => m.id === id)) router.push(`/studio/image?model=${encodeURIComponent(id)}`);
     },
     // a new skill's tile: its chip on the box, as the `/` menu would
     onSkill: (name) => {
@@ -3555,12 +3536,12 @@ function Composer() {
     : starters;
   const frameLabel = ratios.find((r) => r.id === ratio)?.label ?? "Frame";
   // the phone's one model button: the model the next make uses
-  const phoneModelLabel =
-    output === "image" ? (imageModels.find((m) => m.id === imageModel)?.label ?? "Model") : pinnedClip ? (optionOf(clipModels, pinnedClip)?.label ?? "Model") : "Auto";
+  // the phone's settings button: the shape (or frame and length) -- Vesper
+  // chooses the model (2026-11-02)
+  const phoneModelLabel = output === "image" ? aspect : `${frameLabel} · ${seconds}s`;
   // the greeting's name: the first word of the person's name
   const firstName = (me?.user.display_name || "").trim().split(/\s+/)[0] || "";
   const brainLabel = brains.find((b) => b.id === brain)?.label ?? "Model";
-  const imageModelLabel = imageModels.find((m) => m.id === imageModel)?.label ?? "Model";
   const modelLabel = (id?: string) =>
     id === SHEET_MODEL
       ? "Element sheet · GPT Image 2.5"
@@ -4069,21 +4050,6 @@ function Composer() {
                 {!explore && output === "image" ? (
                   <OptMenu heading="Image shape" value={aspect} onChange={setAspect} options={IMAGE_ASPECTS} label={aspect} />
                 ) : null}
-                {!explore && output === "image" && imageModels.length ? (
-                  <>
-                    <span className="zc-dot" aria-hidden>
-                      ·
-                    </span>
-                    <OptMenu
-                      heading="Which model draws"
-                      value={imageModel}
-                      onChange={setImageModel}
-                      options={imageModels}
-                      label={imageModelLabel}
-                      chevron
-                    />
-                  </>
-                ) : null}
                 {!explore && output === "video" && ratios.length ? (
                   <OptMenu heading="Frame" value={ratio} onChange={setRatio} options={ratios} label={frameLabel} />
                 ) : null}
@@ -4101,32 +4067,6 @@ function Composer() {
                           {seconds}s
                         </button>
                       )}
-                    />
-                  </>
-                ) : null}
-                {!explore && output === "video" && clipModels.length ? (
-                  <>
-                    <span className="zc-dot" aria-hidden>
-                      ·
-                    </span>
-                    <OptMenu
-                      heading="Which model renders"
-                      value={pinnedClip}
-                      // OmniHuman opens the talking-photo card; it is never pinned
-                      onChange={(id) => (isTalkModelPick(id) ? startTalk() : setVideoModel(id))}
-                      options={[
-                        { id: "", label: "Auto", note: "Vesper proposes one per scene; you can change it on the Render card" },
-                        ...clipModels.map((m) => ({
-                          id: m.id,
-                          label: m.label,
-                          // no price in a picker: the price is on the one button
-                          // that spends (Mike's rule; QA 2026-11-02 T3)
-                          note: m.note ?? "",
-                        })),
-                        ...(talkModelOffered(talkMenu) ? [{ ...TALK_MODEL_OPTION }] : []),
-                      ]}
-                      label={pinnedClip ? (optionOf(clipModels, pinnedClip)?.label ?? "Model") : "Auto"}
-                      chevron
                     />
                   </>
                 ) : null}
@@ -4235,7 +4175,7 @@ function Composer() {
                   type="button"
                   className="zc-phone-model"
                   aria-haspopup="dialog"
-                  aria-label={`Model: ${phoneModelLabel}. Change the model, frame and length`}
+                  aria-label={`Settings: ${phoneModelLabel}. Change the shape, frame and length`}
                   onClick={() => setPhoneSheet(true)}
                 >
                   {phoneModelLabel}
@@ -4435,16 +4375,10 @@ function Composer() {
         open={phoneSheet}
         onClose={() => setPhoneSheet(false)}
         output={output}
-        models={
-          output === "image"
-            ? imageModels.map((m) => ({ id: m.id, label: m.label }))
-            : [
-                { id: "", label: "Auto", note: "Vesper picks the best one" },
-                ...clipModels.map((m) => ({ id: m.id, label: m.label })),
-              ]
-        }
-        model={output === "image" ? imageModel : pinnedClip}
-        onModel={(id) => (output === "image" ? setImageModel(id) : setVideoModel(id))}
+        // no model here (2026-11-02): Vesper chooses it
+        models={[]}
+        model=""
+        onModel={() => {}}
         frames={output === "image" ? IMAGE_ASPECTS.map((a) => ({ id: a.id, label: a.id })) : ratios}
         frame={output === "image" ? aspect : ratio}
         onFrame={(id) => (output === "image" ? setAspect(id) : setRatio(id))}

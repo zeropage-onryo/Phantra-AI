@@ -64,7 +64,9 @@ test("the model sheet sets the same state the desktop pickers set and prices not
   const sheet = strip(src("../src/components/studio/phone/model-sheet.tsx"));
   assert.doesNotMatch(sheet, /credits|quote|approve|apiFetch/i);
   const view = strip(src("../src/app/studio/(create)/create-view.tsx"));
-  assert.match(view, /onModel=\{\(id\) => \(output === "image" \? setImageModel\(id\) : setVideoModel\(id\)\)\}/);
+  // Create has no model picker (2026-11-02, Mike): Vesper chooses, so the
+  // phone's sheet carries no models there
+  assert.match(view, /models=\{\[\]\}/);
   assert.match(view, /onFrame=\{\(id\) => \(output === "image" \? setAspect\(id\) : setRatio\(id\)\)\}/);
 });
 

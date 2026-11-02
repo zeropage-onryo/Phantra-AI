@@ -187,8 +187,19 @@ def test_the_models_paragraph_rides_only_where_the_list_is_offered():
     named = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", text))
     assert named == {"list_models", "make_image", "make_video", "model_why"}
     assert "http" not in text and "$" not in text
-    assert "MAY PROPOSE THE MODEL" in creative_guide.instructions(with_models=True)
-    assert "MAY PROPOSE THE MODEL" not in creative_guide.instructions(maker=True)
+    assert "YOU CHOOSE THE MODEL" in creative_guide.instructions(with_models=True)
+    assert "YOU CHOOSE THE MODEL" not in creative_guide.instructions(maker=True)
+
+
+# guards: Create has no model picker (2026-11-02, Mike) -- the brain is told the
+# model is its own choice on every make, never "what the person picked"
+def test_create_tells_the_brain_the_model_is_its_choice():
+    models = (PROMPTS / "creative_guide_models.txt").read_text()
+    assert "no model picker" in models and "Before any make_image or make_video" in models
+    make = (PROMPTS / "creative_guide_make.txt").read_text()
+    assert "on the image model you choose" in make and "model they picked" not in make
+    picks = (PROMPTS / "model_picks.txt").read_text()
+    assert "what the person picked" not in picks
 
 
 # ---------- a whole turn ----------
@@ -228,7 +239,7 @@ def test_a_turn_reads_the_list_and_proposes_a_model_for_the_still(keyed, monkeyp
                                          "model_why": "the words must read"}
     assert reply["tool_runs"] == [{"tool": "list_models", "args": {}, "ok": True}]
     assert "looked at the models" in notes
-    assert "MAY PROPOSE THE MODEL" in seen[0][1]["config"].system_instruction
+    assert "YOU CHOOSE THE MODEL" in seen[0][1]["config"].system_instruction
     back = [p.function_response.response["result"] for c in seen[1][0]
             for p in (getattr(c, "parts", None) or []) if getattr(p, "function_response", None)]
     assert back and "- ideogram4.5 -- Ideogram 4.5" in back[0] and "http" not in back[0]
