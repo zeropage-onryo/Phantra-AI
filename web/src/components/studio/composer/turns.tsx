@@ -142,7 +142,7 @@ type Handlers = {
   onApprove: (i: number) => void;
   /** under Approve: the model that draws the still (this one, else the
    *  picker's) and what one costs -- "Nano Banana · 10 credits" */
-  stillLine: (modelId?: string) => string;
+  stillLine: (modelId?: string, quoted?: number) => string;
   /** an element sheet step's Approve: saves the character, draws the sheet */
   onApproveSheet: (i: number) => void;
   /** under the sheet's Approve: "Nano Banana Pro · 36 credits" */
@@ -877,7 +877,10 @@ export function ComposerStream({
                 {isStillStep(t) ? (
                   <StillStep
                     turn={t}
-                    line={handlers.stillLine(t.made?.model ?? handlers.stillModelOf(t).id)}
+                    line={handlers.stillLine(
+                      t.made?.model ?? handlers.stillModelOf(t).id,
+                      t.made?.quoted != null && t.made.model === handlers.stillModelOf(t).id ? t.made.quoted : undefined,
+                    )}
                     busy={handlers.busy}
                     onApprove={() => handlers.onApprove(i)}
                     held={heldLine(stillsFor(turns, t.reply?.proposal?.args.results).map((s) => s.n))}

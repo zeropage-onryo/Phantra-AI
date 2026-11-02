@@ -403,7 +403,7 @@ def test_a_still_is_drawn_from_the_face_that_was_picked(client, bucket, monkeypa
 
     monkeypatch.setattr("src.nano_banana.generate_from_prompt", draw)
     started = client.post("/api/generate/run", data={
-        "prompt": "michael at the window", "output": "image", "asset_photos": [MICHAEL]})
+        "prompt": "michael at the window", "output": "image", "expect_credits": "100", "asset_photos": [MICHAEL]})
     job = _wait(client, started.json()["job_id"])
     assert job["status"] == "done", job.get("error")
     ((account, references),) = seen

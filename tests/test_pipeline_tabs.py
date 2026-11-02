@@ -207,7 +207,7 @@ def test_generate_run_saves_a_real_one_shot_concept(tmp_db, hermetic_generate,
                         {"ok": True, "media_url": "/renders/frame.png"})
     job_id = client.post("/api/generate/run", data={
         "prompt": "the Ducati tank badge, low key",
-        "preset": "slow_push_in", "output": "image",
+        "preset": "slow_push_in", "output": "image", "expect_credits": "100",
     }).json()["job_id"]
     job = wait_for_job(job_id)
     assert job["status"] == "done"
@@ -238,14 +238,14 @@ def test_a_composer_still_says_its_render_id_so_an_effect_can_name_it(tmp_db, he
                         lambda prompt, reference_image=None, db_path=None, **kw:
                         {"ok": True, "media_url": "/renders/frame.png", "asset_id": 31})
     job = wait_for_job(client.post("/api/generate/run", data={
-        "prompt": "the can", "output": "image"}).json()["job_id"])
+        "prompt": "the can", "output": "image", "expect_credits": "100"}).json()["job_id"])
     assert job["status"] == "done" and job["asset"] == "gen:31"
     # a still that was not banked on the wall names nothing
     monkeypatch.setattr("src.nano_banana.generate_from_prompt",
                         lambda prompt, reference_image=None, db_path=None, **kw:
                         {"ok": True, "media_url": "/renders/frame.png"})
     job = wait_for_job(client.post("/api/generate/run", data={
-        "prompt": "the can again", "output": "image"}).json()["job_id"])
+        "prompt": "the can again", "output": "image", "expect_credits": "100"}).json()["job_id"])
     assert job["status"] == "done" and "asset" not in job
 
 
@@ -266,7 +266,7 @@ def test_a_still_sees_every_reference_each_under_what_it_is_for(tmp_db, hermetic
     monkeypatch.setattr("src.nano_banana.generate_from_prompt", fake)
     light, can = "/refs/light.jpg", "/refs/can.jpg"
     job = wait_for_job(client.post("/api/generate/run", data={
-        "prompt": "the can", "output": "image", "asset_photos": [light, can],
+        "prompt": "the can", "output": "image", "expect_credits": "100", "asset_photos": [light, can],
         "ref_roles": json.dumps({light: "light", can: "product"})}).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     (refs,) = seen
@@ -276,7 +276,7 @@ def test_a_still_sees_every_reference_each_under_what_it_is_for(tmp_db, hermetic
     # no roles: both still arrive, in the order attached, under their plain captions
     seen.clear()
     wait_for_job(client.post("/api/generate/run", data={
-        "prompt": "the can again", "output": "image",
+        "prompt": "the can again", "output": "image", "expect_credits": "100",
         "asset_photos": [light, can]}).json()["job_id"])
     (refs,) = seen
     assert [data for _label, data in refs] == [b"bytes:" + light.encode(), b"bytes:" + can.encode()]
@@ -284,7 +284,7 @@ def test_a_still_sees_every_reference_each_under_what_it_is_for(tmp_db, hermetic
     # and none at all is still None, as it always was
     seen.clear()
     wait_for_job(client.post("/api/generate/run", data={
-        "prompt": "nothing attached", "output": "image"}).json()["job_id"])
+        "prompt": "nothing attached", "output": "image", "expect_credits": "100"}).json()["job_id"])
     assert seen == [None]
 
 
@@ -301,7 +301,7 @@ def test_generate_run_passes_an_allowed_image_aspect(tmp_db, hermetic_generate,
     monkeypatch.setattr("src.nano_banana.generate_from_prompt", fake)
     for aspect in ("4:5", "7:3"):
         job = wait_for_job(client.post("/api/generate/run", data={
-            "prompt": "a still", "output": "image", "aspect": aspect,
+            "prompt": "a still", "output": "image", "expect_credits": "100", "aspect": aspect,
         }).json()["job_id"])
         assert job["status"] == "done"
     assert seen == ["4:5", None]
@@ -346,7 +346,7 @@ def test_a_still_that_fails_at_the_provider_is_said_plainly(tmp_db, hermetic_gen
                         lambda prompt, reference_image=None, db_path=None, **kw:
                         {"ok": False, "error": raw})
     job = wait_for_job(client.post("/api/generate/run", data={
-        "prompt": "the can on wet steel", "output": "image",
+        "prompt": "the can on wet steel", "output": "image", "expect_credits": "100",
     }).json()["job_id"])
     assert job["status"] == "done"                    # the row it rides on was saved
     assert job["detail"] == ("The still was not made: the image service turned the studio "

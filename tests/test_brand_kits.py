@@ -449,7 +449,7 @@ def test_the_composer_route_hands_the_project_and_the_chip_to_the_still(kitted, 
 
     def run(**data):
         r = client.post("/api/generate/run",
-                        data={"prompt": "a Gygler cook", "output": "image", **data})
+                        data={"prompt": "a Gygler cook", "output": "image", "expect_credits": "100", **data})
         if r.status_code != 200:
             return r
         deadline = time.time() + 5

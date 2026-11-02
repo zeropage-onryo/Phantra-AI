@@ -266,6 +266,12 @@ export function shotsToDraw<P extends ShotLike>(parts: P[] | null | undefined, s
  *  charged than the number here -- never more (the draw is capped at it). */
 export type KeyframeQuoteLike = { stills: number; credits: number; up_to?: boolean };
 
+/** The keyframes the card sells, or null (2026-11-02). A scene rendered as
+ *  ONE clip goes out on its photos: on a reference model its keyframes are
+ *  never sent, elsewhere only shot 1's is, so they are not offered. */
+export const keyframesOnSale = <Q extends KeyframeQuoteLike>(plan: { oneClip?: boolean } | null, q: Q | null | undefined): Q | null =>
+  plan?.oneClip ? null : (q ?? null);
+
 /** "1 keyframe" · "3 keyframes" · "up to 2 keyframes" */
 export const keyframeCount = (q: KeyframeQuoteLike): string =>
   `${q.up_to ? "up to " : ""}${q.stills} keyframe${q.stills === 1 ? "" : "s"}`;

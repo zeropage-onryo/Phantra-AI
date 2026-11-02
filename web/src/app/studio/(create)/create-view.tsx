@@ -1419,7 +1419,9 @@ function Composer() {
     // picker's -- the brain's proposal or the person's choice on the card
     // `pickedBy`: who put the model there, for the keep rate (src: app/api.py
     // _create_provenance)
-    on: { aspect?: string; seconds?: number; model?: string; pickedBy?: "person" | "vesper" | "default" } = {},
+    // `credits`: the price the card showed for a still, when it is not the
+    // model's opening price (a re-priced card); the route holds the still to it
+    on: { aspect?: string; seconds?: number; model?: string; pickedBy?: "person" | "vesper" | "default"; credits?: number } = {},
     // a plan's step (lib/make-plan.ts): the pictures it is held to, and the
     // box, the brief and the conversation are left as they are
     // `from`: the result this make continues (a Variation), by its render id
@@ -1498,6 +1500,10 @@ function Composer() {
       if (preset) form.append("preset", preset.id);
       form.append("aspect", useAspect);
       if (useModel) form.append("image_model", useModel);
+      // the price the card (or the send button) showed: the route refuses a
+      // still that would cost more at this shape with these pictures
+      const shown = on.credits ?? imageModels.find((m) => m.id === useModel)?.credits;
+      if (typeof shown === "number") form.append("expect_credits", String(shown));
       // what this still's keep rate is read by (2026-10-24; app/api.py
       // _create_provenance): who picked the model, the dial, the brain
       if (on.pickedBy) form.append("model_picked_by", on.pickedBy);
@@ -1542,7 +1548,21 @@ function Composer() {
     // signal (src/outcomes.py): a Variation says which still it came from
     if (isImage && step.from) form.append("continued_from", step.from);
 
-    const started = isImage ? await runImage(form) : await runScenes(form);
+    let started: { job_id: number };
+    try {
+      started = isImage ? await runImage(form) : await runScenes(form);
+    } catch (e) {
+      // more than the card said: nothing ran; the card shows the real price
+      // and the next Approve is held to it
+      if (!(isImage && e instanceof ApiError && e.code === "price_changed" && typeof e.credits === "number")) throw e;
+      const detail =
+        `With these pictures at ${useAspect} this still costs ${e.credits.toLocaleString()} credits, more than was shown. Nothing was charged.` +
+        (by.role === "assistant" ? " Approve again to draw it." : "");
+      polling.current.delete(madeId);
+      running.current = null;
+      patchMade(madeId, { status: "failed", quoted: e.credits, detail });
+      return { madeId, status: "failed", detail };
+    }
     me.jobId = started.job_id;
     patchMade(madeId, { jobId: started.job_id });
     const job = await pollJob(started.job_id, (j) => tick(madeId, j), () => me.stopped);
@@ -1615,7 +1635,13 @@ function Composer() {
       prompt,
       "image",
       { role: "assistant", message: t.content, reply: t.reply, at: t },
-      { aspect: stillFrameOf(t), model: stillModelOf(t).id, pickedBy: PICKED_BY[stillModelOf(t).by] },
+      {
+        aspect: stillFrameOf(t),
+        model: stillModelOf(t).id,
+        pickedBy: PICKED_BY[stillModelOf(t).by],
+        // re-priced by the route on the last Approve, for the same model
+        ...(t.made?.quoted != null && t.made.model === stillModelOf(t).id ? { credits: t.made.quoted } : {}),
+      },
       { refs: [...new Set([...(t.held ?? []), ...named])].filter((u) => !boxed.includes(u)), from: t.from },
     );
   }
@@ -1701,10 +1727,11 @@ function Composer() {
 
   // what a step card says under its Approve: the model that draws the still
   // (the one it was drawn on, or the picker's as it stands) and what one costs
-  const stillLine = (modelId?: string) => {
+  // (`quoted`: the route's price for its shape and pictures, once it said so)
+  const stillLine = (modelId?: string, quoted?: number) => {
     const m = imageModels.find((x) => x.id === (modelId || imageModel)) ?? imageModels[0];
     if (!m) return "";
-    return `${m.label} · ${balance?.exempt ? "not charged" : `${m.credits.toLocaleString()} credits`}`;
+    return `${m.label} · ${balance?.exempt ? "not charged" : `${(quoted ?? m.credits).toLocaleString()} credits`}`;
   };
 
   /* ── A PLAN (lib/make-plan.ts; docs/tasks/task-studio-agent.md item 2) ──
@@ -1814,11 +1841,17 @@ function Composer() {
   };
 
   /* A scene's keyframes are priced once the scene exists: the step reads
-     its quote here, and is done already when every shot has its frame. */
+     its quote here, and is done already when every shot has its frame. A
+     scene that renders as ONE clip skips them (2026-11-02): that clip goes
+     out on the scene's photos, and the stills would not steer it. */
   async function priceKeyframes(plan: Plan, st: PlanStep): Promise<Partial<PlanStep>> {
     const scene = sceneOf(plan, st);
     if (!scene?.conceptId) return { status: "failed", note: "there is no scene to draw them for" };
     try {
+      const card = (await sceneRender(scene.conceptId)).scene;
+      if (card.quote && !card.quote.error && card.quote.one_clip) {
+        return { status: "skipped", credits: 0, stills: 0, note: "it renders as one clip from its photos, so keyframes would not steer it" };
+      }
       const quote = (await getConceptDetail(scene.conceptId)).keyframes;
       if (!quote || !quote.stills) {
         return { status: "done", credits: 0, stills: 0, note: "every shot already has its first frame" };
@@ -2003,7 +2036,7 @@ function Composer() {
         if ((st.do === "keyframes" || st.do === "render") && typeof st.credits !== "number") {
           const priced = st.do === "render" ? await priceRender(plan, st) : await priceKeyframes(plan, st);
           applyPlan(id, (p) => patchStep(p, n, priced));
-          if (priced.status === "done") continue;
+          if (priced.status === "done" || priced.status === "skipped") continue;
           if (priced.status === "failed") break;
           st = { ...st, ...priced };
         }

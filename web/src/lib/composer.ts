@@ -129,6 +129,10 @@ export type Made = {
   prompt?: string;
   /** IMAGE: which model drew it (an /image-models id) */
   model?: string;
+  /** IMAGE: what the route said this still costs at the shape and pictures
+   *  sent, when that was above the card's price; the card shows it and the
+   *  next Approve is held to it (app/api.py generate_run, 2026-11-02) */
+  quoted?: number;
   /** VIDEO: the clip model the brain proposed for this scene and why --
    *  only where its Render card opens (lib/step-model.ts) */
   renderModel?: string;

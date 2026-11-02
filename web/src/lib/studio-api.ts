@@ -231,14 +231,16 @@ async function apiForm<T>(
   if (!res.ok) {
     let message = res.statusText || `request failed (${res.status})`;
     let code: string | undefined;
+    let credits: number | undefined;
     try {
       const body = await res.clone().json();
       message = body?.error?.message ?? body?.detail ?? message;
       code = body?.error?.code;
+      if (typeof body?.credits === "number") credits = body.credits;
     } catch {
       /* not JSON */
     }
-    throw new ApiError(message, res.status, code);
+    throw new ApiError(message, res.status, code, credits);
   }
   return (await res.json()) as T;
 }
@@ -1357,7 +1359,9 @@ export function recallActiveProject(): number | null {
    reference fields Create sends (`files`, `asset_photos`) -> one Nano
    Banana still saved as a one-shot concept. Not mutation_header-guarded
    (the Create route beside it is not either). `aspect` is optional and
-   allowlisted server-side. */
+   allowlisted server-side. `expect_credits` is the price the card showed:
+   the still is held to it at the shape and pictures actually sent (409
+   price_changed, with `credits`, if they price it otherwise). */
 /* GET /api/image-models: what a still can be drawn on, with what one
    costs -- the composer's picker, and the pill's step card price line */
 export type ImageModels = { items: { id: string; label: string; note: string; credits: number }[]; default: string };
