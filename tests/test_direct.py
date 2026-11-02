@@ -394,3 +394,28 @@ def test_grok_prices_the_picture_it_starts_on(monkeypatch):
     assert direct.video_quote(model="seedance2.5", seconds=5, resolution="720p",
                               start_frame=True)["usd"] == \
         direct.video_quote(model="seedance2.5", seconds=5, resolution="720p", aspect="9:16")["usd"]
+
+
+# ---------- the Video page opens on a model that holds several pictures (2026-11-02) ----------
+
+def test_the_video_page_opens_on_the_cheapest_model_that_holds_pictures():
+    items = [{"id": "ltx2.3", "max_refs": 0}, {"id": "wan3", "max_refs": 10},
+             {"id": "seedance2-fast", "max_refs": 9}, {"id": "grok1.5", "max_refs": 7}]
+    per_s = {"ltx2.3": 0.08, "wan3": 0.10, "seedance2-fast": 0.24, "grok1.5": 0.14}
+    assert direct.opening_video_model(items, per_s, "ltx2.3") == "wan3"
+    # none holds pictures: the studio's own render default, else the first
+    only_start = [{"id": "ltx2.3", "max_refs": 0}, {"id": "veo3.1", "max_refs": 0}]
+    assert direct.opening_video_model(only_start, {"ltx2.3": 0.08}, "veo3.1") == "veo3.1"
+    assert direct.opening_video_model(only_start, {}, "gone") == "ltx2.3"
+    assert direct.opening_video_model([], {}, "ltx2.3") == ""
+
+
+def test_wan3_holds_pictures_on_its_own_reference_endpoint():
+    assert fal.ref_max("wan3") == 10
+    assert fal.ref_tags("wan3", 2) == ["Image 1", "Image 2"]
+    model_id, body = fal.build_body("the subject in Image 1 walks into Image 2", model="wan3",
+                                    aspect_ratio="9:16", resolution="720p",
+                                    reference_urls=["https://a/1.jpg", "https://a/2.jpg"])
+    assert model_id == "alibaba/wan-3.0/reference-to-video"
+    assert body["reference_image_urls"] == ["https://a/1.jpg", "https://a/2.jpg"]
+    assert "start_image_url" not in body

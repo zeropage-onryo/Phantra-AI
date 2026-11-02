@@ -43,13 +43,16 @@ import {
   keptLine,
   modelBadges,
   openingModel,
+  picturesUsed,
   readPick,
   referencesLine,
   refsCountLine,
   reuseOf,
+  roomierModel,
+  trayCap,
+  videoPicturesLine,
   videoRefMode,
   videoResolutions,
-  refsTrimmedLine,
   videoRefTags,
   secondsChoices,
   videoPickFor,
@@ -256,7 +259,10 @@ function Generator({ kind }: { kind: Kind }) {
   const exempt = !!(video ? vMenu?.exempt : iMenu?.exempt);
   const refMode = video ? videoRefMode(vModel, refs.length, oneAsRef) : "none";
   const hasStart = refMode === "start";
-  const held = refMode === "references" ? refs.length : 0;
+  // what reaches the model: the tray may hold more than the picked model
+  // takes (2026-11-02), and only these are priced and sent
+  const used = video ? picturesUsed(refMode, vModel, refs.length) : Math.min(refs.length, Math.max(0, iModel?.max_refs ?? 0));
+  const held = refMode === "references" ? used : 0;
   // with pictures held, only the resolutions the model renders them at; a
   // pick outside them is priced and sent at the highest one, and that is said
   const resolutions = videoResolutions(vModel, refMode);
@@ -301,10 +307,10 @@ function Generator({ kind }: { kind: Kind }) {
       const model = vMenu.items.find((m) => m.id === id);
       if (!model) return;
       const next = videoPickFor(model, vPick);
-      // pictures past what the model takes come off, and that is said
-      const trimmed = refsTrimmedLine(model, refs.length);
-      if (trimmed) setRefs((was) => was.slice(0, Math.max(1, model.max_refs)));
-      setPickNote([keptLine(model, vPick, next), trimmed].filter(Boolean).join(" "));
+      // pictures past what the model takes stay in the tray, marked Unused,
+      // with a line under it (2026-11-02): moving back to a model that holds
+      // them uses them again, so nothing is taken off
+      setPickNote(keptLine(model, vPick, next));
       setVPick(next);
       writeStore(PICK_KEY.video, JSON.stringify(next));
     } else if (iMenu) {
@@ -332,15 +338,20 @@ function Generator({ kind }: { kind: Kind }) {
   };
 
   /* ── pictures: a start frame or references for a clip, references for a still ── */
+  // The tray holds what the ROOMIEST model on the menu holds, whatever
+  // model is picked (2026-11-02, Mike: "im not allowed to add more than one
+  // reference image" -- the Video page opened on a start-frame-only model
+  // and took one). Each picture then says what the picked model does with
+  // it, and a model that holds them all is one click away.
   const vCap = Math.max(1, vModel?.max_refs ?? 0);
-  const cap = video ? vCap : Math.max(1, iMenu ? Math.max(...iMenu.items.map((m) => m.max_refs), 1) : 12);
+  const cap = video ? trayCap(vMenu?.items ?? [], 1) : trayCap(iMenu?.items ?? [], 12);
   const addRefs = useCallback(
     (list: Ref[]) => {
       if (!list.length) return;
-      // a model that only starts on a picture swaps it; one with references adds up to its count
-      setRefs((was) => (video && vCap === 1 ? [list[0]] : [...was, ...list].slice(0, cap)));
+      // with room for one only, a new picture swaps the old; else it adds up to the tray's count
+      setRefs((was) => (cap === 1 ? [list[0]] : [...was, ...list].slice(0, cap)));
     },
-    [video, vCap, cap],
+    [cap],
   );
   const addFiles = (files: FileList | File[] | null | undefined) => {
     const pics = Array.from(files ?? []).filter((f) => f.type.startsWith("image/"));
@@ -418,7 +429,8 @@ function Generator({ kind }: { kind: Kind }) {
       form.set("model", iPick.model);
       form.set("aspect", iPick.aspect);
     }
-    for (const r of refs) {
+    // only the pictures that reach the model: the rest stay in the tray
+    for (const r of refs.slice(0, used)) {
       if (r.file) form.append("files", r.file, r.file.name);
       else if (r.url) form.append("asset_photos", r.url);
     }
@@ -485,9 +497,26 @@ function Generator({ kind }: { kind: Kind }) {
   const items = video ? (vMenu?.items ?? []) : (iMenu?.items ?? []);
   const current = video ? vModel : iModel;
   const lengths = secondsChoices(vModel?.seconds);
-  const warn = !video && iModel ? referencesLine(iModel, refs.length) : "";
-  const notSent = !video && !!iModel && iModel.max_refs <= 0 && refs.length > 0;
-  const tags = refMode === "references" ? videoRefTags(vModel, refs.length) : [];
+  const warn = video ? videoPicturesLine(vModel, refMode, refs.length) : iModel ? referencesLine(iModel, refs.length) : "";
+  const tags = refMode === "references" ? videoRefTags(vModel, used) : [];
+  // a model that holds every picture, offered in one click when some do not reach the picked one
+  const roomier =
+    refs.length > used ? (video ? roomierModel(vMenu?.items ?? [], refs.length, vPick?.model, 2) : roomierModel(iMenu?.items ?? [], refs.length, iPick?.model)) : null;
+  const picturesNote = warn ? (
+    <div className="dg-kept dg-roomier" role="status">
+      <span>{warn}</span>
+      {roomier ? (
+        <button type="button" className="dg-linkbtn" onClick={() => chooseModel(roomier.id)}>
+          Use {roomier.label} · holds {roomier.max_refs}
+        </button>
+      ) : null}
+      {used > 0 ? (
+        <button type="button" className="dg-linkbtn" onClick={() => setRefs((was) => was.slice(0, used))}>
+          Remove the extras
+        </button>
+      ) : null}
+    </div>
+  ) : null;
   const insertTag = (tag: string) => {
     const el = promptEl.current;
     const at = el ? el.selectionStart : prompt.length;
@@ -520,7 +549,7 @@ function Generator({ kind }: { kind: Kind }) {
       ref={file}
       type="file"
       accept="image/*"
-      multiple={!video || vCap > 1}
+      multiple={cap > 1}
       hidden
       onChange={(e) => {
         addFiles(e.target.files);
@@ -530,8 +559,14 @@ function Generator({ kind }: { kind: Kind }) {
   );
   const picker = picking ? (
     <PicturePicker
-      room={video && vCap === 1 ? 1 : room}
-      note={video ? (vCap > 1 ? `${vModel?.label ?? "This model"} holds up to ${vCap}.` : "One picture: the clip starts on it.") : "Each is sent by its address; nothing is uploaded again."}
+      room={cap === 1 ? 1 : room}
+      note={
+        video
+          ? vCap > 1
+            ? `${vModel?.label ?? "This model"} holds up to ${vCap}.`
+            : `${vModel?.label ?? "This model"} starts on one picture; the models marked "pics" hold several.`
+          : "Each is sent by its address; nothing is uploaded again."
+      }
       onClose={() => setPicking(false)}
       onAdd={(list) => {
         addRefs(list.map((m) => ({ key: `lib-${m.asset_id}`, thumb: m.thumb ?? m.url, url: m.url })));
@@ -542,25 +577,25 @@ function Generator({ kind }: { kind: Kind }) {
   const tray = (size: "lg" | "sm") => (
     <div className="dg-tray" data-size={size}>
       {refs.map((r, i) => (
-        <span key={r.key} className="dg-thumb" data-off={notSent ? "1" : undefined}>
+        <span key={r.key} className="dg-thumb" data-off={i >= used ? "1" : undefined} title={i >= used ? `Not used by ${current?.label ?? "this model"}` : undefined}>
           <img src={mediaSrc(r.thumb)} alt="" onError={toMaster(r.url)} />
-          {video && refMode === "start" ? <i className="dg-tag">Start</i> : null}
+          {video && refMode === "start" && i === 0 ? <i className="dg-tag">Start</i> : null}
           {tags[i] ? (
             <button type="button" className="dg-tag" title="Put this tag in the prompt" onClick={() => insertTag(tags[i])}>
               {tags[i]}
             </button>
           ) : null}
-          {notSent ? <i className="dg-tag">Not sent</i> : null}
+          {i >= used ? <i className="dg-tag">Unused</i> : null}
           <button type="button" className="dg-thumb-x" aria-label="Remove this picture" onClick={() => dropRef(r.key)}>
             <X strokeWidth={2.4} />
           </button>
         </span>
       ))}
-      {refs.length < cap || (video && vCap === 1) ? (
+      {refs.length < cap || cap === 1 ? (
         <>
           <button type="button" className="dg-add" onClick={() => file.current?.click()}>
             <Upload strokeWidth={1.8} />
-            <span>{video && vCap === 1 && refs.length ? "Replace" : "Upload"}</span>
+            <span>{cap === 1 && refs.length ? "Replace" : "Upload"}</span>
           </button>
           <button type="button" className="dg-add" onClick={() => setPicking((v) => !v)} aria-expanded={picking}>
             <LayoutGrid strokeWidth={1.8} />
@@ -631,7 +666,7 @@ function Generator({ kind }: { kind: Kind }) {
               <span className="dg-count">{iModel ? refsCountLine(iModel.max_refs, refs.length) : ""}</span>
             </span>
             {tray("lg")}
-            {warn ? <p className="dg-kept">{warn}</p> : <p className="dg-hint">Drop pictures anywhere on this panel.</p>}
+            {picturesNote ?? <p className="dg-hint">Drop pictures anywhere on this panel.</p>}
           </div>
 
           {iMenu && iPick ? (
@@ -698,6 +733,7 @@ function Generator({ kind }: { kind: Kind }) {
             />
           </div>
           {notes}
+          {picturesNote}
           <div className="dgv-dock-bar">
             <ChipMenu
               name="Model"
@@ -784,6 +820,7 @@ function Generator({ kind }: { kind: Kind }) {
             />
           </div>
           {notes}
+          {picturesNote}
           {refMode === "references" && tags.length ? (
             <p className="dg-hint">The clip is held to these pictures. Name them in the prompt; tap a tag to put it there.</p>
           ) : null}
