@@ -64,6 +64,7 @@ from src import (
     plugin_tokens,
     posts,
     preprod,
+    pricing,
     publish_review,
     quote_redemptions,
     rag,
@@ -251,6 +252,11 @@ async def lifespan(app: FastAPI):
         if os.environ.get("FAL_RECOVER", "1") != "0":
             fal_requests.start_background()
         retire_gold_standard()              # the exemplar is not a winner (2026-10-02)
+        # The deployed API says which price table is live, so a studio
+        # server on an older checkout refuses to quote (src/pricing.py,
+        # live_drift; QA 2026-11-02 K1). Fly only: a Mac's API is not live.
+        if (os.environ.get("FLY_APP_NAME") or "").strip():
+            pricing.record_live()
         # What's new (2026-10-25): file a pending announcement for every
         # model / effect / look / skill the wall has never seen. Spends
         # nothing; off with PHANTRA_WHATS_NEW_SYNC=0.
