@@ -23,6 +23,7 @@ import {
   CalendarDays,
   Clapperboard,
   FolderKanban,
+  Handshake,
   House,
   ImageIcon,
   LayoutGrid,
@@ -148,6 +149,7 @@ export function PhoneMenu({ open, onClose }: { open: boolean; onClose: () => voi
         {row("/studio/calendar", "Calendar", CalendarDays)}
         {row("/studio/plugins", "Plugins", Plug)}
         {row(SETTINGS_HOME, "Settings", Settings)}
+        {row("/affiliates", "Affiliate Program", Handshake)}
       </nav>
       <div className="ph-menu-foot">
         <Link href={COMPOSE_HREF} className="ph-go" onClick={onClose}>

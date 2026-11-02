@@ -6,7 +6,7 @@
 #   1. Put a TEST key in the environment:   export STRIPE_SECRET_KEY=sk_test_...
 #   2. ./affiliate-testmode.command
 #
-# What it does: creates the 20%-off-once coupon in TEST mode, runs the API,
+# What it does: creates the 10%-off-once coupon in TEST mode, runs the API,
 # forwards test webhooks with `stripe listen`, and tells you the 5 clicks.
 cd "$(dirname "$0")" || exit 1
 
@@ -17,25 +17,25 @@ esac
 command -v stripe >/dev/null || { echo "Install the Stripe CLI first: brew install stripe/stripe-cli/stripe"; exit 1; }
 
 # 1. the buyer coupon, test mode (safe to re-run: reuses it if it exists)
-if ! stripe coupons retrieve affiliate-buyer-20 --api-key "$STRIPE_SECRET_KEY" >/dev/null 2>&1; then
-  stripe coupons create --id affiliate-buyer-20 --percent-off 20 --duration once \
-    --name "Referral: 20% off first month" --api-key "$STRIPE_SECRET_KEY" >/dev/null
+if ! stripe coupons retrieve affiliate-buyer-10 --api-key "$STRIPE_SECRET_KEY" >/dev/null 2>&1; then
+  stripe coupons create --id affiliate-buyer-10 --percent-off 10 --duration once \
+    --name "Referral: 10% off first month" --api-key "$STRIPE_SECRET_KEY" >/dev/null
 fi
-export STRIPE_AFFILIATE_COUPON=affiliate-buyer-20
+export STRIPE_AFFILIATE_COUPON=affiliate-buyer-10
 
 # 2. webhook secret for this session
 export STRIPE_WEBHOOK_SECRET="$(stripe listen --print-secret --api-key "$STRIPE_SECRET_KEY")"
 
-# 3. an approved partner to refer from (idempotent: approve is a no-op if already approved)
+# 3. a partner to refer from -- the link is instant, there is nothing to approve
 echo
-echo "Make a partner first (once): sign in to the studio as yourself, open /affiliates, apply,"
-echo "then run:   venv/bin/python -m src.affiliates approve <your-slug>"
-echo "Your link will be   http://localhost:3000/?ref=<code>"
+echo "Make a partner first (once): sign in to the studio as yourself, open /affiliates and press"
+echo "'Get my link' (your channel URL and the terms box). Your link appears at once:"
+echo "   http://localhost:3000/?ref=<code>"
 echo
 echo "Then, in a PRIVATE window: open that link, sign up as a NEW account, buy Standard monthly"
-echo "with card 4242 4242 4242 4242. Checkout should show 20% off the first month."
+echo "with card 4242 4242 4242 4242. Checkout should show 10% off the first month."
 echo "When it finishes, in another terminal:   venv/bin/python -m src.affiliates report"
-echo "You should see 1 signup, 1 paying, held = 20%-off price x 25%."
+echo "You should see 1 signup, 1 paying, held = 10%-off price x 25%."
 echo "Starter pays on the amount actually paid: \$15 x 0.80 = \$12.00 -> \$3.00 held."
 echo
 

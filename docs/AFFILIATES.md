@@ -10,25 +10,26 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
 
 | Tier | Earns | For | Reached at |
 |---|---|---|---|
-| Starter | 25% | first 3 months of a referral's payments | approval |
+| Starter | 25% | first 6 months of a referral's payments | sign-up (instant) |
 | Pro | 30% | first 6 months | 10 paying referrals *(build's assumption)* |
 | Partner | 35% | first 12 months | 50 paying referrals |
 
-- **Referred buyer:** 20% off their first *monthly* payment (a yearly plan already has 20% off).
-- **Gating:** apply → Mike reads the channel → approves (`approve`). No link before approval.
+- **Referred buyer:** 10% off their first *monthly* payment (a yearly plan already has 20% off).
+- **Joining (2026-11-02):** a channel URL and the terms box; the code and link exist the moment the form is sent. Set `AFFILIATE_AUTO_APPROVE=0` on Fly to put applications back in a queue for `approve`. The review moves to the money: look at a partner's channel and referrals (`report`) before you send their **first** payout.
 - **Locked at first payment:** the tier is read when a referral first pays and stored on that
   referral. A partner who reaches Pro keeps Starter terms on people already referred.
 - **Commission base:** what the customer paid, **before tax** (`invoice_net_cents`). Free
   invoices pay nothing; top-up packs never earn; only subscription invoices.
-- **Yearly:** counted in months covered. A Starter partner's yearly referral earns 25% × 3/12
+- **Yearly:** counted in months covered. A Starter partner's yearly referral earns 25% × 6/12
   of the payment, exactly what three monthly payments would have.
 - **Hold:** 60 days from the payment (the refund window; also what absorbs chargebacks).
   A full refund inside the hold voids the commission, a partial one scales it. After the hold
   nothing is clawed back.
-- **Payout:** **credits by default** — a `promo` lot on the partner's own account, 1 credit per
-  cent, **12-month expiry** — because a credit costs about 42¢ on the dollar (pricing.MARKUP 2.4),
-  so the top tier is ~14.6% of referred revenue in credits against 35% in cash. **Cash is a
-  per-partner switch Mike flips** (`set-payout`), paid by hand in batches of $50 or more.
+- **Payout (2026-11-02, Mike: "lets just do cash"):** **cash by default**, paid by hand in batches of
+  $50 or more (`payouts`, send PayPal/bank, `mark-paid`). Credits still exist as a per-partner switch
+  (`set-payout <slug> credits`): a `promo` lot on the partner's own account, 1 credit per cent,
+  12-month expiry, which costs about 42¢ on the dollar (pricing.MARKUP 2.4). Cash costs the full face
+  amount, so the top tier is 35% of referred revenue, not ~14.6%.
 - **Attribution:** `?ref=<code>` link → `phantra_ref` cookie (60 days, domain `.phantra.ai`)
   → attributed at sign-up (`app/auth._provision`). Only a *new* account, only to an *approved*
   partner, first touch wins, never after the account has paid, never to yourself (same account
@@ -37,14 +38,14 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
 ## Assumptions to change if you disagree (each is one constant or line)
 
 1. Pro unlocks at **10** paying referrals (`TIERS`). You only specified "at least 50" for Partner.
-2. Credits are the default payout; cash is opt-in per partner.
+2. Cash is the default payout; credits are opt-in per partner.
 3. 60-day hold (`HOLD_DAYS`), 60-day cookie (`COOKIE_DAYS`), $50 cash minimum (`MIN_CASH_PAYOUT_CENTS`).
 4. Buyer discount is monthly plans' first payment only.
 5. "Paying referrals" = referrals with a booked, not-voided commission.
 
 ## Launch checklist (the only things that need you)
 
-1. **Stripe, once:** Dashboard → Product catalog → Coupons → new coupon, **20% off, duration "once"**.
+1. **Stripe, once:** Dashboard → Product catalog → Coupons → new coupon, **10% off, duration "once"**.
    Copy its id.
 2. **Env:** on Fly set `STRIPE_AFFILIATE_COUPON=<that id>` (unset = referred buyers simply get no
    discount; nothing breaks). Optional `AFFILIATE_LINK_BASE` (defaults to `https://phantra.ai`).
@@ -82,3 +83,16 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
 `tests/test_affiliates.py` (22), the tenancy audit in `tests/test_tenancy.py` (three owned
 tables, four reasoned allowlist entries), `web/tests/affiliate.test.mjs`. A Python test fails if
 `web/src/content/affiliate.json` disagrees with `public_terms()`.
+
+
+## The Apply modal (web)
+
+`/affiliates` has no inline form. Every "Apply now" button (hero, calculator,
+closing band) opens one dialog (`web/src/components/site/affiliate-apply.tsx`):
+sign-in prompt, then the short form (first and last name, link to main
+platform, country, allowed / not allowed rules, agree checkbox), then the
+partner's link with a Copy button, their tier and numbers, and a "large
+audience? Contact us" row. Sign-in returns to `/affiliates?apply=1`, which
+reopens it. Name and country are stored on `affiliate_partners` (`full_name`,
+`country`) and show in `python -m src.affiliates report`.
+The page uses Marigold (#FFC800) as its accent via the `--mari` variable.

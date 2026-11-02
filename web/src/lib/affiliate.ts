@@ -46,9 +46,11 @@ export async function loadAffiliate(): Promise<Loaded> {
 
 export async function applyAffiliate(body: {
   channel_url: string;
-  audience: string;
-  plan: string;
   accept_terms: boolean;
+  full_name?: string;
+  country?: string;
+  audience?: string;
+  plan?: string;
 }): Promise<Loaded> {
   try {
     return { kind: "ok", summary: await apiFetch<AffiliateSummary>("/affiliates/apply", { method: "POST", body: JSON.stringify(body) }) };

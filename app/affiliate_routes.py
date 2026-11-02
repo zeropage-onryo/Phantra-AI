@@ -7,16 +7,19 @@ route audit in tests/test_tenancy.py (each handler declares
 
   GET  /api/affiliates/me        -> src/affiliates.summary: status, link,
                                     tier, progress, earnings
-  POST /api/affiliates/apply     {"channel_url", "audience", "plan",
-                                  "accept_terms"} -> the summary
+  POST /api/affiliates/apply     {"channel_url", "accept_terms"} (+ optional
+                                  "full_name", "country", "audience", "plan")
+                                  -> the summary; the
+                                  link is in it, approval is immediate
   POST /api/affiliates/attribute {"code"} -> {"attributed", "reason"}:
        the studio calls this once after sign-in with the `phantra_ref`
        cookie's value, for the doors that do not pass the cookie to the
        API's own callback (the cookie is also read at sign-up in
        app/auth.py). Safe to call repeatedly.
 
-Approving, rejecting, paying and the cash payout are Mike's CLI
-(`python -m src.affiliates`), not routes: a human reads every channel.
+Rejecting, suspending and the cash payout are Mike's CLI
+(`python -m src.affiliates`), not routes: he reads a channel before he
+sends its first payment.
 """
 from __future__ import annotations
 
@@ -36,6 +39,8 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
 
 class ApplyBody(BaseModel):
     channel_url: str = ""
+    full_name: str = ""
+    country: str = ""
     audience: str = ""
     plan: str = ""
     accept_terms: bool = False
@@ -56,7 +61,8 @@ def affiliate_apply(body: ApplyBody, account_id: int = Depends(auth.current_acco
         return _error(403, "no_account", "no workspace to earn on")
     try:
         affiliates.apply(account_id, channel_url=body.channel_url, audience=body.audience,
-                         plan=body.plan, accept_terms=body.accept_terms)
+                         plan=body.plan, accept_terms=body.accept_terms,
+                         full_name=body.full_name, country=body.country)
     except affiliates.AffiliateError as e:
         return _error(400, e.code, str(e))
     return affiliates.summary(account_id)
