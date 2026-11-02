@@ -98,7 +98,8 @@
       "needs": [
         "product"
       ],
-      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one."
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one.",
+      "example": "effect.product_orbit"
     },
     {
       "id": "ugc",
@@ -117,7 +118,9 @@
       "needs": [
         "product"
       ],
-      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. The person on camera is a stand-in customer: never a real, named person."
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. The person on camera is a stand-in customer: never a real, named person.",
+      "example": "create.usecase.ugc",
+      "cast": true
     },
     {
       "id": "ugc_unboxing",
@@ -136,7 +139,9 @@
       "needs": [
         "product"
       ],
-      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. The box is shown as plain packaging unless their photos show the real one."
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. The box is shown as plain packaging unless their photos show the real one.",
+      "example": "create.usecase.unboxing",
+      "cast": true
     },
     {
       "id": "tv_spot",
@@ -156,7 +161,8 @@
       "needs": [
         "product"
       ],
-      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. Write it as timed shots; the brand kit's end card closes the final cut."
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. Write it as timed shots; the brand kit's end card closes the final cut.",
+      "example": "create.usecase.seasonal"
     },
     {
       "id": "motion_ad",
@@ -177,7 +183,8 @@
       "needs": [
         "kit"
       ],
-      "note": "This format is built from the brand kit: its colours, type, logo and the product's own screens. When they ask for it to be made, use make_ad. With no kit in play, say so in one line and point them to reading their website into a kit on the Brand page."
+      "note": "This format is built from the brand kit: its colours, type, logo and the product's own screens. When they ask for it to be made, use make_ad. With no kit in play, say so in one line and point them to reading their website into a kit on the Brand page.",
+      "example": "create.usecase.saas"
     },
     {
       "id": "product_still",
@@ -196,7 +203,8 @@
       "needs": [
         "product"
       ],
-      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. It is ONE still: when they ask for it, make_image."
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. It is ONE still: when they ask for it, make_image.",
+      "example": "create.source.headphones"
     },
     {
       "id": "social_cutdown",
@@ -218,7 +226,8 @@
         "clip"
       ],
       "free": true,
-      "note": "This works on an ad they already made: re-shape it with reformat and shorten it with trim_clip, both free. If no clip is in the conversation, ask them to attach it from the Library first. Nothing is re-rendered."
+      "note": "This works on an ad they already made: re-shape it with reformat and shorten it with trim_clip, both free. If no clip is in the conversation, ask them to attach it from the Library first. Nothing is re-rendered.",
+      "example": "create.usecase.hook"
     }
   ]
 }

@@ -33,6 +33,10 @@ export type AdFormat = {
   default_seconds: number | null;
   needs: ("product" | "kit" | "clip")[];
   free?: boolean;
+  /** a key in the site's showcase manifest (lib/showcase.ts): the card's example */
+  example?: string;
+  /** a clip with a person on camera: the brief offers a character to cast */
+  cast?: boolean;
 };
 export type StudioPage = {
   id: string;
@@ -61,6 +65,8 @@ export type AdBrief = {
   /** the product element (an Elements id), or null */
   product: { id: string; name: string } | null;
   kit: { id: number; name: string } | null;
+  /** who is on camera (a character element), for a format that casts one */
+  actor: { id: string; name: string } | null;
 };
 
 /** What rides on the conversation's draft and every brain turn
@@ -74,6 +80,9 @@ export type StudioPick = {
 };
 
 export const AD_STUDIO_HREF = "/studio/ads";
+/** what "Make it now" adds to the first message: an ask in this turn, the
+ *  rule the brain makes on (prompts/creative_guide_make.txt) */
+export const MAKE_NOW = "Make it now.";
 
 export function formatOf(page: StudioPage | null | undefined, id: string | null | undefined): AdFormat | null {
   return page?.formats.find((f) => f.id === id) ?? null;
@@ -88,6 +97,8 @@ export function startBrief(format: AdFormat, keep?: Partial<AdBrief>): AdBrief {
     intake: keep?.intake ?? {},
     product: keep?.product ?? null,
     kit: keep?.kit ?? null,
+    // kept across formats; only a format that casts uses it
+    actor: keep?.actor ?? null,
   };
 }
 
@@ -155,9 +166,10 @@ export function briefText(page: StudioPage, brief: AdBrief): string {
   const what = format.output === "image" || /\bad$/i.test(named) ? named : `${named} ad`;
   const length = format.output === "video" && brief.seconds ? `${brief.seconds}-second ` : "";
   const product = brief.product?.name ? ` for ${clean(brief.product.name)}` : "";
+  const actor = format.cast && brief.actor?.name ? `, with ${clean(brief.actor.name)} on camera` : "";
   const lead = `${length}${brief.aspect} ${what}`;
   const a = article(lead);
-  const parts = [`${a.charAt(0).toUpperCase()}${a.slice(1)} ${lead}${product}.`];
+  const parts = [`${a.charAt(0).toUpperCase()}${a.slice(1)} ${lead}${product}${actor}.`];
   const platform = brief.intake.platform ? labelOf(page, "platform", brief.intake.platform) : "";
   const audience = clean(brief.intake.audience);
   if (platform && audience) parts.push(`It runs on ${platform}, for ${audience}.`);
@@ -185,23 +197,29 @@ export function missing(format: AdFormat, brief: AdBrief): string[] {
   if (format.needs.includes("kit") && !brief.kit)
     out.push("A motion ad is built from a brand kit: pick one, or read a website into one.");
   if (format.needs.includes("clip")) out.push("Attach the ad to cut down from your Library once you're in Create.");
+  if (format.cast && !brief.actor) out.push("No one on camera picked: Vesper casts a stand-in customer.");
   return out;
 }
 
 /** The link into Create. Every param is one the composer already reads
  *  (spark, kind, frame, kit, attach) plus the studio's own (studio, skill,
  *  seconds). */
-export function handoffHref(page: StudioPage, brief: AdBrief): string {
+export function handoffHref(page: StudioPage, brief: AdBrief, opts: { now?: boolean } = {}): string {
   const format = formatOf(page, brief.format);
   const q = new URLSearchParams();
-  q.set("spark", briefText(page, brief));
+  // "Make it now" (2026-10-27): the same hand-off, sent at once with the ask
+  // in it, so the first answer is the priced card -- which still waits
+  q.set("spark", opts.now ? `${briefText(page, brief)} ${MAKE_NOW}` : briefText(page, brief));
+  if (opts.now) q.set("send", "1");
   if (format) q.set("kind", format.output);
   if (brief.aspect) q.set("frame", brief.aspect);
   if (format?.skill) q.set("skill", format.skill);
   if (format?.output === "video" && brief.seconds) q.set("seconds", String(brief.seconds));
   q.set("studio", JSON.stringify(pickOf(page, brief)));
   if (brief.kit) q.set("kit", String(brief.kit.id));
-  if (brief.product) q.set("attach", brief.product.id);
+  // the person on camera first, then the product: refs[0] anchors a clip
+  const attach = [format?.cast ? brief.actor?.id : null, brief.product?.id].filter(Boolean);
+  if (attach.length) q.set("attach", attach.join(","));
   return `/studio?${q}`;
 }
 

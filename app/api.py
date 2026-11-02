@@ -384,6 +384,65 @@ def studio_page(studio_id: str, account_id: int = Depends(auth.current_account_i
     return page
 
 
+class ProductLinkBody(BaseModel):
+    url: str
+    name: str = ""
+
+
+@router.post("/studios/product-from-link")
+def studio_product_from_link(body: ProductLinkBody, request: Request,
+                             account_id: int = Depends(auth.current_account_id)):
+    """The Ad Studio's "Paste a product link" (2026-10-27): a product page
+    -> ONE product element with its main picture and what the page says,
+    through the connector's own `add_element` (src/mcp_server.py: the page
+    read is linkrefs' one SSRF-safe fetch, the picture is fetched like any
+    public image, the element is saved through the Elements page's body,
+    no sheet drawn, nothing spent). The name defaults to the page's last
+    path word; the person can rename it on Elements."""
+    from src import mcp_server, studios
+    model_connections.mutation_header(request)
+    url = (body.url or "").strip()
+    if not url.lower().startswith(("http://", "https://")):
+        return _error(400, "bad_link", "paste the product page's address (https://...)")
+    name = " ".join((body.name or "").split()) or studios.name_from_link(url)
+
+    def add(kind, item_name, *, photo, notes="", account_id=None):
+        try:
+            return create_element(kind, item_name, account_id=account_id, notes=notes,
+                                  uploads=[photo], sheet=False, strict=True)
+        except ElementRefused as e:
+            if e.status == 402:
+                raise mcp_server.Refused(e.message) from e
+            raise ValueError(e.message) from e
+
+    try:
+        out = mcp_server.add_element("prop", name, url, create_element=add,
+                                     account_id=account_id)
+    except mcp_server.Refused as e:
+        return _error(402, "subscribe_or_top_up", str(e))
+    except ValueError as e:
+        return _error(400, "not_added", str(e))
+    element = out.get("element") or {}
+    return {"name": out.get("name") or name, "kind": "prop",
+            "photos": len(element.get("photos") or []), "page": out.get("page"),
+            "note": out.get("note")}
+
+
+@router.get("/studios/{studio_id}/insights")
+def studio_insights(studio_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What has worked for this workspace (the connector's `what_works`):
+    kept and posted, by model and preset, as lines. Read only, no model."""
+    from src import mcp_server, studios
+    if not studios.get(studio_id):
+        return _error(404, "no_studio", f"no studio {studio_id!r}")
+    try:
+        got = mcp_server.what_works(account_id=account_id)
+    except Exception:                                               # noqa: BLE001
+        return {"enough_data": False, "lines": [], "posted": []}
+    return {"enough_data": bool(got.get("enough_data")), "lines": got.get("lines") or [],
+            "posted": got.get("posted") or []}
+
+
 # --- ad results (2026-10-29, src/ad_results.py, docs/tasks/task-ad-results.md) ---
 # What a person's ads did once they ran: the ad-level report they export from
 # Meta Ads Manager or TikTok Ads Manager, dropped on the Ad Studio. Open to
@@ -5314,6 +5373,65 @@ def concept_refs(concept_id: int, body: ConceptRefsBody, account_id: int = Depen
     return {"ok": True, "refs": shots[0]["refs"]}
 
 
+class SceneHookBody(BaseModel):
+    asset: str                      # gen:<id>, a video render of this account's
+    seconds: float = 2.0
+
+
+def _save_first_shot(concept_id: int, concept: dict, shots: list[dict], account_id: int) -> None:
+    """Write the shot list back exactly as it was but for the first shot,
+    carrying the warnings and duration through (as concept_refs does)."""
+    preprod.update_concept_shots(
+        concept_id, {"shots": shots, "duration": concept.get("duration"),
+                        **({"ai": concept["ai"]} if concept.get("ai") else {})},
+        warnings=concept.get("warnings") or [], account_id=account_id)
+
+
+@router.put("/scenes/{concept_id}/hook")
+def set_scene_hook(concept_id: int, body: SceneHookBody,
+                   account_id: int = Depends(auth.current_account_id)):
+    """The scene's hook (2026-10-29): a short effect clip the Final cut opens
+    on, played for `seconds` and then a hard cut into shot 1. Free: it only
+    names a clip already made (and paid for on its own card). Kept on the
+    first shot, outside its prompt and refs, so no quote goes stale."""
+    from src import render_assets
+    from src.cut import assemble as cut_assemble
+    from src.cut import doc as cut_doc
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept["shots"]:
+        return _error(404, "not_found", "no such scene")
+    parsed = cut_doc.parse_handle(body.asset)
+    if not parsed or parsed[0] != "gen":
+        return _error(400, "bad_media", "a hook is a gen:<id> clip from the Library")
+    row = render_assets.get(parsed[1], account_id=account_id)
+    if row is None or row.get("deleted_at"):
+        return _error(404, "not_found", "that clip is not in your Library")
+    if row.get("media_kind") != "video":
+        return _error(400, "bad_media", "a hook has to be a video clip")
+    if not (cut_assemble.HOOK_MIN_SECONDS <= body.seconds <= cut_assemble.HOOK_MAX_SECONDS):
+        return _error(400, "bad_seconds",
+                      f"a hook plays {cut_assemble.HOOK_MIN_SECONDS:g}-"
+                      f"{cut_assemble.HOOK_MAX_SECONDS:g} seconds")
+    shots = [dict(s) for s in concept["shots"]]
+    shots[0]["hook"] = {"asset": cut_doc.handle("gen", parsed[1]),
+                        "seconds": round(float(body.seconds), 2)}
+    _save_first_shot(concept_id, concept, shots, account_id)
+    return {"ok": True, "hook": shots[0]["hook"]}
+
+
+@router.delete("/scenes/{concept_id}/hook")
+def clear_scene_hook(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Take the hook off; the clip itself stays in the Library."""
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept["shots"]:
+        return _error(404, "not_found", "no such scene")
+    shots = [dict(s) for s in concept["shots"]]
+    had = shots[0].pop("hook", None) is not None
+    if had:
+        _save_first_shot(concept_id, concept, shots, account_id)
+    return {"ok": True, "removed": had}
+
+
 @router.get("/concepts/{concept_id}")
 def concept_detail(concept_id: int, account_id: int = Depends(auth.current_account_id)):
     """The scene board's data: the full shot list, each shot carrying its
@@ -8361,6 +8479,13 @@ from . import billing as _billing  # noqa: E402  (bottom of the file on purpose)
 
 for _path, _endpoint, _methods in _billing.API_ROUTES:
     router.add_api_route(_path, _endpoint, methods=_methods, tags=["billing"])
+
+# --- affiliates (2026-10-26) -----------------------------------------------
+# The partner's own routes; same placement as billing, same reasons.
+from . import affiliate_routes as _affiliate_routes  # noqa: E402
+
+for _path, _endpoint, _methods in _affiliate_routes.API_ROUTES:
+    router.add_api_route(_path, _endpoint, methods=_methods, tags=["affiliates"])
 
 
 # --- the cut (2026-09-26, docs/tasks/CUT_ASSEMBLE_V0.md) -------------------

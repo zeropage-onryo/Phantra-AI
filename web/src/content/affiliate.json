@@ -1,0 +1,31 @@
+{
+  "version": "2026-10-26",
+  "tiers": [
+    {
+      "key": "starter",
+      "label": "Starter",
+      "percent": 25.0,
+      "months": 3,
+      "min_paying": 0
+    },
+    {
+      "key": "pro",
+      "label": "Pro",
+      "percent": 30.0,
+      "months": 6,
+      "min_paying": 10
+    },
+    {
+      "key": "partner",
+      "label": "Partner",
+      "percent": 35.0,
+      "months": 12,
+      "min_paying": 50
+    }
+  ],
+  "hold_days": 60,
+  "cookie_days": 60,
+  "buyer_discount_percent": 20,
+  "credit_expiry_months": 12,
+  "min_cash_payout_dollars": 50
+}

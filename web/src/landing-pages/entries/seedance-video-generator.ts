@@ -332,6 +332,8 @@ export const SEEDANCE: MakePage = {
     // The four sibling video pages (the other video entries already link
     // here), then the Ad Generator this page was first written beside.
     related: [
+      // Kling 4.0's own page (2026-10-22): the other 30-second model
+      "kling-4-video-generator",
       "kling-video-generator",
       "veo-video-generator",
       "ltx-video-generator",

@@ -41,6 +41,7 @@ from src import accounts as accounts_mod
 from src import (
     ad_results,
     addons,
+    affiliates,
     asset_shelf,
     assistant_store,
     autonomy,
@@ -216,6 +217,7 @@ def init_tables() -> None:
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     plugin_tokens.init()    # editing-app panels' sign-in codes and tokens
+    affiliates.init()       # partners, referrals and held commissions
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
     upload_links.init()     # the connector's one-time upload links, spent once

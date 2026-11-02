@@ -15,6 +15,30 @@
   .zps .zpa {
     display: none;
   }
+  /* ...and so is the room every page keeps clear of it (assistant.css,
+     --zpa-clear, ~170px with the dock up): on a phone it was dead space under
+     the chat box and made Create scroll on its own (2026-10-27) */
+  .zps.zps:has(.zpa) .view::after {
+    display: none;
+  }
+  /* typing anywhere in the studio (the chat, Image, Video, an effect's
+     detail): the tab bar steps aside so what you are typing into sits on
+     the keyboard, as on Higgsfield's mobile site (2026-10-27). Each docked
+     box drops its own offset in its own file. */
+  .zps:has(textarea:focus) .ph-tabs {
+    display: none;
+  }
+  .zps:has(textarea:focus) .shell {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* a tap on a phone text box never zooms the page: iOS zooms into anything
+     under 16px, and Image's, Video's and Effects' boxes were 13-15px. Three
+     classes so it outranks each page's own two-class rule. */
+  .zps.zps.zps input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  .zps.zps.zps textarea,
+  .zps.zps.zps select {
+    font-size: max(16px, 1em);
+  }
   .ph-top {
     position: sticky;
     top: 0;
@@ -355,10 +379,13 @@
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 10px 18px 24px;
+  /* the studio is drawn under the home bar now (viewport-fit: cover), so a
+     sheet at the bottom edge keeps its Done clear of it */
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom));
   border: 1px solid var(--edge);
   border-radius: 28px;
   background: var(--panel);
@@ -552,5 +579,18 @@
     border-radius: 28px 28px 0 0;
     border-bottom: 0;
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+  /* the model list is the sheet's to scroll (2026-10-27): boxed at 300px it
+     stopped at the fourth model with nothing saying there were ten more,
+     so it read as cut off. The sheet scrolls; Done stays at its foot. */
+  .ph-sheet .ph-models {
+    max-height: none;
+    overflow: visible;
+  }
+  .ph-sheet > .ph-go {
+    position: sticky;
+    bottom: env(safe-area-inset-bottom);
+    flex: none;
+    box-shadow: 0 0 0 12px var(--panel);
   }
 }

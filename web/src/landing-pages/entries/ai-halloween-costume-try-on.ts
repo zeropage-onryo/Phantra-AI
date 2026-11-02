@@ -22,6 +22,9 @@
 // and no credit figure (Mike, 2026-10-22); no small wording (2026-10-23):
 // tiles carry no title, tag or meta, the costume names live in the copy.
 //
+// NO "FREE" (Mike, 2026-10-27, "dont say free"): no copy on this page says
+// free, or what a new account's credits buy. The note below is how the two
+// steps work under the hood, kept for whoever revisits it.
 // FREE AND PAID (Mike, 2026-10-27, "do option 1"): the preview is a still
 // on Nano Banana edit (src/effects.py "nano-banana-edit", "keeps faces and
 // identity", priced at pricing.CREDIT_FLOOR), which a new account's one-time
@@ -58,11 +61,26 @@
 // - after: "reframe", "add-sound", "upscale" in src/effects.py; the editor
 //   (src/cut/) exports MP4
 import { COMMERCIAL_FAQ } from "../shared";
-import { PHANTRA } from "../theme";
+import { HALLOWEEN, PHANTRA } from "../theme";
 import type { MakePage, MakeTile } from "../pages";
 
-/** An empty slot: the accent's plate until an example is approved. */
-const slot = (aspect = "9:16"): MakeTile => ({ title: "", tag: "", aspect });
+// MEDIA (2026-10-29, Mike approved each batch): four invented people (no
+// real faces) drawn on Seedream 4.5, costumes put on them with Nano Banana
+// edit (face kept), and five spin-reveal clips on Kling 3 Turbo Pro from
+// the before photos with the Costume Try-On prompt. All of it is in the
+// studio's project 7, "Halloween Costume Try-On page". Stills and posters
+// live in public/make/ai-halloween-costume-try-on/; the MP4s in R2 at
+// site/make/ai-halloween-costume-try-on/ (media.ts). A poster is the clip's
+// last frame, the costume, since the first frame is the plain photo.
+const DIR = "/make/ai-halloween-costume-try-on";
+const still = (name: string): MakeTile => ({ title: "", tag: "", aspect: "9:16", src: `${DIR}/${name}.jpg` });
+const spin = (name: string): MakeTile => ({
+  title: "",
+  tag: "",
+  aspect: "9:16",
+  video: `${DIR}/spin-${name}.mp4`,
+  src: `${DIR}/spin-${name}.jpg`,
+});
 
 // the twelve one-tap costumes, in the card's order (src/costumes.py COSTUMES)
 const COSTUME_IDEAS = [
@@ -98,9 +116,9 @@ export const HALLOWEEN_TRY_ON: MakePage = {
     "Try on any Halloween costume with AI: upload a photo, name the costume, and watch yourself spin into it in a short video. Your face stays yours.",
   h1: "AI Halloween Costume Try-On",
   menu: "Halloween Costume Try-On",
-  subhead: "Preview any costume on your own photo for free, then watch yourself spin into it on video. Your face stays yours.",
+  subhead: "Preview any costume on your own photo, then watch yourself spin into it on video. Your face stays yours.",
   cta: {
-    label: "Try on a costume free",
+    label: "Try on a costume",
     spark: "Edit my attached photo to show me in a vampire costume with a high-collared cape. Keep my face, hair and build; change only the clothes.",
     // the CTA opens the costume card itself: a photo, one tap, Approve
     open: "costume",
@@ -115,29 +133,51 @@ export const HALLOWEEN_TRY_ON: MakePage = {
     order: ["wall", "overview", "features", "howTo", "models", "faq", "related", "final"],
     features: "grid",
   },
-  heroMedia: [slot(), slot(), slot(), slot(), slot()],
+  // SEASON (2026-10-27, Mike: its own tab, spooky for Halloween, "ends the
+  // day after halloween"): the header tab and the pumpkin-and-night look
+  // run Oct 1 to Nov 1 on Eastern time, every year. The page itself stays
+  // up all year in the footer and the /make hub's Seasonal group.
+  season: { start: "10-01", end: "11-01", tab: "Halloween", timeZone: "America/New_York", accent: HALLOWEEN },
+  heroMedia: [spin("vampire"), spin("pirate"), spin("witch"), spin("skeleton"), spin("werewolf")],
+  card: `${DIR}/denim-vampire.jpg`,
   overview: {
     items: [
       {
-        title: "Preview it free.",
-        body: "Tap one of twelve costumes and get a photo of you wearing it, face kept. New accounts start with free credits, enough to try on several costumes before you spend anything.",
+        title: "Preview it first.",
+        body: "Tap one of twelve costumes and get a photo of you wearing it, face kept. Try on as many as you like before you make the video.",
         points: COSTUME_IDEAS,
+        // the before/after slider: drag from the photo to the costume
+        media: still("denim-vampire"),
+        compare: { media: still("before-denim"), label: "Before", mediaLabel: "After" },
       },
       {
         title: "Then watch the reveal.",
         body: "Found the one? Tap Make it a video: you spin once and come back around wearing it, head to toe. Your face, hair and build stay yours; only the clothes change.",
+        media: spin("vampire"),
       },
       {
         title: "Or go full creature.",
         body: `Fourteen one-tap templates turn you into the monster itself. On Kling: ${list(KLING_LOOKS)}. On PixVerse: ${list(PIXVERSE_LOOKS)}.`,
+        media: still("hoodie-werewolf"),
       },
     ],
   },
   wall: {
     title: "Try It On Before You Buy It",
-    tiles: [slot(), slot(), slot(), slot(), slot(), slot(), slot(), slot()],
-    explore: { label: "Try on a costume free", href: "#how" },
-    layout: "bento",
+    tiles: [
+      { ...still("denim-pirate"), prompt: "Show me as a pirate captain: a long burgundy coat with gold buttons, a ruffled shirt and a tricorn hat." },
+      { ...still("couple"), prompt: "Dress us as a couple: me as Frankenstein's bride in a white gown, him as a vampire in a high-collared cape." },
+      { ...still("varsity-zombie-prom"), prompt: "Show me as a zombie prom date in a tattered powder-blue tuxedo with a wilted corsage." },
+      { ...still("hoodie-grim-reaper"), prompt: "Show me as the grim reaper: a long hooded black robe and a tall scythe." },
+      { ...still("varsity-scarecrow"), prompt: "Show me as a scarecrow: a patched plaid shirt, overalls, straw at the cuffs and a battered straw hat." },
+      { ...still("silver-mummy"), prompt: "Wrap me up as a mummy in aged linen bandages, face uncovered." },
+      { ...still("varsity-vampire"), prompt: "Show me as a vampire in a black suit and a cape with a crimson lining." },
+      { ...still("silver-green-witch"), prompt: "Show me as a green witch: an emerald velvet dress, a dark green cape and a tall pointed hat." },
+    ],
+    explore: { label: "Try on a costume", href: "#how" },
+    // showcase (2026-10-29): masonry at each tile's own 9:16 frame; bento
+    // cropped the full-length costumes to landscape and cut off the heads
+    layout: "showcase",
   },
   features: {
     title: "What the Costume Try-On Does",
@@ -184,7 +224,7 @@ export const HALLOWEEN_TRY_ON: MakePage = {
       },
       {
         icon: "edit",
-        title: "Preview free first",
+        title: "Preview first",
         body: "Try a few costumes as photos, keep the one you like, then make the video of that one.",
       },
     ],
@@ -194,7 +234,7 @@ export const HALLOWEEN_TRY_ON: MakePage = {
     items: [
       {
         title: "Costume preview",
-        body: "Nano Banana edit puts the costume on your own photo and keeps your face. The free first step.",
+        body: "Nano Banana edit puts the costume on your own photo and keeps your face. The first step.",
         spark: "Edit my attached photo to show me as a pirate captain. Keep my face, hair and build; change only the clothes.",
       },
       {
@@ -222,7 +262,7 @@ export const HALLOWEEN_TRY_ON: MakePage = {
         body: "Sign in and drop a photo of yourself into the box. Head to toe works best.",
       },
       {
-        title: "Preview it free",
+        title: "Preview it first",
         body: "Tap a costume and see yourself in it in seconds. Try a few.",
       },
       {
@@ -247,9 +287,8 @@ export const HALLOWEEN_TRY_ON: MakePage = {
         a: "The clip starts from your photo and the try-on is written to change only the clothes, keeping your face, hair, skin tone and build. A clear photo of one person, facing the camera, keeps the most of you. Watch the clip before you post it.",
       },
       {
-        q: "Is the costume try-on free?",
-        a: "Previewing a costume as a photo is free with a new account's starter credits, enough for several costumes. The spin-reveal video is a paid render, and its price is on the card before you approve it.",
-        link: { href: "/pricing", label: "See the plans" },
+        q: "Can I try on more than one costume?",
+        a: "Yes. Preview as many costumes as you like as photos, keep the one you love, then make the spin-reveal video of that one.",
       },
       {
         q: "What is the difference between the try-on and the creature effects?",
@@ -275,6 +314,6 @@ export const HALLOWEEN_TRY_ON: MakePage = {
   finalCta: {
     eyebrow: "",
     title: "See yourself in it.",
-    body: "Preview the costume free on your own photo, then make the video of the one you love.",
+    body: "Preview the costume on your own photo, then make the video of the one you love.",
   },
 };

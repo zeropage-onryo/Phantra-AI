@@ -256,7 +256,7 @@ def test_local_tools_are_published_only_when_asked(monkeypatch):
     # research (2026-10-11, src/look_research.py)
     assert {s["name"] for s in specs} == {"find_references", "keep_references", "search_footage",
                                           "create_project", "save_as_project", "load_skill",
-                                          "research_look"}
+                                          "research_look", "what_worked"}
     # keeping a look is offered only where there is a project to keep it
     inside = {s["name"] for s in guide_tools.session(local=True, in_project=True)[0]}
     assert inside - {s["name"] for s in specs} == {"set_project_look"}
