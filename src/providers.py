@@ -157,6 +157,7 @@ def _fixed(value, *, note: str) -> dict:
 
 
 def _fal_models() -> list[dict]:
+    from . import model_menu  # lazy: model_menu reads the tables this module projects
     out = []
     for name, spec in sorted(fal.VIDEO_MODELS.items()):
         low, high = spec["durations"]
@@ -169,7 +170,10 @@ def _fal_models() -> list[dict]:
         takes_resolution = "resolution" in (spec.get("params") or ())
         out.append({
             "id": name,
-            "label": f"{name} ({spec['platform']})",
+            # the public name the pickers and the Library use, never the raw
+            # id and its platform: the Approve button read "kling3-turbo-pro
+            # (kling)" under a line saying Kling 3 Turbo Pro (QA 2026-11-02 T2)
+            "label": model_menu.label_for(name) or name,
             "platform": spec["platform"],
             "available": True,
             "duration": duration,

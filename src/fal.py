@@ -726,8 +726,11 @@ IMAGE_MODELS: dict[str, dict] = {
         "source": "https://fal.ai/models/fal-ai/flux-2-pro",
     },
     "nano-banana-pro": {
-        "label": "Nano Banana Pro (fal)",
-        "note": "Gemini's image model through fal; strong on references and text.",
+        # named by the model, never the host (Mike, 2026-11-02); beside the
+        # direct Gemini route the picker reads it "Nano Banana Pro · alt"
+        # (model_menu.ALT)
+        "label": "Nano Banana Pro",
+        "note": "Gemini's image model on a second route; strong on references and text.",
         "endpoint": "fal-ai/nano-banana-pro",
         "edit": "fal-ai/nano-banana-pro/edit",
         "size": "aspect",

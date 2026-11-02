@@ -70,6 +70,15 @@ export function optionLabel(m: ModelOption): string {
   return m.label;
 }
 
+/** The step card's one button that spends, with its price ON it (Mike's
+    rule: the price sits on the button, never under it or in a picker;
+    QA 2026-11-02 T1): "Approve · Nano Banana · 10 credits". `line` is the
+    model and its price. */
+export function approveText(state: "waiting" | "running" | "done" | "failed", line: string): string {
+  const verb = state === "failed" ? "Approve again" : "Approve";
+  return line ? `${verb} · ${line}` : verb;
+}
+
 /** What the card says under the model: whose pick it is, and why. */
 export function modelLine(step: StepModel, menu: ModelOption[]): string {
   const name = optionOf(menu, step.id)?.label ?? "";

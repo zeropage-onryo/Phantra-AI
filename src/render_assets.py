@@ -113,27 +113,43 @@ def ensure(dsn: Optional[str] = None) -> None:
             db.run_init(lambda: init(dsn), dsn)
 
 
+# Models no table names any more: renders made before a renderer or a
+# slot was retired keep the model's name, not the platform's.
+_RETIRED_NAMES = {"gen4_turbo": "Runway Gen-4 Turbo", "gen4.5": "Runway Gen-4.5",
+                  "seedance2_5": "Seedance 2.5"}
+
+
 def _label(tool: str, model: str) -> str:
+    """The Library's provider: the MODEL that made a render, by the name
+    the pickers print, never the platform that hosted it (Mike's rule).
+    Until QA 2026-11-02 T4 every fal still and effect read "Fal", Kling 4.0
+    read "Kling" and the one Runway clip "Runway": only the video catalog
+    was asked. model_menu.label_for knows the image, video and effect
+    tables, so it is asked first."""
     if tool == "nano":
         return "Nano Banana Pro" if "pro" in model.lower() else "Nano Banana"
-    if tool == "runway":
-        return "Runway"
     if tool == "kit":                  # an app screen drawn from a brand kit (src/kit_screens.py)
         return "Kit screen"
     if tool == "cut":                  # clips joined in the studio (src/cut/join.py)
         # a scene's own assembled cut (src/cut/assemble.file_on_wall)
         return "Final cut" if (model or "").lower() == "final cut" else "Joined clips"
-    # a fal render stores the platform as its tool ("ltx", "kling") and the
-    # catalog key as its model ("ltx2.3"): the wall says the model's public
-    # name, the one /models and the Queue print (2026-09-28). Lazy -- pricing
-    # reaches providers and the ledger, which this module does not need.
+    # Lazy -- model_menu reaches fal, effects and pricing, which this
+    # module does not need at import.
     try:
-        from . import pricing
-        names = {m: name for _, m, name, _ in pricing.CATALOG_MODELS}
+        from . import model_menu
+        named = model_menu.label_for(model)
     except Exception:                                   # noqa: BLE001
-        names = {}
-    if model in names:
-        return names[model]
+        named = None
+    if named:
+        return named
+    if model in _RETIRED_NAMES:
+        return _RETIRED_NAMES[model]
+    if (model or "").startswith("talk-"):              # src/talking_photo.py's clip
+        return "Talking photo"
+    # an id no table knows: on fal (the host of every still and effect)
+    # the id itself, never "Fal"; anywhere else the tool, as it always was
+    if tool == "fal" and model:
+        return model
     return tool.replace("_", " ").title()
 
 
