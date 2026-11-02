@@ -604,6 +604,14 @@ REF2V: dict[str, dict] = {
     "grok1.5": {"endpoint": "xai/grok-imagine-video/v1.5/reference-to-video",
                 "field": "reference_image_urls", "max": 7, "tag": "<IMAGE_{n}>", "tag_from": 0,
                 "resolutions": ("480p", "720p"), "per_image_usd": 0.01},
+    # Wan 3.0 (added 2026-11-02, read off fal's llms.txt for the endpoint
+    # that day): up to 10 pictures as `reference_image_urls`, named in the
+    # prompt by position ("the subject in Image 1"), billed at the same
+    # per-second rate as the image-to-video row ($0.05/$0.10/$0.20). Video
+    # and audio references exist on the endpoint and are not wired.
+    # https://fal.ai/models/alibaba/wan-3.0/reference-to-video/llms.txt
+    "wan3": {"endpoint": "alibaba/wan-3.0/reference-to-video",
+             "field": "reference_image_urls", "max": 10, "tag": "Image {n}", "tag_from": 1},
 }
 
 

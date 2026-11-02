@@ -39,7 +39,7 @@ test('the starters are prompts, not runs', () => {
   }
 });
 
-import { videoResolutions, refsTrimmedLine } from '../src/lib/direct.ts';
+import { videoResolutions } from '../src/lib/direct.ts';
 
 test('with pictures held, only the resolutions the model renders them at are offered', () => {
   const grok = { resolutions: ['480p', '720p', '1080p'], ref_resolutions: ['480p', '720p'] };
@@ -47,11 +47,4 @@ test('with pictures held, only the resolutions the model renders them at are off
   assert.deepEqual(videoResolutions(grok, 'start'), ['480p', '720p', '1080p']);
   assert.deepEqual(videoResolutions({ ...grok, ref_resolutions: null }, 'references'), ['480p', '720p', '1080p']);
   assert.deepEqual(videoResolutions(null, 'references'), []);
-});
-
-test('pictures a new model cannot take are said as they come off', () => {
-  assert.equal(refsTrimmedLine({ label: 'LTX 2.3', max_refs: 0 }, 4), 'LTX 2.3 starts on one picture, so the other 3 were taken off.');
-  assert.equal(refsTrimmedLine({ label: 'Kling 4', max_refs: 4 }, 5), 'Kling 4 holds up to 4 pictures, so the other one was taken off.');
-  assert.equal(refsTrimmedLine({ label: 'Seedance', max_refs: 9 }, 3), '');
-  assert.equal(refsTrimmedLine({ label: 'LTX 2.3', max_refs: 0 }, 1), '');
 });

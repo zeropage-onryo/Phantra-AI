@@ -84,3 +84,29 @@ The Video page takes up to the model's own number of pictures as references (`fa
 Seedance 2.5, Seedance 2.0 / Fast, Kling 4 while its slot is on, Grok 1.5), and each model's own
 prompt cap (`fal.PROMPT_MAX`, 10,000 where the schema sets none). One picture is still a start
 frame unless flipped. Details in `task-vesper-audit-follow-ups.md`, item 1.
+
+## As built later: every picture shown, and a page that opens on one that holds them (2026-11-02)
+
+**From:** Mike, 2026-11-02: "im not allowed to add more that one reference image". The Video page
+opened on LTX 2.3, which takes one start frame, so its picker went single-select and a second
+upload replaced the first; nothing said that five other models hold several.
+
+- **The Video page opens on the cheapest model that holds several pictures**
+  (`direct.opening_video_model`: per second at its opening pick, of the models with
+  `max_refs >= 2`; today Wan 3.0 at $0.10/s against LTX 2.3's $0.08/s). The studio's render
+  default (`providers.default_model`) is unchanged; a person's own last pick still outranks this.
+- **Wan 3.0 holds up to 10 pictures** on `alibaba/wan-3.0/reference-to-video`
+  (`reference_image_urls`, named "Image 1", "Image 2" in the prompt; same per-second rate as its
+  image-to-video row), read off fal's llms.txt for the endpoint that day. A REF2V row, so a timed
+  scene rendered on Wan as one clip is held to its photos too.
+- **The tray takes what the roomiest model holds, whatever is picked** (`trayCap`), on Video and
+  Image. Each picture says what the picked model does with it: Start, its tag, or Unused (dimmed).
+  Only the pictures that reach the model are priced and sent; the rest stay in the tray, so moving
+  back to a model that holds them uses them again.
+- **When some do not reach the model**, one line says so with two buttons: "Use <model> · holds N"
+  (`roomierModel`: the cheapest opening price of the models that hold every picture, else the one
+  that holds most; a click only changes the pick, it never generates) and "Remove the extras".
+  Nothing switches by itself.
+
+Not done: the Effects tab still takes one picture per slot (two slots) though Nano Banana edit and
+Seedream edit take four; Ad Studio holds one product; a talking photo is one photo by design.

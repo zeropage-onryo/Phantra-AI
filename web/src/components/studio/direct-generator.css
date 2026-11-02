@@ -130,6 +130,29 @@
   line-height: 1.4;
   color: var(--text);
 }
+/* some pictures do not reach the picked model (2026-11-02): the line, a
+   model that holds them all, and the way to drop the extras */
+.dg .dg-roomier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.dg .dg-roomier > span {
+  flex: 1 1 100%;
+}
+.dg .dg-linkbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--signal);
+  cursor: pointer;
+}
+.dg .dg-linkbtn:hover {
+  text-decoration: underline;
+}
 .dg .dg-prompt {
   width: 100%;
   min-height: 132px;
@@ -413,6 +436,8 @@
   font-style: normal;
   line-height: 1.2;
   text-transform: uppercase;
+  /* "Image 1" (Wan 3's tag) stays on one line */
+  white-space: nowrap;
 }
 .dg button.dg-tag {
   text-transform: none;

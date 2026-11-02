@@ -109,3 +109,46 @@ test('the prompt names pictures by the model\'s own tags', () => {
   assert.deepEqual(videoRefTags({ ref_tag: '<IMAGE_0>' }, 2), ['<IMAGE_0>', '<IMAGE_1>']);
   assert.deepEqual(videoRefTags({ ref_tag: null }, 2), []);
 });
+
+/* ── every picture shown (2026-11-02) ── */
+import { picturesUsed, videoPicturesLine, roomierModel, trayCap } from '../src/lib/direct.ts';
+
+const LTX = { id: 'ltx2.3', label: 'LTX 2.3', max_refs: 0, credits: 20 };
+const WAN = { id: 'wan3', label: 'Wan 3', max_refs: 10, credits: 24 };
+const GROK = { id: 'grok1.5', label: 'Grok 1.5', max_refs: 7, credits: 34 };
+const SD25 = { id: 'seedance2.5', label: 'Seedance 2.5', max_refs: 30, credits: 114 };
+
+test('how many pictures reach the clip', () => {
+  assert.equal(picturesUsed('none', LTX, 0), 0);
+  assert.equal(picturesUsed('start', LTX, 3), 1);
+  assert.equal(picturesUsed('references', GROK, 3), 3);
+  assert.equal(picturesUsed('references', GROK, 9), 7);
+});
+
+test('the line says which pictures will not reach the model', () => {
+  assert.equal(videoPicturesLine(LTX, 'start', 1), '');
+  assert.equal(videoPicturesLine(LTX, 'start', 3), 'LTX 2.3 starts on the first picture only; the other 2 pictures will not reach it.');
+  assert.equal(videoPicturesLine(LTX, 'start', 2), 'LTX 2.3 starts on the first picture only; the other picture will not reach it.');
+  assert.equal(videoPicturesLine(GROK, 'references', 7), '');
+  assert.equal(videoPicturesLine(GROK, 'references', 9), 'Grok 1.5 holds 7; the last 2 will not reach it.');
+  assert.equal(videoPicturesLine(null, 'start', 4), '');
+});
+
+test('the one-click switch is the cheapest model that holds them all', () => {
+  const menu = [LTX, SD25, GROK, WAN];
+  assert.equal(roomierModel(menu, 3, 'ltx2.3', 2)?.id, 'wan3');
+  assert.equal(roomierModel(menu, 12, 'ltx2.3', 2)?.id, 'seedance2.5');
+  assert.equal(roomierModel(menu, 9, 'grok1.5', 2)?.id, 'wan3');
+  // nothing holds more than the picked one: no offer
+  assert.equal(roomierModel(menu, 40, 'seedance2.5', 2), null);
+  // none holds all of them: the one that holds the most
+  assert.equal(roomierModel([LTX, GROK, WAN], 40, 'ltx2.3', 2)?.id, 'wan3');
+  // a still model with no references gets any model that takes one
+  assert.equal(roomierModel([{ id: 'ideo', max_refs: 0, credits: 10 }, { id: 'nano', max_refs: 12, credits: 10 }], 2, 'ideo')?.id, 'nano');
+});
+
+test('the tray takes what the roomiest model holds', () => {
+  assert.equal(trayCap([LTX, GROK, WAN], 12), 10);
+  assert.equal(trayCap([LTX], 12), 1);
+  assert.equal(trayCap([], 12), 12);
+});
