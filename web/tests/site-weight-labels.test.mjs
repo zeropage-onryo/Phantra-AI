@@ -31,7 +31,10 @@ test('a fan hero plays one clip; the others are stills', () => {
   const hero = read('landing-pages/components/make-hero.tsx');
   assert.match(hero, /function Media\([^)]*still/);
   const fan = hero.slice(hero.indexOf('function FanHero'), hero.indexOf('function ReelHero'));
-  assert.match(fan, /<Media[^>]*still=\{i !== 1\}/);
+  // the top card plays: the last one drawn, the only one fully in view
+  assert.match(fan, /<Media[^>]*still=\{i !== media\.length - 1\}/);
+  // the Halloween tiles have no titles, so a title is not a key
+  assert.doesNotMatch(fan, /key=\{tile\.title\}/);
 });
 
 test('the site header shows a focus ring, never the red one', () => {
