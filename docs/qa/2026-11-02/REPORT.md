@@ -20,7 +20,7 @@ Credits before → after: workspace 5 (`/mcp/claude`) **343 → 343**, workspace
 throwaway backend accounts only moved inside the stubbed ledger test, as designed (03).
 
 **Suites on `8ba89087`** (00): ruff clean; web `node --test` 439/439, typecheck and build pass;
-pytest — see `00-baseline.md` for the count.
+pytest **5,127 passed, 5 xfailed, 0 failed** (53 min, serial as CI).
 
 ## Top 10 issues (by severity, then by reach)
 

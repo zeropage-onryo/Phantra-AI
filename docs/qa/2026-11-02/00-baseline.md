@@ -37,4 +37,20 @@ install otherwise imports `src`/`app` from the main checkout, which holds Mike's
 edits). Web: a separate detached worktree of `origin/main` so the build's `.next` cannot collide
 with Agent B's dev server.
 
-(Results filled in below when the runs finish.)
+| Suite | Result | Time |
+|---|---|---|
+| `ruff check .` | **All checks passed** (also clean on `docs/qa/2026-11-02/*.py`) | — |
+| `python -m pytest tests/ -q` | **5,127 passed, 5 xfailed, 0 failed** (18 Pillow `getdata` deprecation warnings in `tests/test_kit_screens.py`) | 53 min 29 s (16:14 → 17:07 UTC, Mac shared with five agents) |
+| `npm ci` | ok | — |
+| `node --test tests/*.test.mjs` | **439 passed, 0 failed** | — |
+| `npm run typecheck` | ok | — |
+| `npm run build` | ok | — |
+
+No failures, so no `test_env_posture` / local-only triage was needed.
+
+## Credits after every agent finished (17:00 UTC)
+
+| Listing | Workspace | Before | After |
+|---|---|---|---|
+| `/mcp/claude` | 5 | 343 available, 0 held | **343 available, 0 held** |
+| `/mcp` | 1 | 8,133 available, 0 held | **8,133 available, 0 held** |
