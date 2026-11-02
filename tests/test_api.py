@@ -1237,7 +1237,7 @@ def test_a_sheet_that_cannot_start_says_why(tmp_db, tmp_path, monkeypatch,
     monkeypatch.setattr(api_mod, "CHARACTERS_DIR", tmp_path / "characters")
     monkeypatch.setattr(api_mod, "_mirror_photos_to_r2", lambda *a, **k: None)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda a=None: None)
-    res = client.post("/api/assets/characters", data={"name": "A"},
+    res = client.post("/api/assets/characters", data={"name": "A", "sheet": "1"},
                       files=[("photos", ("a.jpg", b"x", "image/jpeg"))])
     assert res.json()["sheet_job"] is None and "GEMINI_API_KEY" in res.json()["sheet_note"]
     res = client.post("/api/assets/characters", data={"name": "B", "sheet": "0"},

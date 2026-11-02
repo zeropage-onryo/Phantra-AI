@@ -321,8 +321,8 @@ def test_the_same_name_again_adds_the_photo_and_never_a_second_element(world):
 
 
 def test_a_place_is_listed_even_when_it_could_not_be_described(world, monkeypatch):
-    """The page leaves an undescribed place's photos for a later describe
-    and records no row. A connector's caller needs the ref now."""
+    """A connector's caller needs the ref now, and since QA 2026-11-02 E6
+    the page's own create lists the place too."""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     out = _add(world, "a", "location", "The Hallway", world["render"](world["a"], 3))
@@ -330,11 +330,12 @@ def test_a_place_is_listed_even_when_it_could_not_be_described(world, monkeypatc
     assert out["photo"]["ref"].startswith("/locations/the-hallway/photo/add-")
     assert preprod.get_location_by_name("the-hallway", dsn=world["dsn"],
                                         account_id=world["a"]) is not None
-    # and the page's own behaviour is untouched: saved, no row
+    # and the page's own create: saved AND listed (it used to leave no row,
+    # so the Elements list never showed the place)
     api.create_element("location", "Garage", account_id=world["a"],
                        uploads=[("a.png", _png())])
     assert preprod.get_location_by_name("garage", dsn=world["dsn"],
-                                        account_id=world["a"]) is None
+                                        account_id=world["a"]) is not None
 
 
 @pytest.mark.parametrize("kind, name, source, why", [
