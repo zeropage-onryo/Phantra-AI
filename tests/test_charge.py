@@ -90,8 +90,10 @@ def test_an_empty_balance_is_refused_before_anything_is_submitted(studio, tmp_pa
 def test_a_render_holds_then_settles_at_the_charge_linked_to_its_row(studio, tmp_path, monkeypatch):
     monkeypatch.setattr(fal, "RENDER_DIR", tmp_path / "renders")
     ledger.grant(studio["account_id"], 1000, "purchase", dsn=studio["dsn"])
-    price = ledger.charge_credits(fal.estimate_cost(1))
-    assert price == pricing.credits_for(pricing.usd_micros(fal.estimate_cost(1)))
+    # the default model (LTX 2.3) carries its own markup (2.0x since 2026-11-02)
+    price = ledger.charge_credits(fal.estimate_cost(1), model=fal.DEFAULT_MODEL)
+    assert price == pricing.credits_for(pricing.usd_micros(fal.estimate_cost(1)),
+                                        model=fal.DEFAULT_MODEL)
 
     result = fal.generate_from_prompt(PROMPT, db_path=studio["dsn"],
                                          account_id=studio["account_id"])
