@@ -91,6 +91,7 @@ from src.cut import store as cut_store
 from . import (
     api,
     auth,
+    cross_site,
     jobs,
     mcp_auth,
     mcp_mount,
@@ -412,6 +413,10 @@ app.add_middleware(SessionMiddleware, secret_key=auth._session_secret(),
 # The sign-in, consent and upload pages are never framed (clickjacking;
 # security review S10, 2026-10-15).
 app.add_middleware(security_headers.NoFraming)
+# A write made with the session cookie from another site's page is
+# refused before any route runs (QA 2026-11-02 E1; app/cross_site.py).
+# Added before CORS so CORS stays outermost and its headers reach a 403.
+app.add_middleware(cross_site.CrossSiteWrites)
 # Cross-origin access for a separate frontend (the Next.js app). Its
 # fetches are credentialed (the phantra_session cookie), so the allow-list must
 # be explicit origins -- a wildcard is illegal with credentials -- and

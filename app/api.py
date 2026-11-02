@@ -25,7 +25,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -7948,8 +7948,21 @@ def concept_deny(concept_id: int, body: DenyBody, account_id: int = Depends(auth
 
 # --- evals ------------------------------------------------------------------
 
+def eval_operator(request: Request,
+                  account_id: int = Depends(auth.current_account_id)) -> int:
+    """The eval golden set and its runs are SHARED tables graded on the
+    operator's Gemini key, so only an owner of the house account reaches
+    them here (QA 2026-11-02 E2: any customer could list, add to and
+    delete the set, and start a billed run). The dev console's twins
+    (app/main.py, DEV_TOOLS) call these functions directly and skip it."""
+    if account_id is None or whats_new_routes._operator(request, account_id) is None:
+        raise HTTPException(403, "The eval set is the operator's.")
+    return account_id
+
+
 @router.get("/evals/golden")
-def evals_golden(account_id: int = Depends(auth.current_account_id)):
+def evals_golden(account_id: int = Depends(auth.current_account_id),
+                 _op: int = Depends(eval_operator)):
     return {"items": evalstore.list_golden()}
 
 
@@ -7960,7 +7973,8 @@ class GoldenBody(BaseModel):
 
 
 @router.post("/evals/golden")
-def evals_golden_add(body: GoldenBody, account_id: int = Depends(auth.current_account_id)):
+def evals_golden_add(body: GoldenBody, account_id: int = Depends(auth.current_account_id),
+                     _op: int = Depends(eval_operator)):
     try:
         golden_id = evalstore.add_golden(body.query, body.relevant,
                                          source=body.source)
@@ -7970,18 +7984,21 @@ def evals_golden_add(body: GoldenBody, account_id: int = Depends(auth.current_ac
 
 
 @router.delete("/evals/golden/{golden_id}")
-def evals_golden_delete(golden_id: int, account_id: int = Depends(auth.current_account_id)):
+def evals_golden_delete(golden_id: int, account_id: int = Depends(auth.current_account_id),
+                        _op: int = Depends(eval_operator)):
     evalstore.delete_golden(golden_id)
     return {"deleted": golden_id}
 
 
 @router.get("/evals/runs")
-def evals_runs(account_id: int = Depends(auth.current_account_id)):
+def evals_runs(account_id: int = Depends(auth.current_account_id),
+               _op: int = Depends(eval_operator)):
     return {"items": evalstore.list_runs()}
 
 
 @router.get("/evals/runs/{run_id}")
-def evals_run_detail(run_id: int, account_id: int = Depends(auth.current_account_id)):
+def evals_run_detail(run_id: int, account_id: int = Depends(auth.current_account_id),
+                     _op: int = Depends(eval_operator)):
     run = evalstore.get_run(run_id)
     if run is None:
         return _error(404, "not_found", "no such run")
@@ -7993,7 +8010,8 @@ class EvalRunBody(BaseModel):
 
 
 @router.post("/evals/run")
-def evals_run(body: EvalRunBody, account_id: int = Depends(auth.current_account_id)):
+def evals_run(body: EvalRunBody, account_id: int = Depends(auth.current_account_id),
+              _op: int = Depends(eval_operator)):
     """Compare one-shot retrieval with the complete CRAG retry path.
 
     Every metric is computed server-side and stored with the exact golden

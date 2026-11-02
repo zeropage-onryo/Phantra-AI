@@ -850,7 +850,16 @@ def test_shot_generate_surfaces_render_failure(tmp_db, monkeypatch):
 
 # --- evals ------------------------------------------------------------------
 
-def test_golden_crud_and_seed(tmp_db):
+@pytest.fixture
+def eval_operator():
+    """The /api/evals routes take only the house account's owners
+    (api.eval_operator; tests/test_evals_operator.py checks the refusal)."""
+    app.dependency_overrides[api_mod.eval_operator] = lambda: None
+    yield
+    app.dependency_overrides.pop(api_mod.eval_operator, None)
+
+
+def test_golden_crud_and_seed(tmp_db, eval_operator):
     items = client.get("/api/evals/golden").json()["items"]
     assert items, "init should seed the golden set from eval_cases.json"
     new_id = client.post("/api/evals/golden", json={
@@ -863,7 +872,7 @@ def test_golden_crud_and_seed(tmp_db):
     assert "backlit rocks glass" not in queries
 
 
-def test_eval_run_computes_and_stores_metrics(tmp_db, monkeypatch):
+def test_eval_run_computes_and_stores_metrics(tmp_db, monkeypatch, eval_operator):
     for g in evalstore.list_golden(dsn=tmp_db):
         evalstore.delete_golden(g["id"], dsn=tmp_db)
     evalstore.add_golden("find the brief", ["prompts/brief.txt"], dsn=tmp_db)
@@ -915,7 +924,7 @@ def test_eval_run_computes_and_stores_metrics(tmp_db, monkeypatch):
     assert detail["library_fingerprint"]
 
 
-def test_eval_run_refuses_empty_golden_set(tmp_db):
+def test_eval_run_refuses_empty_golden_set(tmp_db, eval_operator):
     for g in evalstore.list_golden(dsn=tmp_db):
         evalstore.delete_golden(g["id"], dsn=tmp_db)
     assert client.post("/api/evals/run", json={}).status_code == 400
