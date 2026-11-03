@@ -90,13 +90,15 @@ def _label(model: str) -> str:
 def video_menu(account_id: Optional[int] = None) -> dict:
     """{"ready", "items": [{id, label, note, seconds (the axis), resolutions,
     resolution, aspects, aspect, credits, prompt_max, max_refs, ref_tag,
-    ref_resolutions}], "default", "exempt"} -- every advertised clip model
+    ref_resolutions, camera}], "camera", "default", "exempt"} -- every advertised clip model
     with what it can be asked for and what its opening pick costs.
     `max_refs` 0 is a model that takes one start frame only; `ref_tag` is how
     the prompt names the first picture ("@Image1"); `ref_resolutions` is
-    None where references render every resolution. `ready` False (no
+    None where references render every resolution. `camera` (top level) is
+    the Camera move and Lens cards' contents, and per item the moves that
+    model takes exactly or by reference clip (camera.menu_for). `ready` False (no
     renderer key) lists nothing."""
-    from . import fal, ledger, providers
+    from . import camera, fal, ledger, providers
 
     exempt = _exempt(account_id)
     if not fal.has_key(account_id):
@@ -128,8 +130,10 @@ def video_menu(account_id: Optional[int] = None) -> dict:
             "ref_tag": (fal.ref_tags(model, 1) or [None])[0],
             "ref_resolutions": (list((fal.ref_spec(model) or {}).get("resolutions") or ())
                                 or None),
+            # how the Camera move card reaches this model (src/camera.py)
+            "camera": camera.menu_for(model),
         })
-    return {"ready": True, "items": items,
+    return {"ready": True, "items": items, "camera": camera.catalogue(),
             "default": opening_video_model(items, per_second, providers.default_model("fal")),
             "exempt": exempt}
 
@@ -279,3 +283,26 @@ def _exempt(account_id: Optional[int]) -> bool:
         return bool(ledger.credit_exempt(account_id))
     except Exception:                                   # noqa: BLE001
         return False
+
+
+def dress_video(prompt: str, model: str, form_get, *, start_frame: bool,
+                resolution: Optional[str]) -> dict:
+    """The Video page's Camera move and Lens picks (`camera_move`,
+    `lens_focal`, `lens_aperture`, `lens_look` on the form) placed into the
+    prompt for the model (camera.dress). ValueError on a pick off the
+    table, two picks that contradict, or a dressed prompt past the model's
+    cap (refused, never cut)."""
+    from . import camera, fal
+
+    def pick(name):
+        return (str(form_get(name) or "").strip() or None)
+
+    out = camera.dress(prompt, model, move_id=pick("camera_move"), focal=pick("lens_focal"),
+                       aperture=pick("lens_aperture"), look=pick("lens_look"),
+                       start_frame=start_frame, resolution=resolution)
+    cap = fal.prompt_max(model)
+    if len(out["prompt"]) > cap:
+        extra = len(out["prompt"]) - len(prompt)
+        raise ValueError(f"the camera and lens lines take {extra} characters and "
+                         f"{_label(model)} takes up to {cap}: shorten the prompt")
+    return out

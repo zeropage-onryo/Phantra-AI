@@ -1213,3 +1213,100 @@
 .dg .dgv-pins {
   padding: 2px 0 6px;
 }
+
+/* ── the Camera move and Lens cards (2026-11-03, lib/camera.ts) ── */
+.dg .dgv-camchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dg .dgv-camchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 3px 4px 3px 4px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--raise);
+  color: var(--bone-2);
+  font-size: 12px;
+}
+.dg .dgv-camchip > b {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--well);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+}
+.dg .dgv-camchip > b[data-mode="Exact"],
+.dg .dgv-camchip > b[data-mode="Reference clip"] {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.dg .dgv-camchip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg .dgv-camchip > button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone-3);
+}
+.dg .dgv-camchip > button:hover {
+  background: var(--well);
+  color: var(--text);
+}
+.dg .dgv-camchip > button svg {
+  width: 13px;
+  height: 13px;
+}
+.dg .dgv-lens {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.dg .dgv-lens-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px;
+}
+.dg .dgv-lens-name {
+  color: var(--bone-3);
+  font-size: 11.5px;
+}
+.dg .dgv-lens-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dg .dgv-lens-row > button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r1);
+  background: transparent;
+  color: var(--bone-2);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.dg .dgv-lens-row > button:hover {
+  border-color: var(--edge-hi);
+}
+.dg .dgv-lens-row > button[aria-pressed="true"] {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+}

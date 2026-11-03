@@ -1,0 +1,58 @@
+{
+  "_about": "The Video page's Camera move and Lens cards (2026-11-03, Mike; docs/tasks/task-camera-lens.md). Every line here is what reaches the model, read by src/camera.py. Moves are written by their relationship to the subject (LTX's own advice, prompts/models/ltx.md 7) and one per clip (Seedance: 'one camera movement per shot', prompts/models/seedance.md 7). Lens words describe what the lens DOES to the picture, never only a number: no video model has a lens setting, and Veo's guide names lens by effect (shallow depth of field, wide-angle, macro, deep focus; prompts/models/veo.md 3). `ltx` is the value LTX 2.5's own camera_motion takes (fal schema, read 2026-11-03). `clip` is the R2 key of Mike's own reference clip of the move; null until he shoots it.",
+  "moves": [
+    {"id": "static", "label": "Locked off", "ltx": "static", "clip": null,
+     "words": "The camera is locked off on a tripod and does not move."},
+    {"id": "push_in", "label": "Push in", "ltx": "dolly_in", "clip": null,
+     "words": "The camera slowly dollies in toward the subject, ending on a medium close-up."},
+    {"id": "pull_out", "label": "Pull out", "ltx": "dolly_out", "clip": null,
+     "words": "The camera slowly dollies back from the subject, revealing the space around it."},
+    {"id": "truck_left", "label": "Truck left", "ltx": "dolly_left", "clip": null,
+     "words": "The camera trucks left, moving sideways and staying parallel to the subject."},
+    {"id": "truck_right", "label": "Truck right", "ltx": "dolly_right", "clip": null,
+     "words": "The camera trucks right, moving sideways and staying parallel to the subject."},
+    {"id": "crane_up", "label": "Crane up", "ltx": "jib_up", "clip": null,
+     "words": "The camera cranes up from eye level and rises above the subject, tilting down to keep it in frame."},
+    {"id": "crane_down", "label": "Crane down", "ltx": "jib_down", "clip": null,
+     "words": "The camera cranes down from above and settles at the subject's eye level."},
+    {"id": "rack_focus", "label": "Rack focus", "ltx": "focus_shift", "clip": null,
+     "words": "The camera holds still while the focus pulls from the foreground to the subject."},
+    {"id": "orbit", "label": "Orbit", "ltx": null, "clip": null,
+     "words": "The camera orbits in a smooth half circle around the subject, keeping it centered."},
+    {"id": "dolly_zoom", "label": "Dolly zoom", "ltx": null, "clip": null,
+     "words": "Dolly zoom: the camera dollies in while zooming out, so the subject stays the same size and the background stretches behind it."},
+    {"id": "whip_pan", "label": "Whip pan", "ltx": null, "clip": null,
+     "words": "The camera whip pans fast off the subject with strong motion blur."},
+    {"id": "fpv", "label": "FPV fly-through", "ltx": null, "clip": null,
+     "words": "FPV drone shot: the camera flies fast and low through the space and arrives at the subject."}
+  ],
+  "focal": {
+    "14": {"label": "14mm", "words": "ultra-wide-angle view with exaggerated perspective and stretched edges"},
+    "24": {"label": "24mm", "words": "wide-angle view that shows the surroundings"},
+    "35": {"label": "35mm", "words": "natural 35mm field of view"},
+    "50": {"label": "50mm", "words": "natural perspective, close to how the eye sees"},
+    "85": {"label": "85mm", "words": "portrait-lens look with flattering compression"},
+    "135": {"label": "135mm", "words": "telephoto compression that pulls the background close"},
+    "macro": {"label": "Macro", "words": "macro close-up where fine surface detail fills the frame"}
+  },
+  "aperture": {
+    "f1.4": {"label": "f/1.4", "words": "very shallow depth of field, the background melted into soft bokeh"},
+    "f2.8": {"label": "f/2.8", "words": "shallow depth of field, the background softly out of focus"},
+    "f5.6": {"label": "f/5.6", "words": "moderate depth of field"},
+    "f11": {"label": "f/11", "words": "deep focus, foreground and background both sharp"}
+  },
+  "looks": {
+    "anamorphic": {"label": "Anamorphic", "words": "anamorphic lens with horizontal flares and oval bokeh"},
+    "vintage": {"label": "Vintage glass", "words": "vintage lens softness with gentle glow"},
+    "halation": {"label": "Halation", "words": "film halation glowing around the highlights"},
+    "diffusion": {"label": "Diffusion", "words": "soft diffusion filter blooming the highlights"},
+    "grain": {"label": "Film grain", "words": "fine film grain"}
+  },
+  "conflicts": [
+    ["rack_focus", "f11", "Rack focus needs a shallow focus, and f/11 keeps everything sharp."],
+    ["dolly_zoom", "macro", "A dolly zoom needs room to move, and macro is inches from the subject."]
+  ],
+  "_placement_about": "Where the camera line goes, by model family, from each vendor's own order: Veo leads with cinematography (veo.md 3, 'Conflicts'), Seedance writes the camera move first inside a shot (seedance.md 6); LTX wants the action first with the camera woven in after (ltx.md 'Order'), Kling puts camera after subject, action and scene (kling.md 3). Unlisted families take the tail.",
+  "placement": {"veo": "lead", "seedance": "lead", "ltx": "tail", "kling": "tail", "wan": "tail", "grok": "tail"},
+  "clip_line": "Use {tag} as the camera movement reference only: follow its camera path and speed, and take nothing else from it (not its subject, set, light or look)."
+}

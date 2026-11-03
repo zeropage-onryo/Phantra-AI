@@ -27,7 +27,11 @@ What a signed-in person has:
   button; a clip may be made from text alone, one start frame, or (on Seedance, Kling 4 and
   Grok 1.5, 2026-10-25; Wan 3, 2026-11-02) several pictures held as references and named in the prompt by tag
   (`fal.REF2V`), each model's prompt held to its own cap (`fal.PROMPT_MAX`), and writes no
-  scene (`docs/tasks/task-direct-generators.md`).
+  scene (`docs/tasks/task-direct-generators.md`). The Video dock's **Camera move** and **Lens**
+  chips (2026-11-03, `src/camera.py`, `prompts/camera.json`, `docs/tasks/task-camera-lens.md`):
+  a move is LTX 2.5's own `camera_motion` where it has one ("Exact"), else fixed words placed
+  where the model's vendor puts them ("Guided"); lens is always words; a reference clip of the
+  move (@Video1 on Seedance, fal only) is wired and OFF until `PHANTRA_CAMERA_CLIPS=1`.
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
   work. A brand lives inside a project, never studio-wide.
 - **Ad Studio** (`/studio/ads`, 2026-10-26, `docs/tasks/task-ad-studio.md`): a page over the one

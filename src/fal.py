@@ -179,6 +179,13 @@ def _price_env(key: str, prices: dict[str, float]) -> dict[str, float]:
 # `duration_wire` is how the value travels: fal's enums are strings ("6"),
 # Veo's carry a unit ("8s"), Wan's field is a plain integer.
 # `image_field` is the i2v field name when it is not `image_url`.
+# LTX 2.5's own camera setting (both tiers, both doors), read off fal's
+# schemas 2026-11-03. The one clip model with a camera field; every other
+# move reaches a model as words (src/camera.py).
+CAMERA_MOTIONS_LTX25 = ("dolly_in", "dolly_out", "dolly_left", "dolly_right",
+                        "jib_up", "jib_down", "static", "focus_shift")
+
+
 VIDEO_MODELS: dict[str, dict] = {
     # $0.06/s at 1080p makes this the cheapest real clip in the repo, which
     # is why it is DEFAULT_MODEL. NOTE: there is no 720p tier -- 1080p is
@@ -222,8 +229,10 @@ VIDEO_MODELS: dict[str, dict] = {
     # picture by default (`generate_audio: true`) and is in the rate. Fast:
     # 6-20 s in even steps, 720p $0.09/s, 1080p $0.13, 1440p $0.19, 2160p
     # $0.30. Pro: 6/8/10 s, 720p $0.12/s, 1080p $0.17. Duration is an INT
-    # enum on the wire (2.3's lesson). camera_motion, fps and end_image_url
-    # exist and are not wired. 2.3 stays the platform default: at $0.06/s
+    # enum on the wire (2.3's lesson). fps and end_image_url exist and are
+    # not wired; camera_motion is (2026-11-03, src/camera.py: the Video
+    # page's Camera move card), its eight values read off both tiers'
+    # schemas that day. 2.3 stays the platform default: at $0.06/s
     # for 1080p it is still the cheapest credible LTX. Both 2.5 tiers default
     # to 720p, the house rule wherever a model offers it.
     "ltx2.5-fast": {
@@ -236,6 +245,7 @@ VIDEO_MODELS: dict[str, dict] = {
         "resolutions": ("720p", "1080p", "1440p", "2160p"),
         "default_resolution": "720p",
         "prices": {"720p": 0.09, "1080p": 0.13, "1440p": 0.19, "2160p": 0.30},
+        "camera_motions": CAMERA_MOTIONS_LTX25,
         "platform": "ltx",
         "checked": "2026-10-08",
         "source": "https://fal.ai/models/lightricks/ltx-2.5/text-to-video/fast",
@@ -250,6 +260,7 @@ VIDEO_MODELS: dict[str, dict] = {
         "resolutions": ("720p", "1080p"),
         "default_resolution": "720p",
         "prices": {"720p": 0.12, "1080p": 0.17},
+        "camera_motions": CAMERA_MOTIONS_LTX25,
         "platform": "ltx",
         "checked": "2026-10-08",
         "source": "https://fal.ai/models/lightricks/ltx-2.5/text-to-video/pro",
@@ -618,17 +629,25 @@ def prompt_max(model: str) -> int:
 # REFERENCE-TO-VIDEO (2026-10-25, the render test: Higgsfield's best clip was
 # held to three pictures -- a storyboard, the character and the real app
 # screens -- and our Video door took one start frame). Read that day off each
-# endpoint's queue schema and model page; images only (video and audio
-# references exist and are not wired). The person names a picture in the
+# endpoint's queue schema and model page; pictures from the person (audio
+# references exist and are not wired). Video references are wired for ONE
+# use, 2026-11-03: the camera move's reference clip (src/camera.py) --
+# `video_field` / `video_max` read off the 2.5 and 2.0 schemas that day
+# (2.5: up to 10 clips of 1.8-30.2 s, 30.2 s in all; 2.0: up to 3, 2-15 s
+# in all, 480-720p), named @Video1.. in the prompt. Kling 4.0 takes
+# video_urls too, but its page does not say it follows a reference's
+# camera, so it lists none. The person names a picture in the
 # prompt by its tag (`tag`, numbered from `tag_from`). Every row is the
 # model's own per-second price; Grok adds $0.01 a picture and renders 480p or
 # 720p only with references. Kling 4.0's row counts only while its slot is
 # on VIDEO_MODELS.
 REF2V: dict[str, dict] = {
     "seedance2.5": {"endpoint": "bytedance/seedance-2.5/reference-to-video",
-                    "field": "image_urls", "max": 30, "tag": "@Image{n}", "tag_from": 1},
+                    "field": "image_urls", "max": 30, "tag": "@Image{n}", "tag_from": 1,
+                    "video_field": "video_urls", "video_max": 10},
     "seedance2": {"endpoint": "bytedance/seedance-2.0/reference-to-video",
-                  "field": "image_urls", "max": 9, "tag": "@Image{n}", "tag_from": 1},
+                  "field": "image_urls", "max": 9, "tag": "@Image{n}", "tag_from": 1,
+                  "video_field": "video_urls", "video_max": 3},
     "seedance2-fast": {"endpoint": "bytedance/seedance-2.0/fast/reference-to-video",
                        "field": "image_urls", "max": 9, "tag": "@Image{n}", "tag_from": 1},
     "kling4": {"endpoint": "kling/v4/reference-to-video",
@@ -1163,7 +1182,9 @@ def build_body(prompt: str, *, model: str = DEFAULT_MODEL,
                aspect_ratio: str = DEFAULT_ASPECT,
                resolution: Optional[str] = None,
                negative_prompt: str = "",
-               reference_urls=None) -> tuple[str, dict]:
+               reference_urls=None,
+               reference_videos=None,
+               camera_motion: Optional[str] = None) -> tuple[str, dict]:
     """(model_id, json body) for one render -- pure, so the entire request
     shape is testable without spending a cent.
 
@@ -1180,12 +1201,30 @@ def build_body(prompt: str, *, model: str = DEFAULT_MODEL,
     these models derive the frame from the image, and a 16:9 default
     arriving beside a 9:16 still is either ignored (best case) or obeyed
     (a letterboxed clip nobody asked for).
+
+    `reference_videos` (2026-11-03) ride in the REF2V row's `video_field`,
+    pictures or not -- the camera move's reference clip. `camera_motion`
+    goes only to a model whose row lists it (`camera_motions`, LTX 2.5); a
+    value off that list is REFUSED.
     """
     spec = model_spec(model)
     model_id = spec["i2v"] if image_url else spec["t2v"]
     allowed = spec["params"]
     body: dict = {"prompt": prompt}
     refs = list(reference_urls or [])
+    videos = list(reference_videos or [])
+    if camera_motion is not None and camera_motion not in (spec.get("camera_motions") or ()):
+        raise ValueError(f"{model} has no camera setting {camera_motion!r}")
+    if videos:
+        ref = ref_spec(model)
+        if not ref or not ref.get("video_field"):
+            raise ValueError(f"{model} takes no video references")
+        if image_url:
+            raise ValueError("a start frame or references, not both")
+        if len(videos) > ref["video_max"]:
+            raise ValueError(f"{model} takes up to {ref['video_max']} video references")
+        model_id = ref["endpoint"]
+        body[ref["video_field"]] = videos
     if refs:
         # REFERENCES, not a start frame (REF2V): the model's own endpoint and
         # field. The frame is still the person's pick -- pictures held for
@@ -1209,6 +1248,8 @@ def build_body(prompt: str, *, model: str = DEFAULT_MODEL,
         body["resolution"] = resolution or spec["default_resolution"]
     if "negative_prompt" in allowed and negative_prompt:
         body["negative_prompt"] = negative_prompt
+    if camera_motion is not None:
+        body["camera_motion"] = camera_motion
     return model_id, body
 
 
@@ -1675,7 +1716,9 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
                    account_id: Optional[int] = None,
                    charge: Optional[charging.Charge] = None,
                    track: Optional[dict] = None,
-                   reference_urls=None) -> Path:
+                   reference_urls=None,
+                   reference_videos=None,
+                   camera_motion: Optional[str] = None) -> Path:
     """
     The thin wrapper: submit -> poll -> fetch -> download. Raises on
     anything, including a missing spend approval, which is checked HERE so
@@ -1710,6 +1753,12 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
     if host == "replicate" and not replicate.has_token():
         raise RuntimeError("REPLICATE_API_TOKEN not set: this render is priced on Replicate "
                            "(set PHANTRA_REPLICATE=0 to render and price it on fal)")
+    # A video reference (the camera move's clip, 2026-11-03) is fal's field
+    # only: Replicate prices Seedance "with no video input" and its input
+    # has no twin for it. Refused before any hold, never dropped.
+    if host == "replicate" and reference_videos:
+        raise RuntimeError("a camera reference clip renders on fal only: pick 1080p, "
+                           "or set PHANTRA_REPLICATE=0")
     # Name-swap first, THEN build the body: what we check has to be what
     # we send.
     prompt = safe_prompt(prompt, db_path, account_id)
@@ -1717,7 +1766,9 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
                                 duration=duration, aspect_ratio=aspect_ratio,
                                 resolution=resolution,
                                 negative_prompt=negative_prompt,
-                                reference_urls=reference_urls)
+                                reference_urls=reference_urls,
+                                reference_videos=reference_videos,
+                                camera_motion=camera_motion)
     out_path = Path(out_path)
     submit_url = None
     if host == "replicate":
@@ -2368,7 +2419,9 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                          aspect_ratio: Optional[str] = None,
                          source: str = "workflow", bank: bool = False,
                          project_id: Optional[int] = None,
-                         references=None) -> dict:
+                         references=None,
+                         reference_videos=None,
+                         camera_motion: Optional[str] = None) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error"}.
     The free-standing render behind the Director canvas's Generate node.
@@ -2388,6 +2441,9 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
     it does), and the result then carries no asset_id. `project_id`
     (2026-10-08) files the clip under a project -- on the row's params and
     so on the Assets wall's metadata -- for a render no scene carries.
+    `reference_videos` / `camera_motion` (2026-11-03) are the Video page's
+    Camera move (src/camera.py), sent as given (build_body refuses a value
+    the model does not take).
     """
     kwargs = {"dsn": db_path} if db_path is not None else {}
 
@@ -2437,6 +2493,8 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                        **brand_kits.provenance(kit),
                        "prompt_image": bool(image_url),
                        **({"references": len(ref_urls)} if ref_urls else {}),
+                       **({"camera_motion": camera_motion} if camera_motion else {}),
+                       **({"reference_videos": len(reference_videos)} if reference_videos else {}),
                        "key_source": key_source,
                        **fal_requests.ref_params(charge.ref)}
         track = {"kind": "row", "platform": platform, "prompt": prompt,
@@ -2460,6 +2518,8 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                            http=http, db_path=db_path, approved=approved,
                            account_id=account_id, charge=charge, track=track,
                            **({"reference_urls": ref_urls} if ref_urls else {}),
+                           **({"reference_videos": list(reference_videos)} if reference_videos else {}),
+                           **({"camera_motion": camera_motion} if camera_motion else {}),
                            **({"duration": seconds} if duration is not None else {}),
                            **({"resolution": resolution} if resolution else {}),
                            **({"aspect_ratio": aspect_ratio} if aspect_ratio else {}))
