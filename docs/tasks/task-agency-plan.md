@@ -48,15 +48,17 @@ Creatify; re-check the vendors' own pages before changing a price.)
 
 ## Mike's steps before it sells
 
-1. In Stripe: a product "Agency", Prices $199/month and $1,910/year.
-2. `fly secrets set STRIPE_PRICE_AGENCY=price_... STRIPE_PRICE_AGENCY_YEAR=price_... -a phantra-api`
-   and the same on Vercel if the site reads them. Until then Agency shows "Not on sale yet".
+1. `venv/bin/python -m ops.stripe_setup --live --fly` creates the Agency Product and its two
+   Prices ($199/month, $1,910/year, read off `pricing.PLANS`), reuses the other seven and the
+   webhook, and pushes `STRIPE_PRICE_AGENCY` / `_YEAR` to Fly. Until then Agency shows
+   "Not on sale yet" and the other plans keep selling.
 3. Check the live database for anybody who belongs to more than one workspace and has switched
    (the `phantra_account` cookie): after deploy their open workspace is where their work goes.
 
 ## Known gaps
 
 - The connectors (`app/mcp_auth.py`, `app/oauth_consent.py`) still act on the OLDEST membership
-  (no cookie there). A teammate with their own older workspace uses the connector on that one.
+  (no cookie there). A teammate with their own older workspace uses the connector on that one;
+  the Connect to Claude panel reads that same account (`auth.oldest_account_id`).
 - Seats are not taken back when a plan lapses: members stay, and nobody new can be invited.
 - No email goes out with an invite; the owner tells the person to sign in with that address.

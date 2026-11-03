@@ -7,7 +7,7 @@
 Needs ONE thing by hand: STRIPE_SECRET_KEY in .env (Stripe dashboard ->
 Developers -> API keys). Everything else is created here:
 
-- the seven Prices, read off pricing.PLANS / pricing.TOPUP so the amount
+- the Prices (nine since the Agency plan, 2026-11-03), read off pricing.PLANS / pricing.TOPUP so the amount
   Stripe charges is the amount /pricing prints. Idempotent by lookup_key
   (`zpf_<item>_<interval>`): a rerun reuses a Price whose amount still
   matches and replaces one whose amount does not (the lookup key moves).

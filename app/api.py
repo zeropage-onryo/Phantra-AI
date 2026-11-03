@@ -766,7 +766,10 @@ def mcp_connection(request: Request, account_id: int = Depends(auth.current_acco
     never another member's. Nothing here calls Supabase or claude.ai."""
     user = auth.current_user(request) or {}
     from src import mcp_connections
-    return mcp_connections.status(account_id, str(user.get("id") or ""))
+    # the CONNECTOR's account (the oldest membership), which is not the
+    # open workspace once a person has switched (2026-11-03)
+    return mcp_connections.status(auth.oldest_account_id(request) or account_id,
+                                  str(user.get("id") or ""))
 
 
 # --- settings: the person's own row and their password --------------------

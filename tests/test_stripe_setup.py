@@ -122,11 +122,11 @@ def values(path):
                 if line and not line.startswith("#"))
 
 
-def test_first_run_creates_seven_prices_and_one_webhook(env):
+def test_first_run_creates_nine_prices_and_one_webhook(env):
     setup.main([])
     v = values(env.path)
-    assert len(env.fake.prices) == 7
-    assert len(env.fake.products) == 4          # three plans + the top-up
+    assert len(env.fake.prices) == 9
+    assert len(env.fake.products) == 5          # four plans + the top-up
     for plan in pricing.PLANS.values():
         month = next(p for p in env.fake.prices if p.id == v[plan.price_env])
         year = next(p for p in env.fake.prices if p.id == v[plan.price_env_yearly])
@@ -151,7 +151,7 @@ def test_rerun_reuses_everything(env):
     setup.main([])
     before = values(env.path)
     setup.main([])
-    assert len(env.fake.prices) == 7 and len(env.fake.products) == 4
+    assert len(env.fake.prices) == 9 and len(env.fake.products) == 5
     assert len(env.fake.hooks) == 1 and not env.fake.deleted_hooks
     assert values(env.path) == before
 
@@ -164,7 +164,7 @@ def test_amount_change_moves_the_lookup_key_and_archives_the_old(env, monkeypatc
     new = values(env.path)[pricing.TOPUP.price_env]
     assert new != old
     assert next(p for p in env.fake.prices if p.id == old).active is False
-    assert len(env.fake.products) == 4          # same Product, new Price
+    assert len(env.fake.products) == 5          # same Product, new Price
 
 
 def test_a_secret_for_another_endpoint_is_not_kept(env):

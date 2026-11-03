@@ -377,6 +377,19 @@ def current_account_id(request: Request) -> int:
     return int(_open_of(request, member_of)["id"])
 
 
+def oldest_account_id(request: Request) -> Optional[int]:
+    """The caller's OLDEST membership: the account an MCP connector call
+    acts on (app/mcp_auth.py, which has no workspace cookie). Since the
+    studio's tenant became the OPEN workspace (2026-11-03) the two can
+    differ; the Connect to Claude panel asks this one. None with no
+    session or no membership."""
+    user = current_user(request)
+    if not user:
+        return None
+    member_of = _memberships(request, user)
+    return min(int(a["id"]) for a in member_of) if member_of else None
+
+
 def tenant_account(request: Request, account_id: Optional[int]) -> Optional[dict[str, Any]]:
     """The membership row behind `current_account_id`'s answer: the
     workspace a request's data routes act on, whichever one is open. Read
