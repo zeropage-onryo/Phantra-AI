@@ -128,3 +128,100 @@ which both lead with editing footage already on the timeline):**
 
 **Left for later:** an email to the person when a panel connects; an owner seeing other
 members' panels; the limiter's in-process key growth (the same shape as `auth._hits`).
+
+## After Effects (2026-11-03)
+
+**From:** a side session of "Blender plugin + editor plugin check", on Mike's comparison with
+Higgsfield's set: one installer that covers Premiere Pro and After Effects, one panel under
+Window > Extensions in each. Built in the panel's own repo (PR
+[zeropage-onryo/phantra-premiere-plugin#3](https://github.com/zeropage-onryo/phantra-premiere-plugin/pull/3),
+0.3.0); nothing in this repo changes but this file (the MCP freeze is in force).
+
+**The decision, from the code:** the Premiere panel is a UXP plugin (`manifest.json`, the UXP
+Developer Tool), and After Effects has no UXP panels. Adobe's plan (blog.developer.adobe.com,
+September 2026, "UXP comes to our flagship applications") gives After Effects a UXP public beta
+"by November 2026" and no GA date, and keeps CEP in Premiere Pro, After Effects and the rest
+until the end of 2029 (Premiere stops taking new CEP Marketplace submissions in December 2027,
+After Effects in December 2028; CEP plugins distributed outside the Marketplace are not
+affected). Higgsfield's "one installer for both" is a CEP extension (a .dmg on the Mac, a .zxp
+through aescripts' ZXP Installer on Windows; Window > Extensions > Higgsfield). So the
+both-hosts panel is CEP: one `CSXS/manifest.xml` naming `PPRO` and `AEFT` from 25.0 (the
+first release of each on CEP 12, Node 17.7.1), the same `index.html` / `main.js` /
+`src/phantra.js`, and a host bridge. The UXP plugin stays for Premiere, where UXP is the
+future; the CEP extension is what the installer ships. The "Not in v1" line above ("port once
+UXP lands there") is therefore answered the other way round: AE joined on CEP, and the UXP
+port is for when AE's UXP ships.
+
+### As built
+
+- `src/host.js` picks the host: `require("premierepro")` resolves -> UXP -> `src/premiere.js`;
+  `window.__adobe_cep__` -> CEP -> `src/cep.js`. Both expose the same calls to `main.js`
+  (`available`, `deviceName`, `openUrl`, `bringIn`, `selectedClip`, `readMedia`,
+  `frameAtPlayhead`), plus `words` (the host's names: "Insert" / "Add to comp", the playhead /
+  the comp's current time, put on the panel at start) and `clientApps`.
+- `src/cep.js` loads the app's ExtendScript once (`$.evalFile` of `jsx/premiere.jsx` or
+  `jsx/aftereffects.jsx` from the extension folder) and calls `PhantraHost.run(name, args)`
+  through `__adobe_cep__.evalScript`; every answer is one JSON string, `{"error"}` becomes a
+  thrown Error, CEP's `EvalScript error.` marker too. Files and the network go through Node
+  (`--enable-nodejs`, `--mixed-context`): `src/node-fetch.js` is `fetch()` over `http`/`https`
+  (CEP 11+ enforces CORS for a page from `file://`), handed to `createClient` as `fetchImpl`, so
+  **`src/phantra.js` and the sign-in are byte-for-byte the Premiere panel's**. Downloads and
+  the token live under `~/Library/Application Support/Phantra/adobe` (Windows `%APPDATA%`), the
+  token file mode 0600 (CEP has no `secureStorage`; the UXP path keeps the keychain).
+- After Effects (`jsx/aftereffects.jsx`, ES3): `app.project.importFile(new ImportOptions(file))`
+  with `sequence = false`, reused when the project already holds the file; a "Phantra" folder
+  (`items.addFolder`, found again by name; `item.parentFolder = folder`); placing is
+  `comp.layers.add(item)` then `layer.startTime = comp.time` on `app.project.activeItem` when it
+  is a `CompItem`, in an undo group; no comp open -> imported, `placed: false`, the panel says
+  "Imported. Open a composition to add it as a layer." **Selected layer:** the first selected
+  `AVLayer` whose source is file footage; its `file.fsName` and the source range the layer shows,
+  `(inPoint - startTime) / (|stretch| / 100)` to the same for `outPoint`, mirrored for a reversed
+  layer; `trim_clip` (free) takes that range after the upload, as for Premiere. **Frame at
+  current time:** `comp.saveFrameToPng(comp.time, file)`, checked for with `typeof` first (it
+  is not in Adobe's guide but has worked since CC 2014).
+- Premiere under CEP (`jsx/premiere.jsx`): `importFiles([path], true, bin, false)`, the bin by
+  `rootItem.createBin`, `videoTracks[0].insertClip(item, playerPosition.seconds)`,
+  `getSelection()` for the clip, `exportFramePNG(time, path)` for the frame.
+- Sign-in in After Effects asks `/plugin/v1/pair` for client `aftereffects` and, on
+  `bad_client`, retries once as `premiere` (in `main.js`, not in the client). **API gap, not
+  built because of the freeze:** `plugin_tokens.CLIENTS` has no `"aftereffects": "After
+  Effects"`; until it does, an AE panel pairs as "Premiere Pro" with the device line "macOS,
+  After Effects 25.x" telling the person which app it is, and the link page's sentence and the
+  Apps card say Premiere Pro. One line in `CLIENTS`, a test beside the Blender one, and the
+  sentence on `/studio/link`, once the freeze lifts (the same shape as the Blender gap).
+- Installer: `scripts/build-zxp.sh` stages `dist/com.phantra.adobe/` from `install.command`'s
+  file list and signs it with Adobe's ZXPSignCmd when it is on the PATH (a self-signed
+  certificate, `PHANTRA_ZXP_PASSWORD`), else an unsigned zip, said loudly;
+  `scripts/build-pkg.sh` builds the Mac `.pkg` (the Resolve plugin's shape) into
+  `/Library/Application Support/Adobe/CEP/extensions/com.phantra.adobe`, the system folder both
+  apps read, refused up front on a Mac with neither app; `install.command` copies into the
+  per-user CEP folder for development and asks before turning on `PlayerDebugMode`.
+  Windows is the `.zxp` through aescripts' ZXP Installer. Proprietary license kept; downloads
+  from phantra.ai, never GitHub (`dist/` is ignored).
+- Tests: 50 (were 9). `test/aftereffects.test.js` and `test/premiere-jsx.test.js` run the
+  ExtendScript under Node's `vm` against fake apps (import once + folder + layer at comp time,
+  no comp, stretch and reverse, the frame, every refusal as `{error}`); `test/cep.test.js` the
+  bridge with a fake `__adobe_cep__` (host detection, one jsx load, download then import,
+  the 450 MB cap, the frame read back, the 0600 token); `test/node-fetch.test.js` the Node
+  fetch against a local server with the unchanged client; `test/manifest.test.js` the two
+  manifests, `.debug`, the install list and an ES3 screen on the jsx. `test/preview.html`
+  gained `&host=aeft`: a fake CEP host, so the real `main.js -> host.js -> cep.js ->
+  node-fetch.js` path was driven in a browser (sign-in state, Library with "Add to comp",
+  download -> importFile -> placed, Selected layer -> upload -> trim, Frame at current time).
+
+### Not verified
+
+- **Neither Premiere Pro nor After Effects is installed on this Mac** (Creative Cloud holds
+  Photoshop and Lightroom), so the panel has not been opened in either host; the first open is
+  the real check, with `http://localhost:8089` (`.debug`) for AE's console. In particular:
+  whether CEP 12 in 25.x/26.x accepts `ExtensionManifest Version="7.0"` with
+  `RequiredRuntime 9.0` (a community report says `12.0` is refused; Adobe's own sample is
+  5.0/6.0); CEP's global `require` and the `index.html` bootstrap that resolves `./` against
+  the extension folder; `saveFrameToPng` in the installed AE (reported quirks: black edges with
+  alpha, a Save dialog in some versions; the render-queue fallback is not built); the new
+  layer's time under the "Create Layers at Composition Start Time" preference.
+- The `.zxp` is unsigned here (no ZXPSignCmd); the `.pkg` was built and expanded (payload and
+  install location right), but the pkg script warns that this shell stamps every file with
+  `com.apple.provenance`, which pkgbuild turns into `._` entries: build the release from a plain
+  Terminal (the script checks its own payload and says so).
+- No sign-in was made and nothing was spent: the live API was not touched.
