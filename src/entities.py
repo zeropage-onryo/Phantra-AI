@@ -156,6 +156,31 @@ def delete_prop(prop_id: int, dsn=None, *, account_id: int) -> None:
         )
 
 
+# --- whose element is it ---------------------------------------------------
+
+# A reference names an element by FOLDER (`/characters/<slug>/...`), and
+# the folder is named by slug alone, so the same address can mean an
+# element in more than one workspace. Places live in preprod's
+# `locations`, named by their slug already.
+_OWNER_TABLES = {"characters": "characters", "props": "props",
+                 "locations": "locations"}
+
+
+def slug_accounts(plural: str, slug: str, dsn=None) -> set:
+    """Every workspace with an element of this kind whose name slugs to
+    `slug` (QA 2026-11-02 E3: the studio's refs routes took another
+    workspace's photo). Empty for a kind or slug nobody has."""
+    from .asset_shelf import slugify
+    table = _OWNER_TABLES.get(plural)
+    if table is None or not slug:
+        return set()
+    # every row, across workspaces, on purpose: a slug is not a stored
+    # column (punctuation drops out of it), and these tables are small
+    with db.connect(dsn) as conn:
+        rows = conn.execute(f"SELECT account_id, name FROM {table}").fetchall()
+    return {r["account_id"] for r in rows if slugify(r["name"]) == slug}
+
+
 # --- descriptions ----------------------------------------------------------
 
 TABLES = {"character": "characters", "prop": "props"}

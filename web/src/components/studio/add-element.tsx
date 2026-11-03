@@ -18,6 +18,7 @@ import { LibraryDrawer } from "@/components/studio/library-drawer";
 import { mediaSrc } from "@/lib/composer";
 import { creditsText } from "@/lib/render-choice";
 import { CREATE_ROUTE, ELEMENT_KINDS, PRODUCT_KIND, type ElementKind } from "@/lib/elements";
+import { addLabel, SHEET_BY_DEFAULT } from "@/lib/add-element";
 
 type Kind = ElementKind;
 const DETAIL_PLACEHOLDER: Record<Kind, string> = {
@@ -63,7 +64,7 @@ export function AddElement({
   // renders picked in the Library drawer ride `photo_urls` with any a
   // "Make element" opened the form with (2026-10-26)
   const [libOpen, setLibOpen] = useState(false);
-  const [sheet, setSheet] = useState(true);
+  const [sheet, setSheet] = useState(SHEET_BY_DEFAULT);
   // the sheet is one still, charged like any other (2026-09-29: every
   // spend of credits says its price before the click that spends it)
   const { balance } = useShell();
@@ -236,7 +237,7 @@ export function AddElement({
             Cancel
           </button>
           <button type="button" className="zbtn pri" disabled={!canSave} onClick={() => void save()}>
-            {busy ? "Saving…" : "Add"}
+            {addLabel(busy, willDraw, sheetPrice)}
           </button>
         </div>
       </div>

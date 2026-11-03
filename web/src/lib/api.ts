@@ -27,33 +27,66 @@ export class ApiError extends Error {
   }
 }
 
+/* AN OUTAGE IS SAID AS ONE (QA 2026-11-02 T11). With the API down, a
+   fetch either fails outright or the proxy answers a bare 500/502/503/504
+   with no JSON error of ours -- and pages read that as an empty account
+   ("no elements yet") or printed "INTERNAL SERVER ERROR". Both now throw
+   ApiError code "unreachable" with one plain line, and the shell hears
+   REACH_EVENT (detail: { up }) to say so above every page until a later
+   request gets through. A 5xx carrying our own `error` stays that error. */
+export const UNREACHABLE = "Phantra's server isn't answering right now. Try again in a moment.";
+export const REACH_EVENT = "phantra:reach";
+let reachable = true;
+
+function heard(up: boolean) {
+  if (up === reachable) return;
+  reachable = up;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(REACH_EVENT, { detail: { up } }));
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers as Record<string, string> | undefined),
-    },
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers as Record<string, string> | undefined),
+      },
+      ...init,
+    });
+  } catch (err) {
+    // a request the caller cancelled is not an outage
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    heard(false);
+    throw new ApiError(UNREACHABLE, 0, "unreachable");
+  }
 
   if (!res.ok) {
     let message = res.statusText || `request failed (${res.status})`;
     let code: string | undefined;
     let credits: number | undefined;
+    let ours = false;
     try {
       const body = await res.clone().json();
+      ours = Boolean(body?.error || body?.detail);
       message = body?.error?.message ?? body?.detail ?? message;
       code = body?.error?.code;
       if (typeof body?.credits === "number") credits = body.credits;
     } catch {
       // not JSON -- keep the fallback
     }
+    if (res.status >= 500 && !ours) {
+      heard(false);
+      throw new ApiError(UNREACHABLE, res.status, "unreachable");
+    }
+    heard(true);
     throw new ApiError(message, res.status, code, credits);
   }
+  heard(true);
 
   if (res.status === 204) return undefined as T;
   const text = await res.text();

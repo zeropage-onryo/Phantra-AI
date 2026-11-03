@@ -1157,7 +1157,8 @@ def test_creating_an_element_draws_its_sheet_as_a_job(
     monkeypatch.setattr(api_mod.element_sheet, "draw", fake_draw)
     monkeypatch.setattr(api_mod, "_mirror_photos_to_r2", lambda *a, **k: None)
     res = client.post("/api/assets/props",
-                      data={"name": "Ducati 959", "category": "vehicle", "notes": "red"},
+                      data={"name": "Ducati 959", "category": "vehicle", "notes": "red",
+                            "sheet": "1"},
                       files=[("photos", ("a.jpg", b"jpg-bytes", "image/jpeg"))])
     body = res.json()
     assert body["ok"] and body["sheet_job"]
@@ -1171,7 +1172,7 @@ def test_creating_an_element_draws_its_sheet_as_a_job(
     assert files == ["sheet.jpg", "a.jpg"]
 
 
-def test_the_sheet_is_opt_out_and_needs_photos_and_a_key(
+def test_the_sheet_is_asked_for_and_needs_photos_and_a_key(
         tmp_db, tmp_path, monkeypatch, rag_recorder, fake_vision):
     monkeypatch.setattr(api_mod, "PROPS_DIR", tmp_path / "props")
     monkeypatch.setattr(api_mod, "_gemini_key", lambda a=None: "k")
@@ -1182,16 +1183,20 @@ def test_the_sheet_is_opt_out_and_needs_photos_and_a_key(
     res = client.post("/api/assets/props", data={"name": "A", "sheet": "0"},
                       files=[("photos", ("a.jpg", b"x", "image/jpeg"))])
     assert res.json()["sheet_job"] is None
+    # left out: off (QA 2026-11-02 T10, a paid sheet is asked for)
+    res = client.post("/api/assets/props", data={"name": "A2"},
+                      files=[("photos", ("a.jpg", b"x", "image/jpeg"))])
+    assert res.json()["sheet_job"] is None
     # on, but nothing to draw from
-    res = client.post("/api/assets/props", data={"name": "B"})
+    res = client.post("/api/assets/props", data={"name": "B", "sheet": "1"})
     assert res.json()["sheet_job"] is None
     # on, with photos
-    res = client.post("/api/assets/props", data={"name": "C"},
+    res = client.post("/api/assets/props", data={"name": "C", "sheet": "1"},
                       files=[("photos", ("a.jpg", b"x", "image/jpeg"))])
     assert res.json()["sheet_job"] == 99 and len(started) == 1
     # no key: saved, no job
     monkeypatch.setattr(api_mod, "_gemini_key", lambda a=None: None)
-    res = client.post("/api/assets/props", data={"name": "D"},
+    res = client.post("/api/assets/props", data={"name": "D", "sheet": "1"},
                       files=[("photos", ("a.jpg", b"x", "image/jpeg"))])
     assert res.json()["ok"] and res.json()["sheet_job"] is None
 
@@ -1232,7 +1237,7 @@ def test_a_sheet_that_cannot_start_says_why(tmp_db, tmp_path, monkeypatch,
     monkeypatch.setattr(api_mod, "CHARACTERS_DIR", tmp_path / "characters")
     monkeypatch.setattr(api_mod, "_mirror_photos_to_r2", lambda *a, **k: None)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda a=None: None)
-    res = client.post("/api/assets/characters", data={"name": "A"},
+    res = client.post("/api/assets/characters", data={"name": "A", "sheet": "1"},
                       files=[("photos", ("a.jpg", b"x", "image/jpeg"))])
     assert res.json()["sheet_job"] is None and "GEMINI_API_KEY" in res.json()["sheet_note"]
     res = client.post("/api/assets/characters", data={"name": "B", "sheet": "0"},

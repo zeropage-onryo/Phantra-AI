@@ -27,7 +27,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src import (
     accounts,
@@ -2403,11 +2403,16 @@ def _create_location(name: str, *, account_id: Optional[int], notes: str = "",
                 # the model's own words go to the log, never to the page
                 print(f"  could not describe location {slug}: {e}", file=sys.stderr)
                 note = NOT_DESCRIBED
-    if strict and not described and known is None:
-        # the connector's caller needs the place to be listed; an earlier
-        # description is never overwritten with an empty one
-        preprod.add_location(slug, {}, photo_count=photo_count,
-                             notes=notes or None, account_id=account_id)
+    if not described:
+        # the place is listed even when it could not be described (QA
+        # 2026-11-02 E6: the page's create left no row, so the Elements
+        # list never showed it); an earlier description is never
+        # overwritten with an empty one
+        prior = known if strict else preprod.get_location_by_name(
+            slug, account_id=account_id)
+        if prior is None:
+            preprod.add_location(slug, {}, photo_count=photo_count,
+                                 notes=notes or None, account_id=account_id)
     if known is not None and known.get("description"):
         description = known["description"]
 
@@ -2665,8 +2670,9 @@ def _sheet_kind(plural: str) -> tuple:
 
 
 def _sheet_wanted(form) -> bool:
-    """The create routes' `sheet` field: on unless the modal says off."""
-    value = str(form.get("sheet") if form.get("sheet") is not None else "1").strip().lower()
+    """The create routes' `sheet` field: OFF unless the form asks
+    (QA 2026-11-02 T10: a form that left it out drew a paid sheet)."""
+    value = str(form.get("sheet") if form.get("sheet") is not None else "0").strip().lower()
     return value not in ("0", "false", "no", "off", "")
 
 
@@ -2794,8 +2800,17 @@ def asset_draw_sheet(plural: str, item_id: int,
     return {"job_id": job["id"]}
 
 
+# How long a name or a text a person types may be (QA 2026-11-02 E12: a
+# megabyte title, folder, prompt or canvas was stored as sent). Far above
+# anything typed; a longer body is a 422 naming the field.
+MAX_TITLE = 200
+MAX_FOLDER = 120
+MAX_TEXT = 20_000
+MAX_GRAPH_BYTES = 500_000
+
+
 class OrganizeBody(BaseModel):
-    folder: Optional[str] = None
+    folder: Optional[str] = Field(default=None, max_length=MAX_FOLDER)
     starred: Optional[bool] = None
 
 
@@ -3766,9 +3781,9 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
 
 
 class ProjectBody(BaseModel):
-    title: Optional[str] = None
-    brief: Optional[str] = None
-    look: Optional[str] = None
+    title: Optional[str] = Field(default=None, max_length=MAX_TITLE)
+    brief: Optional[str] = Field(default=None, max_length=MAX_TEXT)
+    look: Optional[str] = Field(default=None, max_length=MAX_TEXT)
     # the Explore / Make switch (PATCH only; a new project starts in Make)
     explore: Optional[bool] = None
 
@@ -5407,6 +5422,26 @@ class ConceptRefsBody(BaseModel):
     refs: list[str] = []
 
 
+def _not_yours(refs, kept, account_id: Optional[int]):
+    """The 403 for a NEW element photo in `refs` that is another
+    workspace's (QA 2026-11-02 E3: the studio's two refs routes stored
+    one, where the connector's `write_scene` refuses). A ref the scene
+    already carries is never judged -- the canvas re-sends the whole list
+    on every save -- nor is a link, a bin image or a slug the caller has
+    too. None when nothing is refused."""
+    for ref in refs:
+        if ref in kept:
+            continue
+        parsed = asset_shelf.parse_ref(ref)
+        if not parsed or parsed["kind"] == "refs":
+            continue
+        owners = entities.slug_accounts(parsed["plural"], parsed["slug"])
+        if owners and account_id not in owners:
+            return _error(403, "not_your_reference",
+                          "that photo is not one of this workspace's elements")
+    return None
+
+
 @router.post("/concepts/{concept_id}/refs")
 def concept_refs(concept_id: int, body: ConceptRefsBody, account_id: int = Depends(auth.current_account_id)):
     """The reference photos a scene grounds on -- a LIST, because a face
@@ -5416,8 +5451,12 @@ def concept_refs(concept_id: int, body: ConceptRefsBody, account_id: int = Depen
     if concept is None or not concept["shots"]:
         return _error(404, "not_found", "no such scene")
     shots = [dict(s) for s in concept["shots"]]
-    shots[0]["refs"] = [asset_shelf.storable_ref(r)
-                        for r in body.refs if r][:MAX_IMAGE_REFS]
+    refs = [asset_shelf.storable_ref(r) for r in body.refs if r][:MAX_IMAGE_REFS]
+    kept = [asset_shelf.storable_ref(r) for r in (shots[0].get("refs") or [])]
+    refused = _not_yours(refs, kept, account_id)
+    if refused is not None:
+        return refused
+    shots[0]["refs"] = refs
     # a plan dict, not a bare list: update_concept_shots re-validates the
     # whole plan, and carrying the existing warnings/duration through
     # keeps attaching a reference from rewriting anything else
@@ -7600,7 +7639,7 @@ async def direct_image_run(request: Request, account_id: int = Depends(auth.curr
 # --- director mode: per-shot save-back --------------------------------------
 
 class ShotPromptBody(BaseModel):
-    prompt: str
+    prompt: str = Field(max_length=MAX_TEXT)
 
 
 class ShotGraphBody(BaseModel):
@@ -7808,8 +7847,12 @@ def shot_refs_update(concept_id: int, shot_n: int, body: ShotRefsBody,
                       "it keeps the ones it has")
     shots = [dict(s) for s in concept["shots"]]
     shot = next(s for s in shots if s.get("n") == shot_n)
-    if refs == [asset_shelf.storable_ref(r) for r in (shot.get("refs") or [])]:
+    kept = [asset_shelf.storable_ref(r) for r in (shot.get("refs") or [])]
+    if refs == kept:
         return {"ok": True, "changed": False, "refs": refs, "seed_hash": current}
+    refused = _not_yours(refs, kept, account_id)
+    if refused is not None:
+        return refused
     shot["refs"] = refs
     preprod.update_concept_shots(
         concept_id, {"shots": shots, "duration": concept.get("duration")},
@@ -8197,8 +8240,15 @@ def video_refresh(video_id: int, account_id: int = Depends(auth.current_account_
 # the canvas (approved=True), not an environment variable.
 
 class WorkflowBody(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, max_length=MAX_TITLE)
     graph: Optional[dict] = None
+
+    @field_validator("graph")
+    @classmethod
+    def _graph_size(cls, graph):
+        if graph is not None and len(json.dumps(graph)) > MAX_GRAPH_BYTES:
+            raise ValueError(f"a canvas is at most {MAX_GRAPH_BYTES:,} bytes")
+        return graph
 
 
 @router.get("/workflows")
