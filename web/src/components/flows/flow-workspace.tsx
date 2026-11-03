@@ -659,14 +659,18 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
   const backHref = nav.backHref ?? "/studio/projects";
   const backLabel = nav.backLabel ?? "Back to Projects";
   const hrefFor = nav.hrefFor ?? sceneHref;
-  const [initial] = useState(() => makeTemplate("variety"));
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initial.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+  /* A canvas starts blank and you build it (2026-11-02, Runway-style):
+     no starter template, the templates panel shut, the Hand tool active. */
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [name, setName] = useState("Untitled flow");
   const [template, setTemplate] = useState<Template>("variety");
-  const [showTemplates, setShowTemplates] = useState(!conceptId);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [addMenu, setAddMenu] = useState(false);
-  const [tool, setTool] = useState<"select" | "hand" | "cut">("select");
+  const [tool, setTool] = useState<"select" | "hand" | "cut">("hand");
+  const stageRef = useRef<HTMLElement>(null);
+  // what "Start from this shot's prompt" seeds from, kept from the scene load
+  const sceneSeed = useRef<(() => { nodes: FlowNode[]; edges: Edge[] }) | null>(null);
   const [toast, setToast] = useState("");
   const [ready, setReady] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -712,6 +716,36 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
     return () => clearTimeout(timer);
   }, [showTemplates, fitView]);
   useEffect(() => {
+    let held: "select" | "hand" | "cut" | null = null;
+    const typing = (t: EventTarget | null) =>
+      t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
+    const down = (e: KeyboardEvent) => {
+      if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "v") setTool("select");
+      else if (k === "h") setTool("hand");
+      else if (k === " " && !e.repeat && held === null) {
+        e.preventDefault();
+        setTool((t) => {
+          held = t;
+          return "hand";
+        });
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key !== " " || held === null) return;
+      const back = held;
+      held = null;
+      setTool(back);
+    };
+    document.addEventListener("keydown", down);
+    document.addEventListener("keyup", up);
+    return () => {
+      document.removeEventListener("keydown", down);
+      document.removeEventListener("keyup", up);
+    };
+  }, []);
+  useEffect(() => {
     if (!confirm) return;
     const previous = document.activeElement;
     dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -733,7 +767,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
         const saved = localStorage.getItem(KEY);
         if (saved) {
           const draft = JSON.parse(saved) as Draft;
-          if (validDraft(draft)) {
+          if (validDraft(draft) && !untouchedStarter(draft)) {
             setNodes(draft.nodes.map((n) => ({ ...n, data: { ...n.data, busy: !!n.data.jobId } })));
             setEdges(draft.edges);
             setName(draft.name);
@@ -785,9 +819,16 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
           const slug = a.photos[0]?.match(/^\/(characters|locations|props)\/([^/]+)\//)?.[2];
           if (slug) names[slug] = a.name;
         }
+        const seed = () => seedScene(shot, { enhanceSystem: presetsRes.enhance_system, names });
+        sceneSeed.current = seed;
+        // a saved graph is restored (its outputs were paid for); a shot that
+        // already rendered opens on its chain so the render is on screen;
+        // anything else starts on a blank canvas you build
         const loaded = saved.graph
           ? fromLegacy(saved.graph, saved.states || {})
-          : seedScene(shot, { enhanceSystem: presetsRes.enhance_system, names });
+          : shot.reference_image || shot.media_url
+            ? seed()
+            : { nodes: [] as FlowNode[], edges: [] as Edge[] };
         // a render can finish after the previous browser closed: the shot is authoritative
         const image = loaded.nodes.find((n) => n.data.kind === "image");
         const video = loaded.nodes.find((n) => n.data.kind === "video");
@@ -802,7 +843,8 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
         setScene(detail);
         setActiveShot(shot.n);
         setReady(true);
-        setSaveState(saved.stale ? "Rebuilt from the revised scene" : saved.graph ? "Saved to scene" : "Fresh canvas");
+        setSaveState(saved.stale ? "Rebuilt from the revised scene" : saved.graph ? "Saved to scene" : "Blank canvas");
+        if (loaded.nodes.length) setTimeout(() => fitView({ padding: 0.2, maxZoom: 0.85, duration: 300 }), 80);
         lastSaved.current = JSON.stringify(
           toLegacy(loaded.nodes, loaded.edges, graphBase.current, { conceptId, shotN: shot.n }).graph,
         );
@@ -813,7 +855,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
     return () => {
       cancelled = true;
     };
-  }, [conceptId, shotN, setNodes, setEdges]);
+  }, [conceptId, shotN, setNodes, setEdges, fitView]);
 
   /* The canvas's reference wiring IS the scene's reference list
      (2026-09-18): rewiring a face here changes what Pipeline shows,
@@ -968,12 +1010,19 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
     [setNodes],
   );
   const addNode = (kind: Kind) => {
+    // the middle of the canvas itself (it can sit beside a scene list),
+    // nudged per card so a second add does not land on the first
+    const box = stageRef.current?.getBoundingClientRect();
+    const cx = box ? box.left + box.width / 2 : window.innerWidth / 2;
+    const cy = box ? box.top + box.height / 2 - 40 : window.innerHeight / 2;
+    const centre = screenToFlowPosition({ x: cx, y: cy });
+    const step = (getNodes().length % 6) * 32;
     setNodes((ns) => [
       ...ns,
       {
         id: crypto.randomUUID(),
         type: "studio",
-        position: screenToFlowPosition({ x: window.innerWidth / 2 - 120, y: window.innerHeight / 2 - 120 }),
+        position: { x: centre.x - 180 + step, y: centre.y - 110 + step },
         data: {
           kind,
           label: titles[kind],
@@ -1458,7 +1507,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
           </div>
         </header>
 
-        <section className="flow-stage" aria-label="Workflow canvas">
+        <section className="flow-stage" aria-label="Workflow canvas" ref={stageRef}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -1474,12 +1523,12 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
             }}
             isValidConnection={connectionValid}
             fitView
-            fitViewOptions={{ padding: 0.12, maxZoom: 0.85 }}
+            fitViewOptions={{ padding: 0.2, maxZoom: 0.85 }}
             minZoom={0.2}
             maxZoom={1.7}
             panOnDrag={tool === "hand" ? true : [1, 2]}
             selectionOnDrag={tool === "select"}
-            nodesDraggable={tool !== "hand"}
+            nodesDraggable
             deleteKeyCode={["Backspace", "Delete"]}
             onMove={(_, viewport) => setZoom(viewport.zoom)}
             defaultEdgeOptions={{ type: "default", style: { stroke: "rgb(255 255 255 / 0.28)", strokeWidth: 1.5 } }}
@@ -1488,6 +1537,43 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
             <MiniMap pannable zoomable nodeColor="rgb(255 255 255 / 0.3)" maskColor="rgb(4 4 5 / 0.72)" />
           </ReactFlow>
         </section>
+
+        {ready && !sceneError && nodes.length === 0 && (
+          <div className="flow-empty">
+            <span className="m">Blank canvas</span>
+            <h2>Build your workflow</h2>
+            <p>Add a node to start. Drag between ports to wire them.</p>
+            <div className="flow-empty-adds">
+              {(["prompt", "element", "image", "video"] as Kind[]).map((kind) => (
+                <button key={kind} onClick={() => addNode(kind)}>
+                  {kind === "prompt" ? <Type size={15} /> : kind === "element" ? <ImagePlus size={15} /> : kind === "video" ? <Film size={15} /> : <Sparkles size={15} />}
+                  {titles[kind]}
+                </button>
+              ))}
+            </div>
+            {conceptId && scene ? (
+              <button
+                className="flow-empty-link"
+                onClick={() => {
+                  const next = sceneSeed.current?.();
+                  if (!next) return;
+                  setNodes(next.nodes);
+                  setEdges(next.edges);
+                  setTimeout(() => fitView({ padding: 0.2, maxZoom: 0.85, duration: 350 }), 60);
+                }}
+              >
+                Start from this shot&apos;s prompt <ArrowUpRight size={13} />
+              </button>
+            ) : !conceptId ? (
+              <button className="flow-empty-link" onClick={() => setShowTemplates(true)}>
+                Or start from a template <ArrowUpRight size={13} />
+              </button>
+            ) : null}
+            <small>
+              <kbd>H</kbd> hand · <kbd>V</kbd> select · hold <kbd>Space</kbd> to pan
+            </small>
+          </div>
+        )}
 
         <div className="canvas-zoom">
           <button aria-label="Zoom out" title="Zoom out" onClick={() => zoomOut({ duration: 180 })}>
@@ -1651,10 +1737,10 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
                 )}
               </div>
               <i className="tool-divider" />
-              <button aria-label="Select tool" title="Select" aria-pressed={tool === "select"} className={tool === "select" ? "tool-active" : ""} onClick={() => setTool("select")}>
+              <button aria-label="Select tool" title="Select (V)" aria-pressed={tool === "select"} className={tool === "select" ? "tool-active" : ""} onClick={() => setTool("select")}>
                 <MousePointer2 size={18} />
               </button>
-              <button aria-label="Pan tool" title="Pan" aria-pressed={tool === "hand"} className={tool === "hand" ? "tool-active" : ""} onClick={() => setTool("hand")}>
+              <button aria-label="Pan tool" title="Hand (H) · hold Space" aria-pressed={tool === "hand"} className={tool === "hand" ? "tool-active" : ""} onClick={() => setTool("hand")}>
                 <Hand size={18} />
               </button>
               <button aria-label="Cut a wire" title="Cut a wire · click a wire" aria-pressed={tool === "cut"} className={tool === "cut" ? "tool-active" : ""} onClick={() => setTool("cut")}>
@@ -1782,6 +1868,17 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
     </Actions.Provider>
   );
 }
+/* the four-card "variations" starter every draft used to open on: a
+   draft that is still exactly that was never built, so it opens blank */
+function untouchedStarter(d: Draft): boolean {
+  const ids = ["prompt", "image", "take-1", "take-2"];
+  return (
+    d.nodes.length === 4 &&
+    d.nodes.every((n) => ids.includes(n.id) && !n.data.url && !n.data.jobId) &&
+    d.nodes.find((n) => n.id === "prompt")?.data.text === starterText
+  );
+}
+
 function validDraft(value: unknown): value is Draft {
   if (!value || typeof value !== "object") return false;
   const d = value as Draft;
