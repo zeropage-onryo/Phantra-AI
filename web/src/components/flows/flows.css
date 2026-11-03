@@ -270,6 +270,87 @@
 .flows-workspace.tool-hand .react-flow__pane {
   cursor: grab;
 }
+.flows-workspace.tool-hand .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+
+/* ── the blank canvas (2026-11-02): centred, out of the way of the pane ── */
+.flow-empty {
+  position: absolute;
+  top: calc(50% + 26px);
+  left: 50%;
+  z-index: 15;
+  transform: translate(-50%, -60%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(520px, calc(100% - 44px));
+  text-align: center;
+  pointer-events: none;
+}
+.flow-empty > * {
+  pointer-events: auto;
+}
+.flow-empty h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.flow-empty p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--dim);
+}
+.flow-empty-adds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.flow-empty-adds button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(13 13 15 / 0.9);
+  color: var(--text);
+  font-size: 13px;
+}
+.flow-empty-adds button:hover {
+  border-color: var(--signal);
+  background: rgb(255 255 255 / 0.06);
+}
+.flow-empty-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font-size: 12px;
+}
+.flow-empty-link:hover {
+  color: var(--text);
+}
+.flow-empty small {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--dimmer);
+}
+.flow-empty kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 10px;
+}
 .flows-workspace .react-flow__node {
   z-index: 1;
 }
@@ -938,7 +1019,8 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 0 240px 0 22px;
+  /* symmetric, so the bar sits in the middle of the canvas, not left of it */
+  padding: 0 240px;
   pointer-events: none;
 }
 .flow-bottom > * {
@@ -947,7 +1029,7 @@
 /* the open inspector narrows the stage; the bar and the minimap move with it */
 .flows-workspace.has-inspector .flow-bottom {
   right: 320px;
-  padding-right: 22px;
+  padding: 0 22px;
 }
 .flows-workspace.has-inspector .react-flow__minimap {
   display: none;
@@ -1171,7 +1253,7 @@
 }
 @media (max-width: 1100px) {
   .flow-bottom {
-    padding-right: 22px;
+    padding: 0 22px;
   }
   .flows-workspace .react-flow__minimap {
     display: none;
@@ -1188,7 +1270,7 @@
 }
 @container (max-width: 1100px) {
   .flow-bottom {
-    padding-right: 22px;
+    padding: 0 22px;
   }
   .flows-workspace .react-flow__minimap {
     display: none;
