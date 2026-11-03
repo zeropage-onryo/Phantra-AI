@@ -68,8 +68,13 @@ from . import db
 
 ENV = "PHANTRA_WATERMARK"
 TEXT = "Phantra"
-SIGNAL_RED = (228, 0, 43)      # the studio's --signal
-OPACITY = 0.78                 # the mark's own alpha, over the picture
+# The owl app icon (app/static/brand/icon.png at 256px), drawn left of the
+# name since 2026-11-03 (Mike: "our phantra logo and name in the bottom
+# right"); it replaced the red dot. Kept beside the code so `src` reads no
+# file from `app/`.
+LOGO_PATH = Path(__file__).resolve().parent / "assets" / "watermark_owl.png"
+LOGO_SHARE = 1.35              # the owl tile's height against the text's font size
+OPACITY = 0.85                 # the mark's own alpha, over the picture
 FONT_SHARE = 0.04              # the text's height against the frame's short side
 MIN_FONT = 14
 MARGIN_SHARE = 0.03            # distance from the right and bottom edges
@@ -174,11 +179,31 @@ def markable(path: Path) -> Optional[str]:
 # drawing it
 # --------------------------------------------------------------------------
 
+def _logo(side: int):
+    """The owl tile at `side` pixels square, RGBA, or None when the file is
+    missing or unreadable -- the mark then falls back to the name alone
+    rather than failing the render (the module fails open)."""
+    from PIL import Image
+    try:
+        with Image.open(LOGO_PATH) as im:
+            return im.convert("RGBA").resize((side, side), Image.LANCZOS)
+    except Exception as e:  # noqa: BLE001
+        _log(f"owl logo not drawn ({type(e).__name__}); marking with the name only")
+        return None
+
+
+def _faded(im, alpha: float):
+    """`im` with every pixel's alpha scaled by `alpha`."""
+    from PIL import Image
+    r, g, b, a = im.split()
+    return Image.merge("RGBA", (r, g, b, a.point(lambda v: int(round(v * alpha)))))
+
+
 def mark_layer(width: int, height: int):
     """A transparent RGBA layer the size of the frame with the mark drawn
-    in its bottom-right corner: a red dot and the studio's name, white,
-    over a soft shadow so it reads on a light frame as well as a dark one.
-    The same layer marks a still and every frame of a clip."""
+    in its bottom-right corner: the owl app icon and the studio's name in
+    white, over a soft shadow so it reads on a light frame as well as a
+    dark one. The same layer marks a still and every frame of a clip."""
     from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
     short = max(1, min(width, height))
@@ -187,29 +212,42 @@ def mark_layer(width: int, height: int):
         font = ImageFont.load_default(size=size)
     except TypeError:                               # Pillow < 10.1
         font = ImageFont.load_default()
+    stroke = max(1, size // 24)                     # a touch of weight on the bundled font
     probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    left, top, right, bottom = probe.textbbox((0, 0), TEXT, font=font)
+    left, top, right, bottom = probe.textbbox((0, 0), TEXT, font=font, stroke_width=stroke)
     text_w, text_h = right - left, bottom - top
-    dot = max(4, int(round(size * 0.42)))
-    gap = max(3, int(round(size * 0.35)))
+    logo_side = max(10, int(round(size * LOGO_SHARE)))
+    logo = _logo(logo_side)
+    if logo is None:
+        logo_side = 0
+    gap = max(3, int(round(size * 0.4))) if logo is not None else 0
     margin = max(8, int(round(short * MARGIN_SHARE)))
+    block_h = max(text_h, logo_side)
     x1 = width - margin
-    x0 = x1 - (dot + gap + text_w)
+    x0 = x1 - (logo_side + gap + text_w)
     y1 = height - margin
-    y0 = y1 - text_h
+    y0 = y1 - block_h
+    cy = y0 + block_h // 2
+    text_xy = (x0 + logo_side + gap - left, cy - text_h // 2 - top)
+    logo_xy = (x0, cy - logo_side // 2)
     alpha = int(round(255 * OPACITY))
 
     shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.text((x0 + dot + gap - left, y0 - top), TEXT, font=font, fill=(0, 0, 0, 150))
-    cy = y0 + text_h // 2
-    sd.ellipse((x0, cy - dot // 2, x0 + dot, cy - dot // 2 + dot), fill=(0, 0, 0, 150))
+    sd.text(text_xy, TEXT, font=font, fill=(0, 0, 0, 150), stroke_width=stroke,
+            stroke_fill=(0, 0, 0, 150))
+    if logo is not None:
+        radius = max(2, int(round(logo_side * 0.22)))
+        sd.rounded_rectangle((logo_xy[0], logo_xy[1], logo_xy[0] + logo_side, logo_xy[1] + logo_side),
+                             radius=radius, fill=(0, 0, 0, 120))
     shadow = shadow.filter(ImageFilter.GaussianBlur(max(1, size // 8)))
 
     layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    d.ellipse((x0, cy - dot // 2, x0 + dot, cy - dot // 2 + dot), fill=(*SIGNAL_RED, alpha))
-    d.text((x0 + dot + gap - left, y0 - top), TEXT, font=font, fill=(255, 255, 255, alpha))
+    d.text(text_xy, TEXT, font=font, fill=(255, 255, 255, alpha), stroke_width=stroke,
+           stroke_fill=(255, 255, 255, alpha))
+    if logo is not None:
+        layer.alpha_composite(_faded(logo, OPACITY), dest=logo_xy)
     return Image.alpha_composite(shadow, layer)
 
 

@@ -316,3 +316,21 @@ def test_a_paid_invoice_unlocks_the_accounts_renders(acct, monkeypatch):
                              "lines": {"data": [{"price": {"id": "price_creator"}}]}}}},
         dsn=dsn)
     assert out["action"] == "granted" and called == [a]
+
+
+def test_the_mark_carries_the_owl_logo():
+    """2026-11-03 (Mike): the mark is the owl app icon and the name, not a red
+    dot. The icon's dark owl body is the tell: a white name alone has none."""
+    layer = watermark.mark_layer(720, 1280)
+    box = layer.getbbox()
+    assert box is not None and box[0] > 360 and box[1] > 1088
+    corner = layer.crop(box)
+    dark = sum(1 for r, g, b, a in corner.getdata() if a > 150 and r < 60 and g < 60 and b < 60)
+    assert dark > 50, "no owl drawn in the mark"
+    assert watermark.LOGO_PATH.is_file()
+
+
+def test_a_missing_logo_still_marks_with_the_name(monkeypatch, tmp_path):
+    monkeypatch.setattr(watermark, "LOGO_PATH", tmp_path / "gone.png")
+    layer = watermark.mark_layer(720, 1280)
+    assert layer.getbbox() is not None
