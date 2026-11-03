@@ -318,19 +318,19 @@ def test_a_paid_invoice_unlocks_the_accounts_renders(acct, monkeypatch):
     assert out["action"] == "granted" and called == [a]
 
 
-def test_the_mark_carries_the_owl_logo():
-    """2026-11-03 (Mike): the mark is the owl app icon and the name, not a red
-    dot. The icon's dark owl body is the tell: a white name alone has none."""
+def test_the_mark_is_the_yellow_lockup():
+    """2026-11-03 (Mike): the mark is the site's lockup (the owl behind the
+    lowercase "phantra") in the landing page's yellow, not a red dot."""
     layer = watermark.mark_layer(720, 1280)
     box = layer.getbbox()
     assert box is not None and box[0] > 360 and box[1] > 1088
-    corner = layer.crop(box)
-    dark = sum(1 for r, g, b, a in corner.getdata() if a > 150 and r < 60 and g < 60 and b < 60)
-    assert dark > 50, "no owl drawn in the mark"
+    yellow = sum(1 for r, g, b, a in layer.crop(box).getdata()
+                 if a > 150 and r > 200 and g > 200 and b < 180)
+    assert yellow > 200, "no yellow lockup drawn in the mark"
     assert watermark.LOGO_PATH.is_file()
 
 
-def test_a_missing_logo_still_marks_with_the_name(monkeypatch, tmp_path):
+def test_a_missing_lockup_still_marks_with_the_name(monkeypatch, tmp_path):
     monkeypatch.setattr(watermark, "LOGO_PATH", tmp_path / "gone.png")
     layer = watermark.mark_layer(720, 1280)
     assert layer.getbbox() is not None
