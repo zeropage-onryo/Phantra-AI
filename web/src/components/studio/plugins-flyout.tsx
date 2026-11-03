@@ -30,9 +30,11 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "Creative apps",
     items: [
-      // live since 2026-10-23 (Mike): both open their setup inside the studio
+      // live since 2026-10-23 (Mike): each opens its setup inside the studio.
+      // Premiere Pro and After Effects are ONE Adobe panel (2026-11-03), so
+      // both rows open the same tab there.
       { name: "Premiere Pro", href: "/studio/plugins#premiere", logo: "/brand/plugins/premiere-pro.svg" },
-      { name: "After Effects", logo: "/brand/plugins/after-effects.svg" },
+      { name: "After Effects", href: "/studio/plugins#aftereffects", logo: "/brand/plugins/after-effects.svg" },
       { name: "DaVinci Resolve", href: "/studio/plugins#resolve", logo: "/brand/plugins/davinci-resolve.svg" },
     ],
   },

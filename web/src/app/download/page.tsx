@@ -9,23 +9,25 @@ import { PageIntro } from "@/components/site/page-intro";
 import { LEGAL_CONTACT } from "@/components/legal-page";
 import { Button } from "@/components/ui/button";
 import { pageMeta } from "@/lib/page-meta";
-import { downloadOf, humanSize, type Download, type Entry, type PanelId } from "@/lib/downloads";
+import { downloadOf, humanSize, osesOf, type Download, type Entry, type PanelId } from "@/lib/downloads";
 import DOWNLOADS from "@/content/downloads.json";
 
 // The editor panels' download page (docs/tasks/task-plugin-repos.md, Part 2,
 // step 12). What each panel does is said from its own README (the private
 // repos phantra-resolve-plugin and phantra-premiere-plugin); a change to a
-// panel's README is a change here. The Download button exists only once
-// content/downloads.json marks a build live with its size and sha256
-// (lib/downloads.ts); until then the panel reads "Coming soon" and links
-// nothing. Premiere stays "Coming soon" until its build has been run in
-// Premiere Pro 25.6+. No price is printed here: the panels spend credits only
-// through the studio's own quote-and-approve.
+// panel's README is a change here. A Download button exists only once
+// content/downloads.json marks that file live with its size and sha256
+// (lib/downloads.ts); until then it reads "Coming soon" and links nothing.
+// The Adobe panel (2026-11-03) is ONE extension for Premiere Pro and After
+// Effects, a Mac .pkg and a Windows .zxp; both stay "Coming soon" until a
+// signed build has been opened in a real Premiere Pro and After Effects and
+// uploaded. No price is printed here: the panels spend credits only through
+// the studio's own quote-and-approve.
 
 export const metadata: Metadata = pageMeta({
   title: "Download the editor panels",
   description:
-    "Phantra inside DaVinci Resolve Studio and Adobe Premiere Pro: your Library in the Media Pool, AI images, video and effects made from the timeline, priced before anything is spent.",
+    "Phantra inside DaVinci Resolve Studio, Adobe Premiere Pro and After Effects: your Library in the Media Pool, AI images, video and effects made from the timeline, priced before anything is spent.",
   path: "/download",
 });
 
@@ -69,13 +71,18 @@ const PANELS: Panel[] = [
     ],
   },
   {
-    id: "premiere",
-    app: "Premiere Pro",
-    requires: <>Requires Adobe Premiere Pro 25.6 or newer.</>,
+    id: "adobe",
+    app: "Premiere Pro and After Effects",
+    requires: (
+      <>
+        Requires Adobe Premiere Pro or After Effects 2025 (25.0) or newer, on Mac or Windows. One install puts the
+        panel in both apps, under Window, Extensions.
+      </>
+    ),
     does: [
       {
         title: "Your Library",
-        body: "Everything you have made or uploaded in Phantra, imported into the project's Phantra bin or dropped at the playhead.",
+        body: "Everything you have made or uploaded in Phantra, imported into the project's Phantra bin (Premiere) or folder (After Effects), dropped at the playhead or added to your comp at the current time.",
       },
       {
         title: "Make",
@@ -83,7 +90,7 @@ const PANELS: Panel[] = [
       },
       {
         title: "From the timeline",
-        body: "Send the selected clip or the frame at the playhead to Phantra, edit it, and bring the result back.",
+        body: "Send the selected clip or layer, or the frame at the current time, to Phantra, edit it, and bring the result back.",
       },
     ],
   },
@@ -112,6 +119,33 @@ const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
       <>
         Start Resolve Studio, then Workspace, Workflow Integrations, Phantra. If that menu is missing, you are in
         the free version of Resolve, which cannot run the panel. After updating Resolve, run the installer again.
+      </>
+    ),
+  },
+];
+
+const ADOBE_STEPS: { title: string; body: ReactNode }[] = [
+  {
+    title: "Quit Premiere Pro and After Effects",
+    body: <>The installer adds the panel while both apps are closed; each reads it the next time it starts.</>,
+  },
+  {
+    title: "Open the installer",
+    body: (
+      <>
+        On a Mac, double-click the .pkg, press Continue and type your Mac password: the panel goes in
+        /Library/Application Support/Adobe/CEP/extensions, the folder both apps read. On Windows, install the free{" "}
+        <a href="https://aescripts.com/learn/zxp-installer/">ZXP Installer</a> from aescripts, then drag the .zxp onto
+        it.
+      </>
+    ),
+  },
+  {
+    title: "Open the panel",
+    body: (
+      <>
+        Start Premiere Pro or After Effects, then Window, Extensions, Phantra. If Phantra is not in the menu, quit the
+        app fully, not just its window, and open it again.
       </>
     ),
   },
@@ -150,15 +184,19 @@ const SIGN_IN: { title: string; body: ReactNode }[] = [
 const PROSE =
   "text-[15px] leading-relaxed text-[#afafaf] [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-4";
 
-function DownloadBox({ download }: { download: Download }) {
-  if (!download.url || download.size === null || !download.sha256) {
+const OS_NAME = { mac: "Mac", windows: "Windows" } as const;
+
+function DownloadBox({ download, labelled }: { download: Download; labelled: boolean }) {
+  const name = labelled ? ` for ${OS_NAME[download.os]}` : "";
+  if (!download.url || download.size === null || !download.sha256 || !download.file) {
     return (
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <span
           aria-disabled="true"
           className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-[14px] text-[#8a8a8a]"
         >
-          Coming soon
+          {labelled ? OS_NAME[download.os] : null}
+          {labelled ? ": " : ""}Coming soon
         </span>
         <span className="text-[13px] text-[#8a8a8a]">Version {download.version}</span>
       </div>
@@ -168,7 +206,7 @@ function DownloadBox({ download }: { download: Download }) {
     <div className="mt-6">
       <div className="flex flex-wrap items-center gap-3">
         <Button size="lg" render={<a href={download.url} download={download.file} />}>
-          Download
+          Download{name}
           <ArrowDown data-icon="inline-end" className="size-4" />
         </Button>
         <span className="text-[13px] text-[#afafaf]">
@@ -193,13 +231,13 @@ export default function DownloadPage() {
         <PageIntro
           eyebrow="Download"
           title="Phantra inside your editor."
-          dek="A panel in DaVinci Resolve and Premiere Pro: your Library on the timeline, and images, video and effects made from the clip you are cutting. Everything is priced in credits before anything is spent."
+          dek="A panel in DaVinci Resolve, Premiere Pro and After Effects: your Library on the timeline, and images, video and effects made from the clip you are cutting. Everything is priced in credits before anything is spent."
         />
 
         <section className="mx-auto max-w-[1200px] px-6 pb-20">
           <div className="grid gap-3 md:grid-cols-2">
             {PANELS.map((panel) => {
-              const download = downloadOf(panel.id, ENTRIES);
+              const oses = osesOf(panel.id);
               return (
                 <article key={panel.id} className="flex flex-col rounded-[14px] border border-border bg-card p-6">
                   <span className="eyebrow">Panel</span>
@@ -214,15 +252,18 @@ export default function DownloadPage() {
                     ))}
                   </ul>
                   <div className="mt-auto">
-                    <DownloadBox download={download} />
+                    {oses.map((os) => (
+                      <DownloadBox key={os} download={downloadOf(panel.id, ENTRIES, os)} labelled={oses.length > 1} />
+                    ))}
                   </div>
                 </article>
               );
             })}
           </div>
           <p className={`mt-6 max-w-[70ch] ${PROSE}`}>
-            A video is always held to one of your own photos, as everywhere in Phantra. Downloads from the panel go to
-            your Movies folder, under Phantra, so the project can find them.
+            A video is always held to one of your own photos, as everywhere in Phantra. Downloads from the Resolve
+            panel go to your Movies folder, under Phantra; the Adobe panel keeps its files under Phantra in your
+            Application Support (Mac) or AppData (Windows) folder, so the project can find them.
           </p>
         </section>
 
@@ -250,14 +291,39 @@ export default function DownloadPage() {
           </div>
         </section>
 
+        <section id="install-adobe" className="scroll-mt-24 border-t border-border">
+          <div className="mx-auto grid max-w-[1200px] gap-10 px-6 py-20 md:grid-cols-2 md:gap-16">
+            <div>
+              <span className="eyebrow">Premiere Pro and After Effects</span>
+              <h2 className="serif mt-5 text-[clamp(1.75rem,3.5vw,2.5rem)]">One install, both apps.</h2>
+              <p className={`mt-5 max-w-[46ch] ${PROSE} text-[17px]`}>
+                The panel is one Adobe extension that Premiere Pro and After Effects both open from Window,
+                Extensions. The installer copies it into Adobe&apos;s shared extensions folder; nothing else on your
+                computer changes.
+              </p>
+            </div>
+            <ol className="divide-y divide-border border-y border-border">
+              {ADOBE_STEPS.map((step, i) => (
+                <li key={step.title} className="flex gap-5 py-5">
+                  <span className="eyebrow pt-1">{String(i + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h3 className="text-[17px] font-medium tracking-[-0.005em] text-foreground">{step.title}</h3>
+                    <p className={`mt-2 max-w-[56ch] ${PROSE}`}>{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
         <section className="border-t border-border">
           <div className="mx-auto grid max-w-[1200px] gap-10 px-6 py-20 md:grid-cols-2 md:gap-16">
             <div>
               <span className="eyebrow">Sign in</span>
               <h2 className="serif mt-5 text-[clamp(1.75rem,3.5vw,2.5rem)]">With a code, not a password.</h2>
               <p className={`mt-5 max-w-[46ch] ${PROSE} text-[17px]`}>
-                Typing the code your own panel shows is what proves the panel is yours. The sign-in is kept in your
-                Mac&apos;s Keychain, and a panel left unused for 90 days asks again.
+                Typing the code your own panel shows is what proves the panel is yours. The sign-in is kept on your
+                own computer, and a panel left unused for 90 days asks again.
               </p>
             </div>
             <ol className="divide-y divide-border border-y border-border">

@@ -8,7 +8,7 @@
    says where and deletes nothing, and nothing on this page spends.
 
    Apps (2026-10-22, app/plugin_api.py): the editing-app panels this person
-   signed in with a code (DaVinci Resolve, Premiere Pro), each with Disconnect, which stops
+   signed in with a code (DaVinci Resolve, Premiere Pro, After Effects, Blender), each with Disconnect, which stops
    that copy's token at once. A panel is connected from /studio/link.
 
    The "own model logins" card (a ChatGPT or Claude plan signed in on the
@@ -58,7 +58,7 @@ function Apps() {
     <SettingsCard title="Apps" description="editing apps signed in with a code">
       {items === null ? null : items.length === 0 ? (
         <EmptyState title="No apps connected">
-          Open the Phantra panel in DaVinci Resolve, Premiere Pro or Blender and choose Sign in. It shows a code to approve at phantra.ai/studio/link.
+          Open the Phantra panel in DaVinci Resolve, Premiere Pro, After Effects or Blender and choose Sign in. It shows a code to approve at phantra.ai/studio/link.
         </EmptyState>
       ) : (
         items.map((c) => (

@@ -144,6 +144,21 @@ def test_a_blender_add_on_signs_in_and_is_named_everywhere(clean_slate, people):
     assert client.get("/plugin/v1/me", headers=_bearer(token)).json()["client"] == "Blender"
 
 
+def test_the_adobe_panel_in_after_effects_is_named_after_effects(clean_slate, people):
+    """The one Adobe panel pairs as "premiere" in Premiere Pro and as
+    "aftereffects" in After Effects (phantra-premiere-plugin 0.3.0, 2026-11-03),
+    so the link page and the Apps card name the app the person is in."""
+    started = _pair(device="macOS, After Effects 25.2", app="aftereffects")
+    assert started["client"] == "After Effects"
+    _sign_in("mike")
+    assert client.get("/api/plugin/link", params={"code": started["code"]}).json()["client"] == "After Effects"
+    assert client.post("/api/plugin/link", json={"code": started["code"]}, headers=GUARD).status_code == 200
+    assert [c["client"] for c in client.get("/api/plugin/connections").json()["items"]] == ["After Effects"]
+    client.cookies.clear()
+    token = client.post("/plugin/v1/pair/token", json={"secret": started["secret"]}).json()["token"]
+    assert client.get("/plugin/v1/me", headers=_bearer(token)).json()["client"] == "After Effects"
+
+
 def test_an_unknown_client_is_refused(clean_slate):
     response = client.post("/plugin/v1/pair", json={"client": "final-cut"})
     assert response.status_code == 400

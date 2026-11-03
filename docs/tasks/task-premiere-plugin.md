@@ -225,3 +225,48 @@ port is for when AE's UXP ships.
   `com.apple.provenance`, which pkgbuild turns into `._` entries: build the release from a plain
   Terminal (the script checks its own payload and says so).
 - No sign-in was made and nothing was spent: the live API was not touched.
+
+### The site and the API know the Adobe panel (2026-11-03, after the merge of plugin PR #3)
+
+Mike: "ok is it linked to the plugin page" -- it was not: every page still described the UXP
+`.ccx` for "Premiere Pro 25.6 or newer", the flyout's After Effects tile had no link, and the
+API had no "aftereffects" client. As built, in this repo:
+
+- `web/src/lib/downloads.ts`: the `premiere` entry became `adobe`, ONE panel for both apps
+  shipped as two files, a Mac `.pkg` and a Windows `.zxp` (`FILES`, `osesOf`, `fileName(id,
+  version, os)`, `downloadOf(id, entries, os)`); `content/downloads.json` holds the Mac file's
+  size and sha256 at the top and the Windows file's under `windows`, each linked only on its
+  own facts, and `live` is the panel's one switch. `adobe` is 0.3.0, `live: false`: nothing
+  is linked until a signed build has been opened in a real Premiere Pro and After Effects and
+  uploaded.
+- `/plugins` and `/download`: the Adobe card names both apps (both logos), 2025 (25.0) or
+  newer on Mac or Windows, a Download box per file ("for Mac" / "for Windows" once there are
+  two), the CEP install steps (quit both apps; the `.pkg` into
+  `/Library/Application Support/Adobe/CEP/extensions`, the `.zxp` through aescripts' free ZXP
+  Installer on Windows; Window, Extensions, Phantra in either app) and an "One install, both
+  apps" section on `/download`. The old `#premiere` anchor still lands on the card
+  (`aliases`), `#aftereffects` beside it. "Keychain" became "on your own computer" (the CEP
+  panel keeps its token in a 0600 file, Windows has no Keychain).
+- `/studio/plugins`: one "Premiere Pro & After Effects" tab with both logos
+  (`shared.tsx` `logos`, `aliases`), its three steps rewritten for CEP, a Mac and a Windows
+  button each drawn from its own file (`downloadsFor`); the flyout's After Effects row links
+  `/studio/plugins#aftereffects` and reads Live. `/studio/link` and the Apps card name After
+  Effects.
+- `src/plugin_tokens.CLIENTS["aftereffects"] = "After Effects"` (the table the Blender PR #573
+  extended the same day, so not under the MCP freeze), with a test beside the Blender one: the
+  one panel pairs as "premiere" in Premiere Pro and "aftereffects" in After Effects
+  (`src/cep.js` `APPS.AEFT.clientApps` asks for it first and falls back to "premiere" against
+  an older API).
+- `ops/upload_plugin_r2.py`: `--plugin resolve|adobe`; the Adobe panel's two files go under
+  one version, and the version's `SHA256SUMS` is the one key that grows (a second file is
+  appended; a name already listed is refused; a build file is never overwritten).
+  `tests/test_upload_plugin_r2.py` covers the pair and the refusals.
+- Checked in the browser (`npm run dev`, no API): `/plugins`, `/download` and
+  `/studio/plugins#aftereffects` draw the Adobe card and tab, both "Coming soon", and the
+  flyout's three editor rows link. 13 `downloads.test.mjs`, 53 pytest across the two files,
+  typecheck clean.
+
+What is left for the download to go live: build from a plain Terminal with ZXPSignCmd on the
+PATH (`scripts/build-zxp.sh`, `build-pkg.sh` in the plugin repo), open the panel in a real
+Premiere Pro and After Effects, upload both files with `ops.upload_plugin_r2 --plugin adobe
+--version 0.3.0 --write`, then fill `downloads.json`'s sizes and hashes and flip `live`.

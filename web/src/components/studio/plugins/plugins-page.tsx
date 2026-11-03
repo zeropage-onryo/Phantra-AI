@@ -1,8 +1,10 @@
 "use client";
 
 /* /studio/plugins (2026-10-23, Mike: "add it to the ui and give me a more
-   visually appealing design"). Where the Plugins flyout's DaVinci Resolve and
-   Premiere Pro rows open (#resolve, #premiere). The one loud thing is the
+   visually appealing design"). Where the Plugins flyout's DaVinci Resolve,
+   Premiere Pro and After Effects rows open (#resolve, #premiere,
+   #aftereffects; the Adobe panel is ONE extension for both apps since
+   2026-11-03, so the last two open the same tab). The one loud thing is the
    drawn editor at the top: a viewer, a timeline, and the Phantra panel docked
    beside it, with the clip Phantra made landing on V2 at the playhead. Under
    it, the plain part (Mike: "simple like this with the downloader attached"):
@@ -11,10 +13,10 @@
    .zplug in studio.css. */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { PANELS, PanelLogo, downloadFor, panelById, type Panel } from "./shared";
-import { humanSize } from "@/lib/downloads";
+import { PANELS, PanelLogo, downloadsFor, panelById, type Panel } from "./shared";
+import { humanSize, type Download } from "@/lib/downloads";
 
-/** #resolve / #premiere picks the app the flyout row was for. */
+/** #resolve / #premiere / #aftereffects picks the app the flyout row was for. */
 function useHashPanel(): [Panel, (p: Panel) => void] {
   const [panel, setPanel] = useState<Panel>(PANELS[0]);
   useEffect(() => {
@@ -71,6 +73,7 @@ function EditorScene({ panel }: { panel: Panel }) {
           <i />
         </span>
         <span className="zed-app">{resolve ? "DaVinci Resolve Studio" : "Adobe Premiere Pro"}</span>
+        {/* the drawn editor is a timeline, so the Adobe tab shows Premiere; After Effects gets the same panel */}
         <span className="zed-proj">Night shift, edit 3</span>
       </div>
       <div className="zed-body" aria-hidden>
@@ -218,20 +221,29 @@ const GUIDE: Record<Panel["id"], Step[]> = {
       ),
     },
   ],
-  premiere: [
+  adobe: [
     {
       title: "Download the plugin",
-      body: "Download the plugin for free. One file installs on Mac and Windows, for Premiere Pro 25.6 or newer.",
+      body: "Download it for free. One install covers Premiere Pro and After Effects, 2025 (25.0) or newer: a .pkg on Mac, a .zxp on Windows.",
     },
     {
       title: "Launch the installer",
-      body: "Double-click the .ccx file. The Creative Cloud app installs the plugin into Premiere.",
-    },
-    {
-      title: "Find Phantra inside Premiere",
       body: (
         <>
-          In Premiere, go to Window → Extensions (or UXP Plugins) → Phantra. Press Sign in and type the code it shows at{" "}
+          Quit Premiere and After Effects. On a Mac, open the .pkg and follow the steps; it puts the panel where both
+          apps read it. On Windows, install the free{" "}
+          <a href="https://aescripts.com/learn/zxp-installer/" target="_blank" rel="noopener noreferrer">
+            ZXP Installer
+          </a>{" "}
+          from aescripts and drag the .zxp onto it.
+        </>
+      ),
+    },
+    {
+      title: "Find Phantra inside Premiere or After Effects",
+      body: (
+        <>
+          In either app, go to Window → Extensions → Phantra. Press Sign in and type the code it shows at{" "}
           <Link href="/studio/link">phantra.ai/studio/link</Link>.
         </>
       ),
@@ -240,42 +252,37 @@ const GUIDE: Record<Panel["id"], Step[]> = {
 };
 
 function Downloads({ panel }: { panel: Panel }) {
-  const d = downloadFor(panel.id);
-  const ready = Boolean(d.url && d.size !== null);
-  const button = (os: "mac" | "windows" | "both", live: boolean) => {
-    const mark = os === "windows" ? <WindowsMark /> : os === "mac" ? <AppleMark /> : null;
-    const name = os === "windows" ? "Windows" : os === "mac" ? "Mac" : "Mac and Windows";
+  // one button per file the panel ships (lib/downloads.ts says which); a
+  // Resolve for Windows button is drawn off, because there is no such build
+  const files = downloadsFor(panel.id);
+  const button = (os: "mac" | "windows", d: Download | null) => {
+    const mark = os === "windows" ? <WindowsMark /> : <AppleMark />;
+    const name = os === "windows" ? "Windows" : "Mac";
+    const live = Boolean(d && d.url && d.size !== null && d.file);
     return live ? (
-      <a key={os} className="zplug-get-btn" href={d.url!} download={d.file} aria-label={`Download for ${name}`}>
+      <a key={os} className="zplug-get-btn" href={d!.url!} download={d!.file!} aria-label={`Download for ${name}`}>
         {mark}
-        {os === "both" ? (
-          <>
-            <AppleMark />
-            <WindowsMark />
-          </>
-        ) : null}
         Download
       </a>
     ) : (
       <span key={os} className="zplug-get-btn off" aria-disabled="true" title={`${name}: coming soon`}>
         {mark}
-        {os === "both" ? (
-          <>
-            <AppleMark />
-            <WindowsMark />
-          </>
-        ) : null}
-        {os === "windows" ? "Coming later" : "Coming soon"}
+        {d ? "Coming soon" : "Coming later"}
       </span>
     );
   };
+  const up = files.filter((d) => d.url && d.size !== null && d.file);
+  const version = files[0]?.version ?? "";
   return (
     <div className="zplug-dls">
       <div className="zplug-btns">
-        {panel.id === "resolve" ? [button("mac", ready), button("windows", false)] : [button("both", ready)]}
+        {button("mac", files.find((d) => d.os === "mac") ?? null)}
+        {button("windows", files.find((d) => d.os === "windows") ?? null)}
       </div>
       <p className="zplug-legal">
-        {ready ? `${d.file}, ${humanSize(d.size!)}. ` : `Version ${d.version}. The download appears here as soon as it is up. `}
+        {up.length
+          ? up.map((d) => `${d.file}, ${humanSize(d.size!)}. `).join("")
+          : `Version ${version}. The download appears here as soon as it is up. `}
         By downloading the plugin, you agree to the <Link href="/download/license">Phantra Plugin License</Link> and
         our <Link href="/terms">Terms</Link>, and acknowledge our <Link href="/privacy">Privacy Policy</Link>.
       </p>

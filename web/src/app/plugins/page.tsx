@@ -9,24 +9,26 @@ import { PageIntro } from "@/components/site/page-intro";
 import { LEGAL_CONTACT } from "@/components/legal-page";
 import { Button } from "@/components/ui/button";
 import { pageMeta } from "@/lib/page-meta";
-import { downloadOf, humanSize, type Download, type Entry, type PanelId } from "@/lib/downloads";
+import { downloadOf, humanSize, osesOf, type Download, type Entry, type PanelId } from "@/lib/downloads";
 import DOWNLOADS from "@/content/downloads.json";
 
 // The editor panels' setup page (2026-10-23, Mike: "make da vinci and premier
-// live and connected and it sends to this page, only showing the two"). The
-// studio's Plugins flyout sends its DaVinci Resolve and Premiere Pro rows here
-// (/plugins#resolve, /plugins#premiere); nothing else on the site links it.
-// The panels' facts are /download's (their READMEs, in the private repos
-// phantra-resolve-plugin and phantra-premiere-plugin). The Download button
-// exists only once content/downloads.json marks a build live with its size and
-// sha256 (lib/downloads.ts), so the page never links a file that is not up;
-// until then each card says its download is on the way. No price is printed:
-// the panels spend credits only through the studio's own quote-and-approve.
+// live and connected and it sends to this page, only showing the two"). Two
+// cards: DaVinci Resolve, and the Adobe panel, ONE extension for Premiere Pro
+// and After Effects (2026-11-03, phantra-premiere-plugin 0.3.0, CEP; the old
+// #premiere anchor still lands on it, and #aftereffects beside it). The
+// panels' facts are /download's (their READMEs, in the private repos
+// phantra-resolve-plugin and phantra-premiere-plugin). A Download button
+// exists only once content/downloads.json marks that file live with its size
+// and sha256 (lib/downloads.ts), so the page never links a file that is not
+// up; until then the card says its download is on the way. No price is
+// printed: the panels spend credits only through the studio's own
+// quote-and-approve.
 
 export const metadata: Metadata = pageMeta({
-  title: "DaVinci Resolve and Premiere Pro plugins",
+  title: "DaVinci Resolve, Premiere Pro and After Effects plugins",
   description:
-    "Set up Phantra inside DaVinci Resolve Studio and Adobe Premiere Pro: your Library on the timeline, and AI images, video and effects made from the clip you are cutting, priced before anything is spent.",
+    "Set up Phantra inside DaVinci Resolve Studio, Adobe Premiere Pro and After Effects: your Library on the timeline, and AI images, video and effects made from the clip you are cutting, priced before anything is spent.",
   path: "/plugins",
 });
 
@@ -37,7 +39,10 @@ type Step = { title: string; body: ReactNode };
 type Panel = {
   id: PanelId;
   app: string;
-  logo: string;
+  /** one logo per app the panel lives in */
+  logos: string[];
+  /** anchors that also open this card */
+  aliases?: string[];
   requires: ReactNode;
   does: string;
   install: Step[];
@@ -63,7 +68,7 @@ const PANELS: Panel[] = [
   {
     id: "resolve",
     app: "DaVinci Resolve",
-    logo: "/brand/plugins/davinci-resolve.svg",
+    logos: ["/brand/plugins/davinci-resolve.svg"],
     requires: (
       <>
         DaVinci Resolve <strong className="font-medium text-foreground">Studio</strong> 20.1 or newer on macOS. The
@@ -89,19 +94,27 @@ const PANELS: Panel[] = [
     ],
   },
   {
-    id: "premiere",
-    app: "Premiere Pro",
-    logo: "/brand/plugins/premiere-pro.svg",
-    requires: <>Adobe Premiere Pro 25.6 or newer, with the Creative Cloud app.</>,
-    does: "Your Library in a Phantra bin and at the playhead, and the selected clip or the frame at the playhead sent up to edit, then brought back.",
+    id: "adobe",
+    app: "Premiere Pro and After Effects",
+    logos: ["/brand/plugins/premiere-pro.svg", "/brand/plugins/after-effects.svg"],
+    aliases: ["premiere", "aftereffects"],
+    requires: <>Adobe Premiere Pro or After Effects 2025 (25.0) or newer, on Mac or Windows. One install covers both apps.</>,
+    does: "Your Library in a Phantra bin or folder and at the playhead or on your comp, and the selected clip or layer, or the frame at the current time, sent up to edit and brought back.",
     install: [
       {
-        title: "Install the .ccx file",
-        body: <>Double-click it; the Creative Cloud app installs the panel into Premiere.</>,
+        title: "Quit Premiere and After Effects, then install",
+        body: (
+          <>
+            On a Mac, double-click the .pkg, press Continue and type your Mac password: it puts the panel in
+            /Library/Application Support/Adobe/CEP/extensions, which both apps read. On Windows, install the free{" "}
+            <a href="https://aescripts.com/learn/zxp-installer/">ZXP Installer</a> from aescripts and drag the .zxp
+            onto it.
+          </>
+        ),
       },
       {
         title: "Open the panel",
-        body: <>In Premiere, Window, Extensions (or UXP Plugins), Phantra.</>,
+        body: <>Start either app, then Window, Extensions, Phantra. If Phantra is not in the menu, quit the app fully and open it again.</>,
       },
       ...SIGN_IN,
     ],
@@ -111,15 +124,18 @@ const PANELS: Panel[] = [
 const PROSE =
   "text-[15px] leading-relaxed text-[#afafaf] [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-4";
 
-function DownloadBox({ download }: { download: Download }) {
-  if (!download.url || download.size === null || !download.sha256) {
+const OS_NAME = { mac: "Mac", windows: "Windows" } as const;
+
+function DownloadBox({ download, labelled }: { download: Download; labelled: boolean }) {
+  const name = labelled ? ` for ${OS_NAME[download.os]}` : "";
+  if (!download.url || download.size === null || !download.sha256 || !download.file) {
     return (
       <div className="flex flex-wrap items-center gap-3">
         <span
           aria-disabled="true"
           className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-[14px] text-[#8a8a8a]"
         >
-          Download on the way
+          Download{name} on the way
         </span>
         <span className="text-[13px] text-[#8a8a8a]">Version {download.version}</span>
       </div>
@@ -129,7 +145,7 @@ function DownloadBox({ download }: { download: Download }) {
     <div>
       <div className="flex flex-wrap items-center gap-3">
         <Button size="lg" render={<a href={download.url} download={download.file} />}>
-          Download
+          Download{name}
           <ArrowDown data-icon="inline-end" className="size-4" />
         </Button>
         <span className="text-[13px] text-[#afafaf]">
@@ -147,19 +163,26 @@ function DownloadBox({ download }: { download: Download }) {
 }
 
 function PanelCard({ panel }: { panel: Panel }) {
-  const download = downloadOf(panel.id, ENTRIES);
+  const oses = osesOf(panel.id);
   return (
     <article id={panel.id} className="flex scroll-mt-24 flex-col rounded-[14px] border border-border bg-card p-6 md:p-8">
+      {panel.aliases?.map((alias) => (
+        <span key={alias} id={alias} aria-hidden className="block scroll-mt-24" />
+      ))}
       <div className="flex items-center gap-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={panel.logo} alt="" width={40} height={40} className="size-10 shrink-0 rounded-[10px]" />
+        {panel.logos.map((logo) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={logo} src={logo} alt="" width={40} height={40} className="size-10 shrink-0 rounded-[10px]" />
+        ))}
         <h2 className="serif text-[clamp(1.5rem,3vw,2rem)]">{panel.app}</h2>
       </div>
       <p className={`mt-5 ${PROSE}`}>{panel.does}</p>
       <p className="mt-3 text-[13px] leading-relaxed text-[#8a8a8a]">Needs: {panel.requires}</p>
 
-      <div className="mt-6">
-        <DownloadBox download={download} />
+      <div className="mt-6 flex flex-col gap-4">
+        {oses.map((os) => (
+          <DownloadBox key={os} download={downloadOf(panel.id, ENTRIES, os)} labelled={oses.length > 1} />
+        ))}
       </div>
 
       <span className="eyebrow mt-8 block">Setup</span>
@@ -186,7 +209,7 @@ export default function PluginsPage() {
         <PageIntro
           eyebrow="Plugins"
           title="Phantra inside your editor."
-          dek="A panel in DaVinci Resolve and Premiere Pro, connected to your studio: your Library on the timeline, and images, video and effects made from the clip you are cutting. Everything is priced in credits and waits for your yes."
+          dek="A panel in DaVinci Resolve, Premiere Pro and After Effects, connected to your studio: your Library on the timeline, and images, video and effects made from the clip you are cutting. Everything is priced in credits and waits for your yes."
         />
 
         <section className="mx-auto max-w-[1200px] px-6 pb-16">
@@ -200,8 +223,8 @@ export default function PluginsPage() {
         <section className="border-t border-border">
           <div className="mx-auto max-w-[760px] px-6 py-16">
             <p className={PROSE}>
-              The panels sign in with a code, never a password, and keep the sign-in in your Mac&apos;s Keychain; a
-              panel left unused for 90 days asks again. Disconnect any copy with Sign out in the panel, or under
+              The panels sign in with a code, never a password, and keep the sign-in on your own computer; a panel
+              left unused for 90 days asks again. Disconnect any copy with Sign out in the panel, or under
               Settings, Connections, Apps in the studio. Never type a code someone else sent you. The panels are free to
               install and use with your own Phantra account, under the{" "}
               <Link href="/download/license">Phantra Plugin License</Link>. Questions:{" "}
