@@ -77,7 +77,16 @@ LOOPBACK = {"localhost", "127.0.0.1", "::1"}
 # told the request expired (EXPIRED), not be dropped in the studio with
 # no word about the app they were connecting.
 PENDING_MAX_AGE = 15 * 60
-EXPIRED = ("This connection request has expired -- they last about ten minutes. "
+# How long a sign-in ALREADY UNDER WAY still comes back here. The sign-in
+# page drops a stale id when it is drawn (`pending`), but a person who
+# opened it in time and finished signing in past PENDING_MAX_AGE never
+# draws it again: `resume` must still send them back, so the page can say
+# the request expired, not drop them in the studio. Measured 2026-11-02:
+# a Google sign-in begun 29 minutes after the page opened landed in the
+# studio with no word about the app. Bounded, so a forgotten tab cannot
+# turn a sign-in hours later into a connection screen.
+RESUME_MAX_AGE = 60 * 60
+EXPIRED =("This connection request has expired -- they last about ten minutes. "
            "Go back to the app you came from and connect again.")
 
 
@@ -85,26 +94,34 @@ def _valid_id(authorization_id: str) -> bool:
     return bool(_ID.match(authorization_id or ""))
 
 
+def _waiting(request: Request, max_age: float) -> Optional[str]:
+    """The pending authorization id while it is younger than `max_age`;
+    an older one is forgotten."""
+    value = request.session.get(PENDING_KEY)
+    if not isinstance(value, dict) or not _valid_id(value.get("id") or ""):
+        return None
+    if time.time() - float(value.get("at") or 0) > max_age:
+        request.session.pop(PENDING_KEY, None)
+        return None
+    return value["id"]
+
+
 def pending(request: Request) -> Optional[str]:
     """The authorization id a sign-in on this browser is FOR, if any --
     what /signin reads to say why the person is there and to skip its
     already-signed-in shortcut (the consent needs a fresh Supabase
     session even when our own cookie is good)."""
-    value = request.session.get(PENDING_KEY)
-    if not isinstance(value, dict) or not _valid_id(value.get("id") or ""):
-        return None
-    if time.time() - float(value.get("at") or 0) > PENDING_MAX_AGE:
-        request.session.pop(PENDING_KEY, None)
-        return None
-    return value["id"]
+    return _waiting(request, PENDING_MAX_AGE)
 
 
 def resume(request: Request, session: dict) -> Optional[RedirectResponse]:
     """Called from auth._finish with the GoTrue session a sign-in just
     produced. When a consent was waiting, keep that sign-in's access token
     for the decision and go back to the page; otherwise None and the
-    sign-in finishes as it always has."""
-    authorization_id = pending(request)
+    sign-in finishes as it always has. Read against RESUME_MAX_AGE, not
+    PENDING_MAX_AGE: past ten minutes Supabase has forgotten the request
+    and the page says so (EXPIRED)."""
+    authorization_id = _waiting(request, RESUME_MAX_AGE)
     request.session.pop(PENDING_KEY, None)
     if authorization_id is None:
         return None
