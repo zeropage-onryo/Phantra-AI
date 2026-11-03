@@ -3,20 +3,22 @@
 /* Settings → Workspace (2026-10-11): the workspaces the person belongs to,
    the switch between them, and who is in the one that is open.
 
-   The members list is read only. Membership is granted by members, never
-   by signing up and never from a page: an invite form is its own decision
-   (docs/BACKLOG.md #22), so this says how people are added and adds
-   nobody. An owner sees addresses; a member sees names. */
+   Since 2026-11-03 (the Agency plan) an OWNER on a plan with seats invites
+   teammates by address here and removes them; nothing is emailed, the
+   person signs in with that address. Below Agency there are no seats, and
+   the card says where they come from. An owner sees addresses; a member
+   sees names. The open workspace is the one work goes to. */
 /* eslint-disable @next/next/no-img-element -- the provider's own avatar, already small */
 import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
-import { getMembers, switchAccount, type Members } from "@/lib/studio-api";
+import { getMembers, inviteMember, removeMember, switchAccount, type Members } from "@/lib/studio-api";
 import { SECTIONS } from "@/lib/settings-sections";
 import { useShell } from "@/components/studio/shell";
 import {
   Badge,
   Button,
   EmptyState,
+  Field,
   Notice,
   Row,
   SectionHeader,
@@ -50,10 +52,45 @@ export function WorkspaceSection() {
     };
   }, [account]);
   const members = read && read.account === account ? read : null;
-  // somebody in more than one workspace is told where their work lives:
-  // the studio keeps it in the FIRST one they joined, whichever is open
-  const home = members?.data?.home ?? null;
   const several = (me?.accounts.length ?? 0) > 1;
+  const [email, setEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const reread = () => {
+    if (account === null) return;
+    getMembers().then(
+      (data) => setRead({ account, data, error: null }),
+      () => {},
+    );
+  };
+  const invite = () => {
+    const address = email.trim();
+    if (!address || inviting) return;
+    setInviting(true);
+    inviteMember(address)
+      .then((r) => {
+        setEmail("");
+        toast(
+          r.joined_existing_user
+            ? `${r.email} can open this workspace from their workspace switch now`
+            : `${r.email} joins when they sign in at phantra.ai with that address`,
+        );
+        reread();
+      })
+      .catch((err) => toast(errorText(err, "Could not invite them"), "err"))
+      .finally(() => setInviting(false));
+  };
+  const remove = (id: string, who: string) => {
+    if (removing) return;
+    setRemoving(id);
+    removeMember(id)
+      .then(() => {
+        toast(`${who} was removed. What they made stays here.`);
+        reread();
+      })
+      .catch((err) => toast(errorText(err, "Could not remove them"), "err"))
+      .finally(() => setRemoving(null));
+  };
 
   const go = (slug: string) => {
     setSwitching(slug);
@@ -98,10 +135,7 @@ export function WorkspaceSection() {
                 </span>
               }
               hint={
-                <>
-                  You are {a.role === "owner" ? "an owner" : "a member"}.
-                  {several && home?.id === a.id ? " Your credits, scenes and elements live here." : ""}
-                </>
+                <>You are {a.role === "owner" ? "an owner" : "a member"}.</>
               }
               control={
                 a.id === active?.id ? null : (
@@ -113,10 +147,9 @@ export function WorkspaceSection() {
             />
           ))
         )}
-        {several && home ? (
+        {several ? (
           <p className="zset-note zset-foot">
-            Switching changes which workspace the studio shows. Your credits, scenes and elements stay in{" "}
-            <b>{home.label}</b>, the first workspace you joined.
+            Switching changes the workspace you work in: its credits, projects, scenes and elements.
           </p>
         ) : null}
       </SettingsCard>
@@ -124,7 +157,13 @@ export function WorkspaceSection() {
       {active ? (
         <SettingsCard
           title={`Members of ${members?.data?.account.label ?? active.label}`}
-          description={members?.data ? `${members.data.members.length} in this workspace` : undefined}
+          description={
+            members?.data
+              ? (members.data.seats ?? 1) > 1
+                ? `${members.data.used ?? members.data.members.length} of ${members.data.seats} seats used`
+                : `${members.data.members.length} in this workspace`
+              : undefined
+          }
         >
           {members?.error ? (
             <div className="zset-card-pad">
@@ -150,15 +189,51 @@ export function WorkspaceSection() {
                     <span className="zset-member-tags">
                       {!m.claimed ? <Badge tone="warn">Invited</Badge> : null}
                       <Badge tone={m.role === "owner" ? "signal" : undefined}>{roleWord(m.role)}</Badge>
+                      {members.data!.role === "owner" && m.role !== "owner" && m.id ? (
+                        <Button onClick={() => remove(m.id!, m.name)} disabled={removing !== null}>
+                          {removing === m.id ? "Removing…" : "Remove"}
+                        </Button>
+                      ) : null}
                     </span>
                   </li>
                 ))}
               </ul>
+              {members.data.can_invite ? (
+                <form
+                  className="zset-card-pad zset-invite"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    invite();
+                  }}
+                >
+                  <Field
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="teammate@agency.com"
+                    aria-label="Teammate's email address"
+                    disabled={inviting || (members.data.used ?? 0) >= (members.data.seats ?? 1)}
+                  />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={inviting || !email.trim() || (members.data.used ?? 0) >= (members.data.seats ?? 1)}
+                  >
+                    {inviting ? "Inviting…" : "Invite"}
+                  </Button>
+                </form>
+              ) : null}
               <p className="zset-note zset-foot">
                 {members.data.can_see_emails
                   ? "As an owner you see everyone’s address. Members see names only."
                   : "Members see names only. Owners see addresses."}{" "}
-                People are added by invitation, by someone who runs the workspace. There is no invite form here yet.
+                {members.data.can_invite
+                  ? (members.data.used ?? 0) >= (members.data.seats ?? 1)
+                    ? "Every seat is taken. Remove someone to invite another person."
+                    : "Nothing is emailed: they join when they sign in at phantra.ai with that address, and share this workspace’s credits."
+                  : members.data.role === "owner"
+                    ? "Inviting teammates comes with the Agency plan: five seats on one credit pool."
+                    : "People are invited by the workspace’s owner."}
               </p>
             </>
           )}

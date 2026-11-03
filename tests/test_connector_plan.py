@@ -16,10 +16,11 @@ from src import accounts, pricing, providers
 
 
 def test_the_keys_and_price_envs_are_the_old_ones_and_only_the_names_moved():
-    assert list(pricing.PLANS) == ["starter", "creator", "studio"]
-    assert [p.name for p in pricing.PLANS.values()] == ["Standard", "Pro", "Max"]
+    assert list(pricing.PLANS) == ["starter", "creator", "studio", "agency"]
+    assert [p.name for p in pricing.PLANS.values()] == ["Standard", "Pro", "Max", "Agency"]
     assert [p.price_env for p in pricing.PLANS.values()] == [
-        "STRIPE_PRICE_STARTER", "STRIPE_PRICE_CREATOR", "STRIPE_PRICE_STUDIO"]
+        "STRIPE_PRICE_STARTER", "STRIPE_PRICE_CREATOR", "STRIPE_PRICE_STUDIO",
+        "STRIPE_PRICE_AGENCY"]
 
 
 def test_every_plan_carries_storage_its_numbers_can_pay_for():
@@ -32,7 +33,7 @@ def test_every_plan_carries_storage_its_numbers_can_pay_for():
 def test_the_catalog_publishes_storage_and_no_connector_flag():
     catalog = pricing.public_catalog()
     assert catalog["trial"]["storage_gb"] == pricing.FREE_STORAGE_GB
-    assert [p["storage_gb"] for p in catalog["plans"]] == [25, 70, 200]
+    assert [p["storage_gb"] for p in catalog["plans"]] == [25, 70, 200, 400]
     # the connector is not a plan feature any more, so no plan says so
     assert all("mcp" not in p for p in catalog["plans"])
 
@@ -101,3 +102,14 @@ def test_a_sign_in_with_no_workspace_is_still_refused():
     status, body = _drive(app, "Bearer someones-jwt")
     assert status == 403 and reached == []
     assert json.loads(body)["error"] == "no_account"
+
+
+def test_seats_are_solo_below_agency_and_five_on_it():
+    # 2026-11-03, Mike: inviting teammates is the Agency plan's reason to exist
+    assert {k: p.seats for k, p in pricing.PLANS.items()} == {
+        "starter": 1, "creator": 1, "studio": 1, "agency": 5}
+    agency = pricing.PLANS["agency"]
+    assert (agency.monthly_usd, agency.credits) == (199, 19900)
+    # twelve discounted months are $1,910.40; the plan names the whole-dollar price
+    assert agency.yearly_usd == 1910 and agency.price_env_yearly == "STRIPE_PRICE_AGENCY_YEAR"
+    assert [p["seats"] for p in pricing.public_catalog()["plans"]] == [1, 1, 1, 5]

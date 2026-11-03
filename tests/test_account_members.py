@@ -98,15 +98,15 @@ def test_the_list_follows_the_workspace_you_have_open(people):
     assert _members()["account"]["slug"] == "north"
 
 
-def test_the_answer_says_where_your_work_lives_whichever_workspace_is_open(people):
-    """Data routes act on the caller's FIRST workspace whatever is open
-    (auth.current_account_id). The page is told which, so a switch does
-    not read as having moved anybody's credits or scenes."""
-    for brand in ("north", "south"):
+def test_your_work_lives_in_the_workspace_you_have_open(people):
+    """Data routes act on the OPEN workspace since 2026-11-03
+    (auth.current_account_id; the Agency plan's teammates), so `home` is
+    the one that is open."""
+    for brand, home_id, label in (("north", 1, "North Films"), ("south", 2, "South Co")):
         people("ada", opened=brand)
         out = _members()
         assert out["account"]["slug"] == brand
-        assert out["home"] == {"id": 1, "slug": "north", "label": "North Films"}
+        assert out["home"] == {"id": home_id, "slug": brand, "label": label}
     people("dee")
     assert _members()["home"]["slug"] == "south"
 

@@ -251,12 +251,21 @@ class Plan:
     # worst month -- a yearly subscriber spending every credit -- at R2's
     # $0.015/GB-month (STORAGE_USD_PER_GB). See storage_ceiling_gb.
     storage_gb: int = 0
+    # SEATS (2026-11-03, the Agency plan): how many people may be members of
+    # a workspace on this plan, invited from Settings -> Workspace
+    # (app/api.py account_invite). 1 = solo; Mike: solo below Agency.
+    seats: int = 1
+    # a yearly price set by hand when twelve discounted months do not land
+    # on whole dollars ($199 x 12 x 0.8 = $1,910.40 -> $1,910)
+    yearly_usd_set: Optional[int] = None
 
     @property
     def yearly_usd(self) -> int:
-        """Twelve months at the discount, in whole dollars (the three
-        plans all land on integers; a plan that would not should pick a
-        price that does)."""
+        """Twelve months at the discount, in whole dollars (the first three
+        plans all land on integers; one that does not names its yearly
+        price in `yearly_usd_set`)."""
+        if self.yearly_usd_set is not None:
+            return self.yearly_usd_set
         cents = Fraction(self.monthly_usd * 100 * MONTHS_PER_YEAR) * (1 - Fraction(YEARLY_DISCOUNT))
         assert cents.denominator == 1 and cents.numerator % 100 == 0, self.key
         return int(cents) // 100
@@ -283,8 +292,17 @@ PLANS: dict[str, Plan] = {
                     "For creators and filmmakers posting every week.",
                     "STRIPE_PRICE_CREATOR", popular=True, storage_gb=70),
     "studio": Plan("studio", "Max", "premium", 95, 9500,
-                   "For agencies, client work and heavy solo use.",
+                   "For heavy solo use and client work.",
                    "STRIPE_PRICE_STUDIO", storage_gb=200),
+    # AGENCY (2026-11-03, Mike, docs/tasks/task-agency-plan.md): the business
+    # tier. Five people share one workspace and its credit pool, each client
+    # kept apart as a project with its own brand kit. Priced just above
+    # Creatify Business ($195) at the plans' own 1c a credit. Its Stripe
+    # Prices (STRIPE_PRICE_AGENCY, _YEAR) are separate from the first three,
+    # so checkout for the others keeps working while they are unset.
+    "agency": Plan("agency", "Agency", "premium", 199, 19900,
+                   "For agencies and teams: five seats on one credit pool, a project and brand kit per client.",
+                   "STRIPE_PRICE_AGENCY", storage_gb=400, seats=5, yearly_usd_set=1910),
 }
 
 # EVERY PLAN RENDERS EVERY MODEL (2026-10-20, Mike's call). A plan's `tier`
@@ -304,7 +322,7 @@ STORAGE_SHARE = "0.10"           # of the worst month's margin
 STRIPE_PCT, STRIPE_FIXED_USD = "0.029", "0.30"
 # What the assistant (free on a plan) is allowed to cost a month, per plan,
 # in the ceiling below -- an estimate, not a meter reading.
-BRAIN_USD = {"starter": 1, "creator": 2, "studio": 4}
+BRAIN_USD = {"starter": 1, "creator": 2, "studio": 4, "agency": 8}
 
 
 def storage_ceiling_gb(plan: Plan) -> int:
@@ -1345,7 +1363,7 @@ def public_catalog() -> dict:
                    "monthly_usd": p.monthly_usd, "yearly_usd": p.yearly_usd,
                    "yearly_monthly_usd": p.yearly_monthly_usd, "credits": p.credits,
                    "blurb": p.blurb, "popular": p.popular,
-                   "storage_gb": p.storage_gb}
+                   "storage_gb": p.storage_gb, "seats": p.seats}
                   for p in PLANS.values()],
         "topup": {"key": TOPUP.key, "name": TOPUP.name, "usd": TOPUP.usd,
                   "credits": TOPUP.credits},

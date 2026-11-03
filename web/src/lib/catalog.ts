@@ -19,6 +19,8 @@ export type Plan = {
   popular: boolean;
   /** what the workspace may keep in storage, in GB (2026-10-20) */
   storage_gb: number;
+  /** people who may share the workspace and its credits (2026-11-03: 5 on Agency, 1 below) */
+  seats: number;
 };
 
 export type Interval = "month" | "year";
