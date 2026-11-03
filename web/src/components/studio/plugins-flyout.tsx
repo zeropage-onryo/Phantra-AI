@@ -3,6 +3,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { CHATGPT_PLUGIN_URL } from "@/lib/connect-claude";
 import Link from "next/link";
 import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
 
@@ -19,7 +20,7 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "MCP",
     items: [
-      { name: "ChatGPT", href: "https://chatgpt.com/plugins", logo: "/brand/plugins/chatgpt.svg" },
+      { name: "ChatGPT", href: CHATGPT_PLUGIN_URL, logo: "/brand/plugins/chatgpt.svg" },
       { name: "Claude", href: "https://claude.ai/customize/connectors", logo: "/brand/plugins/claude.svg" },
       { name: "Grok Bot", logo: "/brand/plugins/grok.svg" },
       { name: "Muse", icon: Music2 },
