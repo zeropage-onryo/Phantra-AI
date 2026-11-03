@@ -42,7 +42,11 @@ export type Catalog = {
   /** Video models priced at their own markup (2026-10-27); every other render uses `markup`. */
   markup_by_model?: Record<string, string>;
   credit_floor: number;
+  /** How long PLAN credit lives (one month since 2026-11-02). */
   expiry_months: number;
+  /** How long a top-up lives, and the trial / promo credit. */
+  topup_expiry_months: number;
+  trial_expiry_months: number;
   clip_seconds: number;
   yearly_discount: string;
   tiers: Tier[];
@@ -110,4 +114,9 @@ export function usd(n: number): string {
 
 export function num(n: number): string {
   return n.toLocaleString("en-US");
+}
+
+/** "a month" / "2 months": an expiry window in words. */
+export function monthsLabel(n: number): string {
+  return n === 1 ? "a month" : `${n} months`;
 }

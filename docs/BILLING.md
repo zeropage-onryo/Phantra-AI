@@ -80,7 +80,11 @@ delete of the row, and their photos are not removed from the bucket -- not cover
 account with no plan (`403 plan_required`, before any Stripe call). At 1,000 for $10 it was
 the same rate as Starter, which gave nobody a reason to subscribe. The Stripe Price stays
 $10; only the grant changed, so no Stripe edit is needed.
-Lots expire 2 months after they land (`ledger.EXPIRY_MONTHS`).
+Plan credit (a `subscription` lot, monthly or one month of a yearly schedule) expires
+**one month** after it lands, since 2026-11-02 (Mike: "change credits to expiring monthly";
+`ledger.expiry_months("subscription")`). Every other lot (top-ups, the trial, promos,
+refunds) keeps 2 months (`ledger.EXPIRY_MONTHS`). Lots granted before the change keep the
+`expires_at` they were written with.
 
 **Yearly = 12 months at 20% off** (Starter $144, Creator $336, Studio $912 — $12 / $28 /
 $76 a month, the toggle on /pricing), **billed once, released monthly.** A year's credit

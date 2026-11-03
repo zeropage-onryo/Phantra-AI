@@ -807,7 +807,7 @@ def test_concept_detail_carries_the_renderers_availability(tmp_db, monkeypatch):
     # credits and never dollars (2026-10-08)
     from src import pricing
     assert d["renderer"]["credits"] == pricing.credits_for(
-        pricing.usd_micros(d["renderer"]["estimate_usd"]))
+        pricing.usd_micros(d["renderer"]["estimate_usd"]), model=d["renderer"]["model"])
     assert "runway" not in d
 
 

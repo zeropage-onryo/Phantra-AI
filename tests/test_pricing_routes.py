@@ -77,7 +77,8 @@ def test_every_pending_card_carries_the_servers_price(tmp_db):
     assert quote["durations"] == [6]           # LTX-2.3's shortest clip
     assert quote["estimate_usd"] == pytest.approx(
         fal.estimate_cost(1, model=quote["model"], duration=6, resolution=quote["frame"]))
-    assert quote["credits"] == pricing.credits_for(pricing.usd_micros(quote["estimate_usd"]))
+    assert quote["credits"] == pricing.credits_for(pricing.usd_micros(quote["estimate_usd"]),
+                                                   model=quote["model"])
     assert "byok" not in quote                 # every render is charged (2026-09-26)
 
 

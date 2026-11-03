@@ -131,6 +131,24 @@ ENTRY_KINDS = ("grant", "hold", "settle", "release", "expire")
 # grant, not the twelve the first draft carried.
 EXPIRY_MONTHS = 2
 
+# PLAN CREDIT LIVES ONE MONTH (2026-11-02, Mike: "change credits to
+# expiring monthly"). A subscription lot -- a monthly invoice's, or one
+# month of a yearly plan's release schedule -- now dies a month after it
+# lands, when the next one arrives, the way Runway's and DomoAI's do. Every
+# other kind keeps EXPIRY_MONTHS: a top-up (`purchase`) is cash the person
+# paid for credit, and shortening that is LAPSE_POLICY's question below
+# (an accountant's, not a code change); the trial and promos keep theirs.
+# Applies to NEW grants: a lot already granted keeps the expires_at it was
+# written with.
+EXPIRY_MONTHS_BY_KIND: dict[str, int] = {
+    "subscription": 1,
+}
+
+
+def expiry_months(kind: str) -> int:
+    """How many months a lot of `kind` lives from its grant."""
+    return EXPIRY_MONTHS_BY_KIND.get(kind, EXPIRY_MONTHS)
+
 # Which lot kinds die when the subscription lapses. A dict rather than a
 # hardcoded rule because THE `purchase` ENTRY IS THE ONE TO REVISIT:
 # voiding credit a customer paid cash for, because a separate
@@ -448,7 +466,7 @@ def _parse(stamp: str) -> datetime:
 
 
 def _plus_months(stamp: str, months: int) -> str:
-    """`granted_at + EXPIRY_MONTHS`, clamping the day.
+    """`granted_at + months` (a lot's expiry_months), clamping the day.
 
     Hand-rolled rather than dateutil because nothing else in this repo
     pulls that in for one call, and the only hard case is the one
@@ -785,7 +803,8 @@ def grant(account_id: Optional[int], credits: int, kind: str, *,
     reading first -- inside the account's advisory lock, so two
     deliveries racing each other cannot both find nothing.
 
-    `expires_at` defaults to EXPIRY_MONTHS after the grant. Pass it
+    `expires_at` defaults to `expiry_months(kind)` after the grant (one
+    month for a subscription lot, EXPIRY_MONTHS for the rest). Pass it
     explicitly only where a plan really does say something else; the
     default is the policy.
     """
@@ -796,7 +815,7 @@ def grant(account_id: Optional[int], credits: int, kind: str, *,
         raise LedgerError(f"lot kind must be one of {LOT_KINDS}, got {kind!r}")
     granted_at = granted_at or _now()
     if expires_at is None:
-        expires_at = _plus_months(granted_at, EXPIRY_MONTHS)
+        expires_at = _plus_months(granted_at, expiry_months(kind))
 
     with db.connect(dsn) as conn:
         _lock(conn, account_id)
@@ -1491,7 +1510,7 @@ def credit_exempt(account_id: Optional[int], dsn: Optional[str] = None) -> bool:
 
 
 __all__ = [
-    "EXPIRY_MONTHS", "LAPSE_POLICY", "LOT_KINDS", "ENTRY_KINDS",
+    "EXPIRY_MONTHS", "EXPIRY_MONTHS_BY_KIND", "expiry_months", "LAPSE_POLICY", "LOT_KINDS", "ENTRY_KINDS",
     "GENERATION_REF_KEY", "SUBSCRIPTION_SOURCES",
     "LedgerError", "InsufficientCredit",
     "credits_for_usd", "charge_credits", "is_billable", "ref_params", "credit_exempt",

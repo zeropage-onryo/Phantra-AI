@@ -90,8 +90,10 @@ def test_an_empty_balance_is_refused_before_anything_is_submitted(studio, tmp_pa
 def test_a_render_holds_then_settles_at_the_charge_linked_to_its_row(studio, tmp_path, monkeypatch):
     monkeypatch.setattr(fal, "RENDER_DIR", tmp_path / "renders")
     ledger.grant(studio["account_id"], 1000, "purchase", dsn=studio["dsn"])
-    price = ledger.charge_credits(fal.estimate_cost(1))
-    assert price == pricing.credits_for(pricing.usd_micros(fal.estimate_cost(1)))
+    # the default model (LTX 2.3) carries its own markup (2.0x since 2026-11-02)
+    price = ledger.charge_credits(fal.estimate_cost(1), model=fal.DEFAULT_MODEL)
+    assert price == pricing.credits_for(pricing.usd_micros(fal.estimate_cost(1)),
+                                        model=fal.DEFAULT_MODEL)
 
     result = fal.generate_from_prompt(PROMPT, db_path=studio["dsn"],
                                          account_id=studio["account_id"])
@@ -149,7 +151,7 @@ def test_a_chosen_length_and_resolution_are_held_sent_and_banked(studio, tmp_pat
     (body,) = studio["submits"]
     assert body["duration"] == 10 and body["resolution"] == "1440p"
     assert ledger.available(studio["account_id"], studio["dsn"]) == \
-        5000 - ledger.charge_credits(usd)
+        5000 - ledger.charge_credits(usd, model="ltx2.3")
     assert banked[0]["media_kind"] == "video" and banked[0]["model"] == "ltx2.3"
     with db.connect(studio["dsn"]) as conn:
         params = json.loads(conn.execute(
@@ -346,7 +348,7 @@ def test_without_a_quote_the_estimate_is_still_the_fallback(studio, tmp_path, mo
     result = fal.generate_from_prompt(PROMPT, db_path=studio["dsn"],
                                          account_id=studio["account_id"])
     assert result["ok"] is True, result
-    price = ledger.charge_credits(fal.estimate_cost(1))
+    price = ledger.charge_credits(fal.estimate_cost(1), model=fal.DEFAULT_MODEL)
     assert ledger.available(studio["account_id"], studio["dsn"]) == 1000 - price
 
 

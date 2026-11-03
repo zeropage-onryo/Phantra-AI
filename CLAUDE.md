@@ -385,7 +385,10 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
   the card offers a draft; Finish upscales the liked take (Topaz) rather than re-rendering it.
 - **Pricing** (`src/pricing.py`): `estimate()` is the provider's USD, `quote()` is credits
   (`MARKUP = "2.4"`, read through `Fraction`; `CREDIT_FLOOR = 10`), `display()` is what every card
-  reads. When `QUOTE_SIGNING_SECRET` is set, a quote carries a signed token (`phq.<body>.<mac>`,
+  reads. Video models carry their own markup (`MARKUP_BY_MODEL`, floor `MIN_MARKUP`): since
+  2026-11-02 Seedance 1.4x and Veo 3.1 1.15x (priced near Higgsfield), LTX 2.0x, the rest 1.5x
+  (`docs/tasks/task-competitive-pricing.md`). Plan credit expires one month after it lands,
+  everything else two (`ledger.expiry_months`). When `QUOTE_SIGNING_SECRET` is set, a quote carries a signed token (`phq.<body>.<mac>`,
   one hour) and a billable approve without it is 400 `missing_quote`. Six refusals, in order:
   bad_signature, retired_pricing, expired, wrong_account, wrong_render, stale_content (the content
   hash is `pricing.content_hash` over the LIVE shot).

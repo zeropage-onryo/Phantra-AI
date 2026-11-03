@@ -445,7 +445,8 @@ def test_each_month_lands_on_its_date_as_its_own_lot_and_never_twice(shop):
                   key=lambda lot: lot["id"])
     assert [lot["source_ref"] for lot in lots] == [f"in_y:m{n}" for n in range(1, 6)]
     assert lots[4]["granted_at"] == _months_later(started, 4)
-    assert lots[4]["expires_at"] == _months_later(_months_later(started, 4), ledger.EXPIRY_MONTHS)
+    assert lots[4]["expires_at"] == _months_later(_months_later(started, 4),
+                                                  ledger.expiry_months("subscription"))
     # ... and the twelfth month closes the schedule
     assert billing.release_due(acct, now=_months_later(started, 30), dsn=dsn) == 7
     sched = billing.schedules(acct, dsn=dsn)[0]
@@ -477,10 +478,12 @@ def test_a_due_month_lands_before_a_hold_is_taken(shop, monkeypatch):
     post(checkout_paid(acct, item="topup"))                       # binds; +1000 purchase
     post(invoice_paid(price="price_starter_year", invoice="in_y"))
     started = billing.schedules(acct, dsn=dsn)[0]["started_at"]
-    # pretend a month passed: rewind the schedule's next date into the past
+    # pretend a month passed: rewind the schedule's next date to now. Not a
+    # month back: plan credit lives one month since 2026-11-02, so a month
+    # released that late would land already expired, as it should.
     with db.connect(dsn) as conn:
         conn.execute("UPDATE credit_schedules SET next_release_at = %s WHERE account_id = %s",
-                     (ledger._plus_months(started, -1), acct))
+                     (started, acct))
     before = ledger.available(acct, dsn)
     c = charging.Charge(acct, provider="runway", ref="r1", estimate_usd=1.0, key_source="env", dsn=dsn)
     c.take()

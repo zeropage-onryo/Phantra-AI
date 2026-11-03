@@ -371,6 +371,28 @@ VIDEO_MODELS: dict[str, dict] = {
         "checked": "2026-09-26",
         "source": "https://fal.ai/models/fal-ai/veo3.1/image-to-video",
     },
+    # Veo 3.1 Fast (added 2026-11-02, Mike: make Veo competitive; the cheap
+    # Veo for drafts and first passes). Read that day off both endpoints'
+    # queue OpenAPI schemas (fal.ai/api/openapi/queue/openapi.json
+    # ?endpoint_id=...): the same inputs as Veo 3.1 -- duration "4s"/"6s"/
+    # "8s", resolution 720p / 1080p / 4k, aspect_ratio 16:9 / 9:16 ("auto"
+    # on image-to-video), generate_audio on by default, prompt up to 20,000.
+    # fal's pricing API and model page: $0.15/s with audio ($0.10 without)
+    # at 720p or 1080p; 4k ($0.35/s) is left out, as on Veo 3.1.
+    "veo3.1-fast": {
+        "t2v": "fal-ai/veo3.1/fast",
+        "i2v": "fal-ai/veo3.1/fast/image-to-video",
+        "params": ("duration", "resolution", "aspect_ratio", "negative_prompt"),
+        "durations": (4, 8),
+        "duration_values": (4, 6, 8),
+        "duration_wire": "seconds",
+        "resolutions": ("720p", "1080p"),
+        "default_resolution": "720p",
+        "prices": {"720p": 0.15, "1080p": 0.15},
+        "platform": "veo",
+        "checked": "2026-11-02",
+        "source": "https://fal.ai/models/fal-ai/veo3.1/fast/image-to-video",
+    },
     # Grok Imagine Video 1.5 and 1.5 Lite (added 2026-10-23, Mike: "grok
     # imagine is available on fal"). xAI's OWN namespace on fal (`xai/`, not
     # a relay), read that day off fal's model listing (api.fal.ai/v1/models
@@ -560,6 +582,7 @@ T2V_ASPECTS: dict[str, tuple[str, ...]] = {
     "seedance2": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
     "seedance2.5": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
     "veo3.1": ("16:9", "9:16"),
+    "veo3.1-fast": ("16:9", "9:16"),
     "grok1.5": ("16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"),
     "grok1.5-lite": ("16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"),
     "kling4": ("16:9", "9:16", "1:1", "21:9"),
@@ -573,7 +596,7 @@ T2V_ASPECTS: dict[str, tuple[str, ...]] = {
 # 6,487 characters -- the old house cap of 4,000 refused it).
 PROMPT_MAX: dict[str, int] = {
     "ltx2.3": 5000, "ltx2.5-fast": 5000, "ltx2.5": 5000,
-    "wan3": 20000, "kling3-turbo-pro": 3072, "veo3.1": 20000,
+    "wan3": 20000, "kling3-turbo-pro": 3072, "veo3.1": 20000, "veo3.1-fast": 20000,
     "grok1.5": 4096, "grok1.5-lite": 4096, "kling4": 26000,
 }
 PROMPT_MAX_UNSET = 10000

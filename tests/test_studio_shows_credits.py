@@ -142,5 +142,6 @@ def test_the_renderer_state_carries_its_clip_in_credits(monkeypatch):
     state = api._render_state(None)
     pick = providers.check_render_choice()
     assert state["estimate_usd"] == pick["estimate_usd"]
-    assert state["credits"] == pricing.credits_for(pricing.usd_micros(pick["estimate_usd"]))
+    assert state["credits"] == pricing.credits_for(pricing.usd_micros(pick["estimate_usd"]),
+                                                   model=pick["model"])
     assert state["credits"] >= pricing.CREDIT_FLOOR

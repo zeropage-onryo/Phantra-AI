@@ -14,6 +14,7 @@ import {
   clipsPerMonth,
   discountPercent,
   monthlyAt,
+  monthsLabel,
   num,
   usd,
   type Interval,
@@ -132,7 +133,7 @@ function FreeCard() {
         ))}
       </ul>
       <p className="mt-6 text-[12px] text-[#82807d]">
-        Trial credits expire {CATALOG.expiry_months} months after they land
+        Trial credits expire {monthsLabel(CATALOG.trial_expiry_months)} after they land
       </p>
     </article>
   );
@@ -204,7 +205,8 @@ export function PlanCards() {
                 ))}
               </ul>
               <p className="mt-6 text-[12px] text-[#82807d]">
-                Credits expire {CATALOG.expiry_months} months after they land
+                Plan credits expire {monthsLabel(CATALOG.expiry_months)} after they land, top-ups after{" "}
+                {monthsLabel(CATALOG.topup_expiry_months)}
                 {interval === "year" ? " · a year's allowance lands month by month" : ""}
               </p>
             </article>
