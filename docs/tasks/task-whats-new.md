@@ -352,3 +352,14 @@ popular, and chose "totals across all accounts" for popular.
   excluded, failed and old rows excluded, offered-only, cache, the feed's field);
   `web/tests/front-page.test.mjs` (6 more). `tests/test_whats_new.py` and
   `tests/test_tenancy.py` pass unchanged.
+
+### Step 6 (2026-11-03, branch `claude/trending-no-floor`): the floor comes off
+
+Mike, 2026-11-03, on the floor of 3 accounts and 5 uses: "its for most popular used things".
+`popular.MIN_ACCOUNTS` and `MIN_RUNS` are 1, so the list is simply the 8 keys that landed most
+this week, ranked by total uses (a tie goes to the key more accounts used, then the key). The
+step 5 "floor" lines above describe the first build. `count()` still takes `min_accounts` /
+`min_runs` if a floor is wanted back. What leaves is unchanged: catalogue keys and totals, never
+a prompt, render or account. With few accounts on the studio, a tile can now trend on one
+account's use alone; the total is all it shows.
+

@@ -17,11 +17,11 @@ sees in a picker -- so the count says "this effect is popular", never
 and `spend.spent_today_everyone` already have: an installation-wide
 number, not anybody's rows.
 
-A FLOOR BEFORE ANYTHING SHOWS (Mike, 2026-10-25: "a minimum before anything
-shows"). A key is trending only once at least MIN_ACCOUNTS different
-accounts used it and it ran at least MIN_RUNS times this week. With one
-heavy user and nobody else, nothing is trending -- a single account's
-habits can never be read off the wall.
+THE MOST USED THINGS, NO FLOOR (Mike, 2026-11-03: "its for most popular
+used things"). The list is simply what landed most this week, by total
+uses; the first build (2026-11-02) held a key back until 3 accounts and 5
+uses, and that floor is gone. MIN_ACCOUNTS / MIN_RUNS stay as knobs, both
+at 1. Ties on uses break on how many accounts used it, then the key.
 
 What counts as a use: a generation that LANDED (`output_path` set; a failed
 attempt row has none, `generative.record_failure`) in the last DAYS, whose
@@ -46,8 +46,8 @@ from typing import Optional
 from . import db
 
 DAYS = 7
-MIN_ACCOUNTS = 3         # different accounts that used a key before it can trend
-MIN_RUNS = 5             # and how many landed uses at least
+MIN_ACCOUNTS = 1         # no floor (Mike, 2026-11-03): the most used things, by total
+MIN_RUNS = 1
 TOP = 8                  # how many the wall is handed
 ROWS_MAX = 50_000        # the newest landed rows read per refresh: one bounded read
 CACHE_SECONDS = 600
@@ -117,7 +117,7 @@ def count(rows, *, min_accounts: int = MIN_ACCOUNTS, min_runs: int = MIN_RUNS,
     """The pure part: (account_id, params_json) rows -> the trending list.
 
     Each item is {id, source, key, label, runs}. The number of accounts is
-    used for the floor and dropped: what leaves is a total, never who."""
+    used to break ties and dropped: what leaves is a total, never who."""
     catalogue = catalogue or _catalogue()
     cells: dict[str, dict] = {}
     for account_id, raw in rows:
@@ -140,8 +140,8 @@ def count(rows, *, min_accounts: int = MIN_ACCOUNTS, min_runs: int = MIN_RUNS,
             continue
         reach = len(cell.pop("_accounts"))
         out.append((reach, cell))
-    # most-shared first: a key five studios use beats one studio's spree
-    out.sort(key=lambda rc: (-rc[0], -rc[1]["runs"], rc[1]["id"]))
+    # most used first; a tie goes to the key more accounts used
+    out.sort(key=lambda rc: (-rc[1]["runs"], -rc[0], rc[1]["id"]))
     return [c for _, c in out][:top]
 
 
@@ -151,7 +151,7 @@ def _read(since: str, dsn: Optional[str]) -> list[tuple]:
             return []
         # Installation-wide ON PURPOSE (see the module docstring): the one
         # read behind the studio's Trending. account_id is selected only to
-        # count how many accounts used a key for the floor; it never leaves
+        # count how many accounts used a key to break ties; it never leaves
         # count(). Siblings: generative.used_today(everyone=True),
         # spend.spent_today_everyone.
         return [(r["account_id"], r["params_json"]) for r in conn.execute(
@@ -163,8 +163,7 @@ def _read(since: str, dsn: Optional[str]) -> list[tuple]:
 def top(*, days: int = DAYS, min_accounts: int = MIN_ACCOUNTS, min_runs: int = MIN_RUNS,
         dsn: Optional[str] = None, now: Optional[datetime] = None,
         fresh: bool = False) -> list[dict]:
-    """What the whole studio used most in the last `days`, past the floor,
-    still offered. Never raises; [] when it cannot read."""
+    """What the whole studio used most in the last `days`, still offered. Never raises; [] when it cannot read."""
     key = (days, min_accounts, min_runs, dsn)
     with _lock:
         hit = _cache.get(key)

@@ -245,7 +245,7 @@ the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). **The fr
 `components/studio/front/`, `lib/front-page.ts`, `docs/tasks/task-create-front-page.md`): renders behind
 the box, a peek tab on its top edge (the tray of the person's own work under the box was removed
 2026-10-23, Mike) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
-offers until one is live). **Trending is studio-wide** (2026-11-02, `src/popular.py`): totals across every account off the attempt log, only past a floor of 3 accounts and 5 uses in 7 days, naming catalogue keys only (never a prompt, render or account); `GET /api/whats-new` carries it and `lib/front-page.applyTrending` turns the tiles it names TRENDING with "N uses this week" (a New tile keeps NEW); the hand-picked Trending entries in `news.json` step aside once anything real is trending. Each tile is the whole click and only fills the
+offers until one is live). **Trending is studio-wide** (2026-11-02, `src/popular.py`): the most used things over 7 days, by total uses across every account off the attempt log (no floor since 2026-11-03, Mike: "its for most popular used things"), naming catalogue keys only (never a prompt, render or account); `GET /api/whats-new` carries it and `lib/front-page.applyTrending` turns the tiles it names TRENDING with "N uses this week" (a New tile keeps NEW); the hand-picked Trending entries in `news.json` step aside once anything real is trending. Each tile is the whole click and only fills the
 box or opens a door. One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
 Auto, Fast / Reasoning), `/` for commands, drop to attach.
