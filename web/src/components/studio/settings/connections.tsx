@@ -58,7 +58,7 @@ function Apps() {
     <SettingsCard title="Apps" description="editing apps signed in with a code">
       {items === null ? null : items.length === 0 ? (
         <EmptyState title="No apps connected">
-          Open the Phantra panel in DaVinci Resolve or Premiere Pro and choose Sign in. It shows a code to approve at phantra.ai/studio/link.
+          Open the Phantra panel in DaVinci Resolve, Premiere Pro or Blender and choose Sign in. It shows a code to approve at phantra.ai/studio/link.
         </EmptyState>
       ) : (
         items.map((c) => (

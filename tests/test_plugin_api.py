@@ -130,6 +130,20 @@ def test_a_resolve_panel_signs_in_and_is_named_everywhere(clean_slate, people):
     assert me["client"] == "DaVinci Resolve"
 
 
+def test_a_blender_add_on_signs_in_and_is_named_everywhere(clean_slate, people):
+    """The Blender add-on (2026-11-03) pairs like the editor panels; the
+    live API refused it with bad_client until "blender" joined CLIENTS."""
+    started = _pair(device="macOS, Blender 4.5", app="blender")
+    assert started["client"] == "Blender"
+    _sign_in("mike")
+    assert client.get("/api/plugin/link", params={"code": started["code"]}).json()["client"] == "Blender"
+    assert client.post("/api/plugin/link", json={"code": started["code"]}, headers=GUARD).status_code == 200
+    assert [c["client"] for c in client.get("/api/plugin/connections").json()["items"]] == ["Blender"]
+    client.cookies.clear()
+    token = client.post("/plugin/v1/pair/token", json={"secret": started["secret"]}).json()["token"]
+    assert client.get("/plugin/v1/me", headers=_bearer(token)).json()["client"] == "Blender"
+
+
 def test_an_unknown_client_is_refused(clean_slate):
     response = client.post("/plugin/v1/pair", json={"client": "final-cut"})
     assert response.status_code == 400
