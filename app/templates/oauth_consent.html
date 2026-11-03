@@ -11,15 +11,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* The consent step of the OAuth flow (app/oauth_consent.py). Same skin as
-   the sign-in page: dark card, red accent, one column. */
+   the sign-in page: dark card, the landing page's lemon accent, one column. */
 :root{
   --bg:#0b0b0c; --card:#161618; --panel:#1d1d20; --line:rgb(255 255 255 / .09);
   --line-hi:rgb(255 255 255 / .22); --text:#f4f3f2; --dim:#9a9894;
-  --accent:#E4002B; --warn:#f5b041; --warn-soft:rgb(245 176 65 / .12);
+  --accent:#f3f48b; --on-accent:#141414; --accent-ink:#f3f48b; --warn:#f5b041; --warn-soft:rgb(245 176 65 / .12);
 }
 @media (prefers-color-scheme: light){
   :root{--bg:#f4f3f1; --card:#ffffff; --panel:#f6f5f3; --line:rgb(0 0 0 / .09);
-    --line-hi:rgb(0 0 0 / .22); --text:#141414; --dim:#5f5d59; --warn:#9a6200;
+    --line-hi:rgb(0 0 0 / .22); --text:#141414; --accent-ink:#6b6c00; --dim:#5f5d59; --warn:#9a6200;
     --warn-soft:rgb(245 176 65 / .16)}
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -28,7 +28,7 @@ body{background:var(--bg);color:var(--text);font:15px/1.55 Inter,-apple-system,s
 .card{width:min(440px,100%);background:var(--card);border:1px solid var(--line);
   border-radius:20px;padding:32px 28px}
 .mark{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:12px;
-  background:var(--accent);color:#fff;font-weight:700;font-size:14px;margin-bottom:20px}
+  background:var(--accent);color:var(--on-accent);font-weight:700;font-size:14px;margin-bottom:20px}
 h1{font-size:22px;line-height:1.25;font-weight:700;margin-bottom:8px}
 .sub{color:var(--dim);margin-bottom:20px}
 .rows{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:20px}
@@ -42,15 +42,15 @@ h1{font-size:22px;line-height:1.25;font-weight:700;margin-bottom:8px}
 ul.can{list-style:none;margin-bottom:22px}
 ul.can li{padding-left:22px;position:relative;margin-bottom:6px}
 ul.can li::before{content:"";position:absolute;left:4px;top:9px;width:7px;height:7px;
-  border-radius:50%;background:var(--accent)}
+  border-radius:50%;background:var(--accent-ink)}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 button{font:inherit;font-weight:600;border-radius:12px;padding:12px 14px;cursor:pointer;
   border:1px solid var(--line-hi);background:transparent;color:var(--text)}
-button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
 a.back{display:block;text-align:center;font-weight:600;border-radius:12px;padding:12px 14px;
-  background:var(--accent);color:#fff;text-decoration:none}
-a.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  background:var(--accent);color:var(--on-accent);text-decoration:none}
+a.back:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
 .foot{color:var(--dim);font-size:13px;margin-top:18px}
 
 /* THE PLAN PICKER (2026-11-03): Krea's connect paywall, in this page's skin.
@@ -59,21 +59,24 @@ a.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .pair{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:18px}
 .pair .tile{display:grid;place-items:center;width:52px;height:52px;border-radius:14px;
   border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px}
-.pair .tile.ph{background:var(--accent);border-color:var(--accent);color:#fff}
+.pair .tile.ph{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .pair .swap{color:var(--dim);font-size:18px}
 .center{text-align:center}
 .toggle{display:inline-flex;border:1px solid var(--line-hi);border-radius:999px;padding:3px;margin:4px 0 6px}
 #iv-month,#iv-year{position:absolute;opacity:0;pointer-events:none}
 .toggle label{padding:7px 16px;border-radius:999px;font-weight:600;font-size:14px;cursor:pointer;color:var(--dim)}
 #iv-month:checked~.toggle label[for=iv-month],#iv-year:checked~.toggle label[for=iv-year]{background:var(--text);color:var(--bg)}
-#iv-month:focus-visible~.toggle label[for=iv-month],#iv-year:focus-visible~.toggle label[for=iv-year]{outline:2px solid var(--accent);outline-offset:2px}
+#iv-month:focus-visible~.toggle label[for=iv-month],#iv-year:focus-visible~.toggle label[for=iv-year]{outline:2px solid var(--accent-ink);outline-offset:2px}
 .save{color:var(--dim);font-size:13px;margin-bottom:22px}
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;text-align:left}
-@media (max-width:760px){.plans{grid-template-columns:1fr}}
+.plans.four{grid-template-columns:repeat(4,1fr)}
+@media (max-width:980px){.plans.four{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){.plans,.plans.four{grid-template-columns:1fr}}
+.plan.freebie{border-style:dashed}
 .plan{position:relative;display:flex;flex-direction:column;border:1px solid var(--line);
   border-radius:16px;background:var(--panel);padding:20px 18px 18px}
-.plan.pop{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
-.badge{position:absolute;top:-11px;left:18px;background:var(--accent);color:#fff;font-size:12px;
+.plan.pop{border-color:var(--accent-ink);box-shadow:0 0 0 1px var(--accent-ink) inset}
+.badge{position:absolute;top:-11px;left:18px;background:var(--accent);color:var(--on-accent);font-size:12px;
   font-weight:600;border-radius:999px;padding:3px 10px}
 .plan h2{font-size:20px;font-weight:700}
 .plan .cr{font-weight:600;margin:2px 0 6px}
@@ -85,9 +88,9 @@ a.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #iv-year:checked~.plans .price .yr{display:inline}
 .plan ul{list-style:none;margin:0 0 18px;font-size:14px}
 .plan li{padding-left:22px;position:relative;margin-bottom:6px}
-.plan li::before{content:"\2713";position:absolute;left:2px;color:var(--accent);font-weight:700}
+.plan li::before{content:"\2713";position:absolute;left:2px;color:var(--accent-ink);font-weight:700}
 .plan button{margin-top:auto;width:100%}
-.plan.pop button{background:var(--accent);border-color:var(--accent);color:#fff}
+.plan.pop button{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .free{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-bottom:6px}
 button.link{border:none;background:none;padding:6px 8px;color:var(--text);text-decoration:underline;text-underline-offset:3px}
 button.quiet{border:none;background:none;padding:6px 8px;color:var(--dim)}
@@ -111,8 +114,7 @@ button.quiet{border:none;background:none;padding:6px 8px;color:var(--dim)}
       <span class="tile">{{ client_name[:1] }}</span><span class="swap">&#8646;</span><span class="tile ph">Ph</span>
     </div>
     <h1>Connect {{ client_name }} to Phantra</h1>
-    <p class="sub">{% if email %}Signed in as <b>{{ email }}</b>. {% endif %}Pick a plan to connect.
-      {% if free_trial %}New here? You can start on the free trial instead.{% endif %}</p>
+    <p class="sub">{% if email %}Signed in as <b>{{ email }}</b>. {% endif %}{% if free_trial %}Start free, or pick a plan.{% else %}Pick a plan to connect.{% endif %}</p>
     {% if cancelled %}<div class="note">Checkout was cancelled. Nothing was charged.</div>{% endif %}
 
     <form method="post" action="/oauth/consent/plan">
@@ -124,7 +126,21 @@ button.quiet{border:none;background:none;padding:6px 8px;color:var(--dim)}
         <label for="iv-month">Monthly</label><label for="iv-year">Yearly</label>
       </div>
       <p class="save">Save {{ save_pct }}% on yearly plans</p>
-      <div class="plans">
+      <div class="plans{% if free_trial %} four{% endif %}">
+        {% if free_trial %}
+        <div class="plan freebie">
+          <h2>Free</h2>
+          <div class="cr">{{ trial_credits }} credits, once</div>
+          <p class="blurb">Try it first. No card needed.</p>
+          <div class="price">$0</div>
+          <ul>
+            <li>Every image and video model</li>
+            <li>The agent and the {{ client_name }} connector</li>
+            <li>Renders carry a small watermark</li>
+          </ul>
+          <button type="submit" formaction="/oauth/consent" name="decision" value="approve">Start free &rarr;</button>
+        </div>
+        {% endif %}
         {% for p in plans %}
         <div class="plan{% if p.popular %} pop{% endif %}">
           {% if p.popular %}<span class="badge">Most popular</span>{% endif %}
@@ -147,7 +163,6 @@ button.quiet{border:none;background:none;padding:6px 8px;color:var(--dim)}
     <form method="post" action="/oauth/consent" class="free">
       <input type="hidden" name="authorization_id" value="{{ authorization_id }}">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      {% if free_trial %}<button class="link" type="submit" name="decision" value="approve">Continue with free trial &middot; {{ trial_credits }} credits</button>{% endif %}
       <button class="quiet" type="submit" name="decision" value="deny">Cancel</button>
     </form>
 

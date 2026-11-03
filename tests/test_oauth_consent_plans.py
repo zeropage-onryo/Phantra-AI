@@ -70,7 +70,8 @@ def test_a_new_account_sees_the_plans_and_may_continue_on_the_free_trial(gotrue)
     for name in ("Standard", "Pro", "Max"):
         assert f"Get {name}" in page.text
     assert "Most popular" in page.text and "Save 20% on yearly plans" in page.text
-    assert "Continue with free trial &middot; 100 credits" in page.text
+    assert "Start free" in page.text and "100 credits, once" in page.text
+    assert 'formaction="/oauth/consent" name="decision" value="approve"' in page.text
     response = _approve(_csrf(page.text))
     assert response.status_code == 303
     assert response.headers["location"].startswith(CLAIMS_CALLBACK + "?code=c0de")
@@ -81,7 +82,7 @@ def test_an_older_account_with_no_plan_must_pick_one(stripe_on, gotrue):
     _age(stripe_on, _account_id(), 48)
     page = _get()
     assert "Get Pro" in page.text
-    assert "Continue with free trial" not in page.text
+    assert "Start free" not in page.text
     assert 'value="approve"' not in page.text
     response = _approve(_csrf(page.text))
     assert response.status_code == 402 and "Pick a plan" in response.text
