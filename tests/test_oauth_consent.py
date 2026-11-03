@@ -376,6 +376,30 @@ def test_a_pending_consent_expires(gotrue, monkeypatch):
     assert back.headers["location"] != f"/oauth/consent?authorization_id={AUTHZ}"
 
 
+def test_a_sign_in_finished_after_the_wait_still_comes_back_to_say_it_expired(gotrue, monkeypatch):
+    """2026-11-02, connecting Antigravity: the sign-in page was drawn in
+    time, the Google sign-in began 29 minutes later, and the person landed
+    in the studio with no word about the app. The page is never drawn
+    again in between, so `resume` is what has to send them back."""
+    _get()
+    assert "Connect an app" in client.get("/signin").text
+    later = time.time() + 29 * 60
+    monkeypatch.setattr(oauth_consent.time, "time", lambda: later)
+    gotrue.requests.clear()          # Supabase forgot it at about ten minutes
+    back = _sign_in()
+    assert back.headers["location"] == f"/oauth/consent?authorization_id={AUTHZ}"
+    page = _get()
+    assert page.status_code == 400 and "has expired" in page.text
+
+
+def test_a_sign_in_hours_later_is_not_a_connection(gotrue, monkeypatch):
+    _get()
+    later = time.time() + oauth_consent.RESUME_MAX_AGE + 5
+    monkeypatch.setattr(oauth_consent.time, "time", lambda: later)
+    back = _sign_in()
+    assert "oauth/consent" not in back.headers["location"]
+
+
 def test_an_expired_token_sends_the_person_to_sign_in_again(gotrue, monkeypatch):
     _arrive_and_sign_in()
     monkeypatch.setattr(auth_mod, "verify_token", lambda token, audience="authenticated": None)
