@@ -94,6 +94,7 @@ from . import (
     api,
     auth,
     cross_site,
+    direct_public,
     jobs,
     mcp_auth,
     mcp_mount,
@@ -595,6 +596,9 @@ app.include_router(share_page.router)
 # the public What's new page's read (/public/whats-new, src/whats_new.py):
 # live announcements only, nothing about any person
 app.include_router(whats_new_public.router)
+# the Image and Video pages' model menus for a signed-out visitor
+# (/public/direct/{image,video}, app/direct_public.py): the public catalogue
+app.include_router(direct_public.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)

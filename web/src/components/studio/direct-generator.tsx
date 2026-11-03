@@ -69,6 +69,8 @@ import {
   getDirectVideo,
   getElementPhotos,
   getMedia,
+  getPublicDirectImage,
+  getPublicDirectVideo,
   quoteDirectImage,
   quoteDirectVideo,
   renderDownloadHref,
@@ -239,12 +241,14 @@ function Generator({ kind }: { kind: Kind }) {
   const closeSignup = useCallback(() => setSignup(null), []);
 
   /* ── the menu, and the pick it opens on ── */
+  // signed out too (2026-11-03): the same menus from /public/direct, so a
+  // visitor sees the models; the tray and the price wait for an account
   useEffect(() => {
-    if (!workspace) return;
+    if (!workspace && !signedOut) return;
     let live = true;
     const linked = params.get("model");
     if (video) {
-      getDirectVideo()
+      (signedOut ? getPublicDirectVideo() : getDirectVideo())
         .then((m) => {
           if (!live) return;
           setVMenu(m);
@@ -255,7 +259,7 @@ function Generator({ kind }: { kind: Kind }) {
         })
         .catch((e) => live && setMenuError(e instanceof Error ? e.message : "The models could not be listed"));
     } else {
-      getDirectImage()
+      (signedOut ? getPublicDirectImage() : getDirectImage())
         .then((m) => {
           if (!live) return;
           setIMenu(m);
@@ -266,15 +270,16 @@ function Generator({ kind }: { kind: Kind }) {
         })
         .catch((e) => live && setMenuError(e instanceof Error ? e.message : "The models could not be listed"));
     }
-    getMedia({ kind })
-      .then((w) => live && setRecent(w.items.filter((x) => x.generated_id).slice(0, 12).map(fromLibrary)))
-      .catch(() => {});
+    if (!signedOut)
+      getMedia({ kind })
+        .then((w) => live && setRecent(w.items.filter((x) => x.generated_id).slice(0, 12).map(fromLibrary)))
+        .catch(() => {});
     return () => {
       live = false;
     };
     // the link is read once, on arrival
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspace, kind]);
+  }, [workspace, signedOut, kind]);
 
   const vModel = useMemo(() => vMenu?.items.find((m) => m.id === vPick?.model) ?? null, [vMenu, vPick]);
   const iModel = useMemo(() => iMenu?.items.find((m) => m.id === iPick?.model) ?? null, [iMenu, iPick]);
@@ -320,7 +325,7 @@ function Generator({ kind }: { kind: Kind }) {
 
   /* ── the price of exactly what is on screen ── */
   const pick = video ? vPick : iPick;
-  const priceKey = pick ? JSON.stringify(video ? [vSend, hasStart, held, nonce] : [iPick, refs.length, nonce]) : "";
+  const priceKey = pick && !signedOut ? JSON.stringify(video ? [vSend, hasStart, held, nonce] : [iPick, refs.length, nonce]) : "";
   useEffect(() => {
     if (!priceKey) return;
     let live = true;

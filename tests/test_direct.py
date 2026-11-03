@@ -54,6 +54,17 @@ def client(pg, monkeypatch):
     app.dependency_overrides.pop(auth.current_account_id, None)
 
 
+@pytest.fixture
+def guest(monkeypatch):
+    """Nobody signed in: no session, no override, the real gates."""
+    monkeypatch.setattr(auth, "current_user", lambda request: None)
+    monkeypatch.setattr(ledger, "credit_exempt", lambda account_id, dsn=None: (
+        False if account_id is None else pytest.fail("a guest's menu read an account")))
+    monkeypatch.setattr(fal, "has_key", lambda account_id=None: True)
+    monkeypatch.setattr(nano_banana, "has_key", lambda account_id=None: True)
+    return TestClient(app)
+
+
 def _wait(client, job_id):
     for _ in range(400):
         job = client.get(f"/api/jobs/{job_id}").json()
@@ -96,6 +107,46 @@ def test_the_video_menu_is_the_catalogue_in_credits(client):
         assert m["resolution"] == opening["frame"]
         # at the model's own markup (pricing.markup_for, 2026-10-27)
         assert m["credits"] == ledger.charge_credits(opening["estimate_usd"], model=m["id"])
+
+
+# ---------- signed out (2026-11-03, QA 2026-11-02 P14) ----------
+# A visitor on /studio/image or /studio/video could type and press "Sign up
+# to generate", but the model picker above the box was empty: both menus are
+# under /api, which requires a session. /public/direct/{video,image}
+# (app/direct_public.py) is the same menu for no account: the catalogue in
+# credits, as /pricing and /models publish it. Pricing a pick and running it
+# stay behind the sign-in.
+def test_a_signed_out_visitor_gets_both_model_menus(guest):
+    video = guest.get("/public/direct/video")
+    assert video.status_code == 200, video.text
+    assert "max-age" in video.headers["cache-control"]
+    body = video.json()
+    assert body == direct.video_menu(None)
+    assert body["ready"] is True and body["exempt"] is False
+    assert [m["id"] for m in body["items"]] == [m for _p, m, _n, _b in pricing.catalog_rows()]
+    assert "usd" not in json.dumps(body)
+
+    image = guest.get("/public/direct/image")
+    assert image.status_code == 200, image.text
+    body = image.json()
+    assert body == direct.image_menu(None)
+    assert body["ready"] is True and body["exempt"] is False
+    assert [m["id"] for m in body["items"]] == [m["id"] for m in model_menu.image_menu(None)["items"]]
+    assert "usd" not in json.dumps(body)
+
+
+def test_a_signed_out_visitor_cannot_list_through_api_price_or_run(guest):
+    for kind in ("video", "image"):
+        assert guest.get(f"/api/direct/{kind}").status_code == 401, kind
+        r = guest.post(f"/api/direct/{kind}/run", data={"model": "x", "prompt": "a cat"})
+        assert r.status_code == 401, kind
+    for path, body in (("/api/direct/video/quote", {"model": "kling4"}),
+                       ("/api/direct/image/quote", {"model": model_menu.NANO_ID})):
+        assert guest.post(path, json=body).status_code == 401, path
+    # and no public door prices or runs
+    for kind in ("video", "image"):
+        for tail in ("quote", "run"):
+            assert guest.post(f"/public/direct/{kind}/{tail}", json={}).status_code in (404, 405)
 
 
 def test_no_renderer_key_lists_nothing(client, monkeypatch):

@@ -87,6 +87,9 @@ const nextConfig: NextConfig = {
       "/locations/:path*",
       "/static/:path*",
       "/account/:path*",
+      // the Image and Video pages' model menus for a signed-out visitor
+      // (app/direct_public.py): the public catalogue, nothing about a person
+      "/public/direct/:path*",
     ].map((source) => ({ source, destination: `${upstream}${source}` }));
   },
   distDir: process.env.NEXT_BUILD_DIR || ".next",
