@@ -8719,6 +8719,12 @@ from . import affiliate_routes as _affiliate_routes  # noqa: E402
 for _path, _endpoint, _methods in _affiliate_routes.API_ROUTES:
     router.add_api_route(_path, _endpoint, methods=_methods, tags=["affiliates"])
 
+# --- Phantra Creators (2026-11-03) ------------------------------------------
+from . import creator_routes as _creator_routes  # noqa: E402
+
+for _path, _endpoint, _methods in _creator_routes.API_ROUTES:
+    router.add_api_route(_path, _endpoint, methods=_methods, tags=["creators"])
+
 
 # --- the cut (2026-09-26, docs/tasks/CUT_ASSEMBLE_V0.md) -------------------
 # Assemble v0: approved clips -> a versioned timeline -> one MP4. Same

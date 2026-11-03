@@ -122,8 +122,9 @@ def test_every_owned_table_grows_an_account_id(pg):
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
     watermark.init(pg)
-    from src import addons, affiliates, plugin_tokens, posts, social_connections
+    from src import addons, affiliates, creators, plugin_tokens, posts, social_connections
     affiliates.init(pg)
+    creators.init(pg)
     plugin_tokens.init(pg)
     social_connections.init(pg)
     posts.init(pg)
@@ -549,6 +550,11 @@ UNSCOPED_ALLOWED = {
     # the operator's CLI names a partner by its numeric id (the review desk,
     # run by Mike against his own database; there is no route to it)
     "SELECT * FROM affiliate_partners WHERE id = %s",
+    # src/creators.py (2026-11-03): the same review desk for Phantra Creators.
+    # Mike's CLI names an application by its numeric id; there is no route to
+    # it, and the page only ever reads or writes its own account's row.
+    "SELECT * FROM creator_applications WHERE id = %s",
+    "UPDATE creator_applications SET status = %s, note = %s, reviewed_at = now()",
     # the Stripe invoice id is globally unique and is the webhook's
     # idempotency key: "was this invoice already booked" has no account to
     # name before the lookup, and the answer is a yes/no
@@ -1103,8 +1109,9 @@ def _init_everything(path):
     mcp_preferences.init(path)
     mcp_recipes.init(path)
     watermark.init(path)
-    from src import affiliates, plugin_tokens, posts, social_connections
+    from src import affiliates, creators, plugin_tokens, posts, social_connections
     affiliates.init(path)
+    creators.init(path)
     plugin_tokens.init(path)
     social_connections.init(path)
     posts.init(path)

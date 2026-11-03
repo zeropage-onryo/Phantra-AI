@@ -415,6 +415,9 @@ OWNED_TABLES = (
     "affiliate_partners",
     "affiliate_referrals",
     "affiliate_commissions",
+    # by-application creators (2026-11-03, src/creators.py): one account's
+    # own application to Phantra Creators
+    "creator_applications",
     # a workspace's paid add-ons (2026-10-26, src/addons.py): what one
     # account bought beside its plan (the Ad Studio), and whether it holds
     "account_addons",
