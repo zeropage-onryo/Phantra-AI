@@ -67,6 +67,7 @@ import {
   ChevronDown,
   ChevronUp,
   Ellipsis,
+  History,
   Image as ImageIcon,
   ImageOff,
   Paperclip,
@@ -153,6 +154,7 @@ import {
   asProjectConversation,
   keepReferences,
   notSentWhy,
+  requestHistory,
   takePendingFill,
   type ContactSheet,
   type Turn,
@@ -3288,7 +3290,9 @@ function Composer() {
       if (done.project && isProjectTool(proposal.tool)) {
         setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
         toast(`“${done.project.title}” is on the Projects board`);
-        if (proposal.tool === "save_as_project") await clearProject().catch(() => {});
+        // the talk was just filed into the project's own history: deleted
+        // here, not also kept in the drawer
+        if (proposal.tool === "save_as_project") await clearProject(true).catch(() => {});
         router.push(workspaceHref(done.project.id));
         return;
       }
@@ -3645,6 +3649,9 @@ function Composer() {
                 <b>Chat</b>
                 {project ? <span className="zc-sheet-sub">{project.title}</span> : null}
                 <span className="spacer" />
+                <button type="button" className="zc-sheet-btn" onClick={() => requestHistory()} aria-label="Chat history" title="Chat history">
+                  <History strokeWidth={2} aria-hidden />
+                </button>
                 <button type="button" className="zc-sheet-btn" onClick={() => setSheetDown(true)} aria-label="Lower the chat" title="Lower the chat">
                   <ChevronDown strokeWidth={2} aria-hidden />
                 </button>

@@ -286,9 +286,17 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
   switches it back.
 - **Failures are said in plain words** (`src/failures.py`: "Nothing was charged.") and an empty
   balance always offers the way to add credits (`lib/out-of-credits.ts`).
-- **One conversation, saved** (`assistant-thread.tsx`, `src/assistant_store.py`): the composer and
-  the floating assistant are two views of one thread, kept as working memory until a scene is
-  written or the person starts a new session; never archived.
+- **One open conversation, and a history of the rest** (`assistant-thread.tsx`,
+  `src/assistant_store.py`): the composer and the floating assistant are two views of the open
+  thread. Since 2026-11-03 (Mike's "C2") New session KEEPS it: the open chat is the row with
+  `archived_at` NULL, earlier ones are parked beside it and listed in the **history drawer**
+  (`components/studio/chat-history.tsx`, the header's History button and the chat sheet's clock;
+  `GET /api/assistant/chats`, `POST .../{id}/open`, `DELETE .../{id}`), grouped in a folder per
+  project (the project page's own chat first). A Create turn run inside a project files the open
+  chat under it (`tag_project`) and it is kept as long as the project; any other chat is deleted
+  14 days after it was last used (`CHAT_KEEP_DAYS`, swept on every list and every start), its
+  countdown shown only in the last 7 days. A chat with nothing said in it is deleted, not kept;
+  `save_as_project` deletes the chat it just filed (`?forget=1`).
 
 ### Projects
 

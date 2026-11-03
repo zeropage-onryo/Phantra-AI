@@ -743,7 +743,7 @@ export function AssistantPill() {
       if (done.project && isProjectTool(proposal.tool)) {
         setTurn(i, { decided: "done" });
         toast(`“${done.project.title}” is on the Projects board`);
-        if (proposal.tool === "save_as_project") await resetProject().catch(() => {});
+        if (proposal.tool === "save_as_project") await resetProject(true).catch(() => {});
         router.push(workspaceHref(done.project.id));
         return;
       }
@@ -760,8 +760,9 @@ export function AssistantPill() {
     }
   }
 
-  /* Clear: the conversation is deleted on the server (never archived --
-     it was working memory) and the card AND the composer's box start empty. */
+  /* Clear: a new session -- the conversation is kept in the history drawer
+     (2026-11-03, chat-history.tsx) and the card AND the composer's box start
+     empty. */
   async function clearConversation() {
     if (busy) return;
     try {
