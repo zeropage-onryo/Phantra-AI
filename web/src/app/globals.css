@@ -404,6 +404,17 @@
     mask-image: linear-gradient(#000 0%, #000 55%, transparent 100%);
   }
 
+  /* The clip rail's progress line (hero-rail.tsx): the playing tile fills
+     over the six seconds before the hero moves to the next start. */
+  @keyframes hero-rail-fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
   /* The hero's reel (hero-reel.tsx): two columns drifting in opposite
      directions on a wide screen, one sideways strip on a phone. Each list
      is drawn twice, so moving by exactly half loops without a seam. */

@@ -18,6 +18,12 @@ export type HeroStart = {
   kind: StartKind;
   /** the picture on the chip, the preview and the drawer */
   image: string;
+  /** the clip the hero plays for this start (2026-11-02, the B3 "clip rail"
+   *  hero): a public /make, /models or /mcp path that clipSrc maps onto the
+   *  R2 bucket, its first-frame poster under public/, and whether it is a
+   *  vertical clip (drawn as a phone-shaped card on a wide screen rather than
+   *  stretched across it) */
+  clip: { src: string; poster: string; tall?: boolean };
   /** the placeholder: an example of what to type */
   example: string;
   /** what the ChatGPT line suggests asking for */
@@ -41,6 +47,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Short film",
     kind: "video",
     image: "/site/reel/c375.jpg",
+    clip: { src: `${K}/ai-short-film-maker/hero.mp4`, poster: `${K}/ai-short-film-maker/busstop.jpg` },
     example: "A stranger in a rain-soaked neon city…",
     ask: "a neon short film",
     line: "I’ll write it shot by shot and show you every still before anything renders.",
@@ -54,6 +61,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Music video",
     kind: "video",
     image: `${M}/wan-video-generator/flamenco.jpg`,
+    clip: { src: `${M}/wan-video-generator/flamenco.mp4`, poster: `${M}/wan-video-generator/flamenco.jpg` },
     example: "A flamenco dancer cut to a slow guitar…",
     ask: "a flamenco music video",
     line: "Give me the mood and the song. I’ll cut the shots to the beat.",
@@ -67,6 +75,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "UGC ad",
     kind: "video",
     image: `${K}/ugc-ads/bottle.jpg`,
+    clip: { src: `${K}/ugc-ads/bottle.mp4`, poster: `${K}/ugc-ads/bottle.jpg`, tall: true },
     example: "A gym-goer showing off my steel bottle…",
     ask: "a UGC ad for my bottle",
     line: "Show me the product. I’ll write the hook and the person holding it.",
@@ -80,6 +89,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Product ad",
     kind: "video",
     image: `${K}/ai-product-ad-generator/fragrance.jpg`,
+    clip: { src: `${M}/seedance-video-generator/soda.mp4`, poster: `${M}/seedance-video-generator/soda.jpg` },
     example: "My fragrance on stone, figs and morning light…",
     ask: "a product ad for my fragrance",
     line: "One product, three hero angles. Pick the one that sells it.",
@@ -93,6 +103,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Brand ad",
     kind: "video",
     image: `${M}/veo-video-generator/barista.jpg`,
+    clip: { src: `${M}/veo-video-generator/barista.mp4`, poster: `${M}/veo-video-generator/barista.jpg` },
     example: "A 15-second café spot in my brand colours…",
     ask: "a 15-second café spot",
     line: "Your colours and logo on every scene. Tell me what the spot should say.",
@@ -106,6 +117,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Trailer",
     kind: "video",
     image: "/site/reel/c135.jpg",
+    clip: { src: `${K}/ai-trailer-maker/hero.mp4`, poster: `${K}/ai-trailer-maker/ship.jpg` },
     example: "A creature-comedy trailer, three beats…",
     ask: "a creature-comedy trailer",
     line: "Three beats, a title card and a sting. I’ll build the trailer around your hook.",
@@ -119,6 +131,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Shorts & Reels",
     kind: "video",
     image: `${M}/kling-video-generator/rooftop.jpg`,
+    clip: { src: "/mcp/examples/video-skate.mp4", poster: "/mcp/examples/video-skate.jpg", tall: true },
     example: "A laugh on a windy rooftop, 9:16…",
     ask: "a 9:16 rooftop reel",
     line: "Vertical from the first frame, with a hook in the first second.",
@@ -132,6 +145,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Storyboard",
     kind: "image",
     image: `${M}/seedance-video-generator/sig-wide.jpg`,
+    clip: { src: `${K}/ai-movie-maker/lake.mp4`, poster: `${K}/ai-movie-maker/lake-poster.jpg` },
     example: "Board out a potter’s morning in six frames…",
     ask: "a six-frame storyboard",
     line: "Paste the script. I’ll board it frame by frame so you can approve the look.",
@@ -145,6 +159,7 @@ export const HERO_STARTS: HeroStart[] = [
     label: "Product shot",
     kind: "image",
     image: `${K}/ai-product-ad-generator/headphones.jpg`,
+    clip: { src: `${M}/seedance-video-generator/honey.mp4`, poster: `${M}/seedance-video-generator/honey.jpg`, tall: true },
     example: "Exploded headphones on a yellow ground…",
     ask: "a headphones product shot",
     line: "Clean, sharp product shots. Want one of them moving too?",
