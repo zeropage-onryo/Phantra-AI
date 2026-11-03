@@ -44,6 +44,9 @@ IDLE_DAYS = 90             # a panel unused this long signs in again
 SWEEP_AFTER = "1 day"      # dead pairings are deleted this long after they expire
 MAX_CLIENT = 80
 CLIENTS = {"premiere": "Premiere Pro", "resolve": "DaVinci Resolve",
+           # the same Adobe panel opened in After Effects (phantra-premiere-plugin
+           # 0.3.0, 2026-11-03): one extension, two hosts, named by the host
+           "aftereffects": "After Effects",
            # the Blender add-on (zeropage-onryo/phantra-blender-plugin, 2026-11-03)
            "blender": "Blender",
            # the free looks Discord bot (zeropage-onryo/phantra-growth, 2026-10-26):

@@ -16,7 +16,7 @@ import { pageMeta } from "@/lib/page-meta";
 
 export const metadata: Metadata = pageMeta({
   title: "Phantra Plugin License",
-  description: "The license the Phantra panels for DaVinci Resolve and Premiere Pro are installed under.",
+  description: "The license the Phantra panels for DaVinci Resolve, Premiere Pro and After Effects are installed under.",
   path: "/download/license",
 });
 
