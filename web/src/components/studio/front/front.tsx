@@ -31,11 +31,12 @@ import { getMedia, rendersUnfinished, sceneHref, type Concept, type MediaItem } 
 import type { Candidate } from "@/lib/effects";
 import { loadShowcase, PLACEHOLDER, type ShowcaseItem, type ShowcaseManifest } from "@/lib/showcase";
 import { effectsDoor, EFFECTS_TAB_HREF, LOOKS, USE_CASE_TABS, type Capabilities } from "@/lib/create-v2";
-import { markSeen, notifyMe, whatsNew, WHATS_NEW_SEEN } from "@/lib/whats-new";
+import { markSeen, notifyMe, whatsNew, WHATS_NEW_SEEN, type TrendingKey } from "@/lib/whats-new";
 import {
   countLabel,
   FILTERS,
   isFinalCut,
+  applyTrending,
   feedNews,
   liveNews,
   mergeNews,
@@ -46,6 +47,7 @@ import {
   TAG,
   trayStages,
   wallTiles,
+  usesLabel,
   whenLabel,
   type FrontFilter,
   type MadeTile,
@@ -87,13 +89,18 @@ export function useFront(on: boolean, caps: Capabilities): Front {
   const [filter, setFilter] = useState<FrontFilter>("all");
   const [stage, setStageRaw] = useState<StageId | null>(null);
   const [feed, setFeed] = useState<ReturnType<typeof feedNews>>({ news: [], media: {} });
+  const [trending, setTrending] = useState<TrendingKey[]>([]);
 
   useEffect(() => {
     if (!on) return;
     let live = true;
     loadShowcase().then((m) => live && setManifest(m));
     whatsNew()
-      .then((r) => live && setFeed(feedNews(r.items)))
+      .then((r) => {
+        if (!live) return;
+        setFeed(feedNews(r.items));
+        setTrending(r.trending ?? []);
+      })
       .catch(() => live && setFeed({ news: [], media: {} }));
     getMedia()
       .then((r) => live && setWall({ items: r.items, totals: r.wall ? { image: r.wall.image, video: r.wall.video } : null }))
@@ -106,7 +113,8 @@ export function useFront(on: boolean, caps: Capabilities): Front {
     };
   }, [on]);
 
-  const news = useMemo(() => mergeNews(liveNews(NEWS, caps), feed.news), [caps, feed]);
+  // the studio's real Trending (totals across every account) marks the tiles it names
+  const news = useMemo(() => applyTrending(mergeNews(liveNews(NEWS, caps), feed.news), trending, new Date()), [caps, feed, trending]);
   // the feed's pictures ride in the same manifest the file's keys read
   const merged = useMemo<ShowcaseManifest | null>(
     () => (manifest || Object.keys(feed.media).length ? { version: 1, items: { ...(manifest?.items ?? {}), ...feed.media } } : null),
@@ -278,7 +286,7 @@ const hoverOff = (e: React.MouseEvent<HTMLElement>) => {
 };
 
 function NewsTile({ item, s, onPick, now }: { item: NewsItem; s: ShowcaseItem; onPick: () => void; now: Date }) {
-  const when = item.type === "soon" ? item.eta || "" : whenLabel(item.date, now);
+  const when = item.type === "soon" ? item.eta || "" : item.runs ? usesLabel(item.runs) : whenLabel(item.date, now);
   const [asked, setAsked] = useState(false);
   const notify = "notify" in item.action;
   const pick = () => {

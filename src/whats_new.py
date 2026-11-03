@@ -525,7 +525,8 @@ def _poster(row: dict) -> Optional[str]:
 
 def feed(account_id: int, user_id: str, caps: Optional[dict] = None,
          dsn: Optional[str] = None, *, now: Optional[dt.datetime] = None) -> dict:
-    """{"items": [...], "unread": n} -- the live tiles this person can use,
+    """{"items": [...], "unread": n, "trending": [...]} -- the live tiles this
+    person can use,
     New ones first. A tile is shown when it is live, its source still offers
     it, its `requires` capability is true, a deal is inside its window, and
     the person has not dismissed it. No price is in any item (a deal's own
@@ -549,7 +550,7 @@ def feed(account_id: int, user_id: str, caps: Optional[dict] = None,
                 (account_id, str(user_id))).fetchall()}
     except Exception as e:
         _note(f"feed unread: {type(e).__name__}: {e}")
-        return {"items": [], "unread": 0}
+        return {"items": [], "unread": 0, "trending": _trending(dsn)}
     items, unread = [], 0
     for r in rows:
         row = dict(zip(_COLS, r))
@@ -588,8 +589,24 @@ def feed(account_id: int, user_id: str, caps: Optional[dict] = None,
             "you_asked": row["id"] in asked,
             "live_at": live_at.isoformat() if live_at else None,
         })
+    trending = _trending(dsn)
+    runs = {t["id"]: t["runs"] for t in trending}
+    for i in items:
+        i["trending_runs"] = runs.get(i["id"])
     items.sort(key=lambda i: (not i["new"], not i["you_asked"]))
-    return {"items": items, "unread": unread}
+    return {"items": items, "unread": unread, "trending": trending}
+
+
+def _trending(dsn: Optional[str]) -> list[dict]:
+    """The studio-wide Trending (src/popular.py, 2026-11-02): catalogue keys
+    and their totals across every account, past the floor. The wall marks
+    its own tiles with them; nothing about any account is in it."""
+    try:
+        from . import popular
+        return popular.top(dsn=dsn)
+    except Exception as e:
+        _note(f"trending unread: {type(e).__name__}: {e}")
+        return []
 
 
 # --------------------------------------------------------------------------

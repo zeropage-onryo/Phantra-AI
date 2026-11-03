@@ -67,7 +67,7 @@ half-made. An entry:
 - `date`: drawn as Today / Yesterday / N days ago / Oct 14; omit it for no date line.
 
 **No offers** until one is live (a test refuses an `offer` type and any price words). **Trending
-is picked by hand**: `GET /api/trending` is this account's own week (the tenancy rules allow no
+was picked by hand** (superseded 2026-11-02: studio-wide Trending, `src/popular.py`, see `task-whats-new.md` step 5): `GET /api/trending` is this account's own week (the tenancy rules allow no
 cross-account read), so it cannot say what is trending across the studio; a real studio-wide
 Trending needs a shared, count-only aggregate, which is a backend decision for later.
 

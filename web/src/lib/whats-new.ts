@@ -54,12 +54,18 @@ export type FeedItem = {
   notify: boolean | null;
   you_asked: boolean;
   live_at: string | null;
+  /** this tile's key is trending studio-wide: its uses this week, across every account */
+  trending_runs?: number | null;
 };
+
+/** One key the whole studio used most this week (src/popular.py): a catalogue
+ *  name and its total, past a floor of several accounts. Never anyone's work. */
+export type TrendingKey = { id: string; source: string; key: string; label: string; runs: number };
 
 /** What the shell's New badge listens for once the wall has marked its tiles seen. */
 export const WHATS_NEW_SEEN = "phantra:whats-new-seen";
 
-export const whatsNew = () => apiFetch<{ items: FeedItem[]; unread: number }>("/whats-new");
+export const whatsNew = () => apiFetch<{ items: FeedItem[]; unread: number; trending?: TrendingKey[] }>("/whats-new");
 export const markSeen = (ids: string[]) =>
   apiFetch<{ marked: number }>("/whats-new/seen", { method: "POST", body: JSON.stringify({ ids }) });
 export const dismiss = (id: string) =>
