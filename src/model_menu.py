@@ -123,15 +123,23 @@ def for_model(account_id: Optional[int] = None) -> str:
     """What list_models hands the brain: every model this account can use,
     by id, with the studio's own line about it and what it costs. No vendor
     pages and no addresses."""
+    from . import image_prompt_tips
+
     stills = image_menu(account_id)["items"]
     clips = video_menu(account_id)
     lines = []
     if stills:
-        lines.append("STILL MODELS -- pass an id as `model` to make_image:")
+        lines.append("STILL MODELS -- pass an id as `model` to make_image"
+                     + (". Where a model has a 'How to write its prompt' line, write the "
+                        "prompt that way for the model you pass, or for the one the person "
+                        "picked:" if image_prompt_tips.enabled() else ":"))
         for m in stills:
             takes = "takes references" if m["references"] else "no reference input"
             lines.append(f"- {m['id']} -- {m['label']}: {m['note']} ({takes}; "
                          f"{m['credits']} credits a still)")
+            how = image_prompt_tips.tip_for(m["id"])
+            if how:
+                lines.append(f"    How to write its prompt: {how}")
     if clips:
         lines.append("CLIP MODELS -- pass an id as `model` to make_video. It only sets where "
                      "the scene's Render card opens; the person picks and pays there:")
