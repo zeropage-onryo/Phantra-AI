@@ -52,10 +52,51 @@ a.back{display:block;text-align:center;font-weight:600;border-radius:12px;paddin
   background:var(--accent);color:#fff;text-decoration:none}
 a.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .foot{color:var(--dim);font-size:13px;margin-top:18px}
+
+/* THE PLAN PICKER (2026-11-03): Krea's connect paywall, in this page's skin.
+   Shown when oauth_consent.offer() says so; the toggle is CSS only. */
+.card.wide{width:min(980px,100%)}
+.pair{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:18px}
+.pair .tile{display:grid;place-items:center;width:52px;height:52px;border-radius:14px;
+  border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px}
+.pair .tile.ph{background:var(--accent);border-color:var(--accent);color:#fff}
+.pair .swap{color:var(--dim);font-size:18px}
+.center{text-align:center}
+.toggle{display:inline-flex;border:1px solid var(--line-hi);border-radius:999px;padding:3px;margin:4px 0 6px}
+#iv-month,#iv-year{position:absolute;opacity:0;pointer-events:none}
+.toggle label{padding:7px 16px;border-radius:999px;font-weight:600;font-size:14px;cursor:pointer;color:var(--dim)}
+#iv-month:checked~.toggle label[for=iv-month],#iv-year:checked~.toggle label[for=iv-year]{background:var(--text);color:var(--bg)}
+#iv-month:focus-visible~.toggle label[for=iv-month],#iv-year:focus-visible~.toggle label[for=iv-year]{outline:2px solid var(--accent);outline-offset:2px}
+.save{color:var(--dim);font-size:13px;margin-bottom:22px}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;text-align:left}
+@media (max-width:760px){.plans{grid-template-columns:1fr}}
+.plan{position:relative;display:flex;flex-direction:column;border:1px solid var(--line);
+  border-radius:16px;background:var(--panel);padding:20px 18px 18px}
+.plan.pop{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.badge{position:absolute;top:-11px;left:18px;background:var(--accent);color:#fff;font-size:12px;
+  font-weight:600;border-radius:999px;padding:3px 10px}
+.plan h2{font-size:20px;font-weight:700}
+.plan .cr{font-weight:600;margin:2px 0 6px}
+.plan .blurb{color:var(--dim);font-size:14px;min-height:42px}
+.price{margin:16px 0 14px;font-size:30px;font-weight:700;letter-spacing:-.01em}
+.price small{font-size:13px;font-weight:500;color:var(--dim)}
+.price .yr{display:none}
+#iv-year:checked~.plans .price .mo{display:none}
+#iv-year:checked~.plans .price .yr{display:inline}
+.plan ul{list-style:none;margin:0 0 18px;font-size:14px}
+.plan li{padding-left:22px;position:relative;margin-bottom:6px}
+.plan li::before{content:"\2713";position:absolute;left:2px;color:var(--accent);font-weight:700}
+.plan button{margin-top:auto;width:100%}
+.plan.pop button{background:var(--accent);border-color:var(--accent);color:#fff}
+.free{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin-bottom:6px}
+button.link{border:none;background:none;padding:6px 8px;color:var(--text);text-decoration:underline;text-underline-offset:3px}
+button.quiet{border:none;background:none;padding:6px 8px;color:var(--dim)}
+.small{max-width:440px;margin:18px auto 0}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:18px;font-size:14px}
 </style>
 </head>
 <body>
-<main class="card">
+<main class="card{% if paywall %} wide{% endif %}">
   {% if problem %}
   <h1>We couldn't finish connecting</h1>
   <p class="sub">{{ problem }}</p>
@@ -64,8 +105,63 @@ a.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <p class="sub">Your browser may ask to open it. If nothing happens, use the button.</p>
   <a class="back" href="{{ back }}">Return to {{ client_name }}</a>
   <p class="foot">You can close this tab once {{ client_name }} says it is connected.</p>
+  {% elif paywall %}
+  <div class="center">
+    <div class="pair" aria-hidden="true">
+      <span class="tile">{{ client_name[:1] }}</span><span class="swap">&#8646;</span><span class="tile ph">Ph</span>
+    </div>
+    <h1>Connect {{ client_name }} to Phantra</h1>
+    <p class="sub">{% if email %}Signed in as <b>{{ email }}</b>. {% endif %}Pick a plan to connect.
+      {% if free_trial %}New here? You can start on the free trial instead.{% endif %}</p>
+    {% if cancelled %}<div class="note">Checkout was cancelled. Nothing was charged.</div>{% endif %}
+
+    <form method="post" action="/oauth/consent/plan">
+      <input type="hidden" name="authorization_id" value="{{ authorization_id }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="radio" name="interval" value="month" id="iv-month" checked>
+      <input type="radio" name="interval" value="year" id="iv-year">
+      <div class="toggle" role="radiogroup" aria-label="Billing">
+        <label for="iv-month">Monthly</label><label for="iv-year">Yearly</label>
+      </div>
+      <p class="save">Save {{ save_pct }}% on yearly plans</p>
+      <div class="plans">
+        {% for p in plans %}
+        <div class="plan{% if p.popular %} pop{% endif %}">
+          {% if p.popular %}<span class="badge">Most popular</span>{% endif %}
+          <h2>{{ p.name }}</h2>
+          <div class="cr">{{ p.credits }} credits / month</div>
+          <p class="blurb">{{ p.blurb }}</p>
+          <div class="price"><span class="mo">${{ p.monthly_usd }}<small> /month</small></span><span class="yr">${{ p.yearly_monthly_usd }}<small> /month, ${{ p.yearly_usd }} a year</small></span></div>
+          <ul>
+            <li>Every image and video model</li>
+            <li>The agent and the {{ client_name }} connector</li>
+            <li>No watermark on renders</li>
+            <li>{{ p.storage_gb }} GB of storage</li>
+          </ul>
+          <button type="submit" name="item" value="{{ p.key }}">Get {{ p.name }} &rarr;</button>
+        </div>
+        {% endfor %}
+      </div>
+    </form>
+
+    <form method="post" action="/oauth/consent" class="free">
+      <input type="hidden" name="authorization_id" value="{{ authorization_id }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if free_trial %}<button class="link" type="submit" name="decision" value="approve">Continue with free trial &middot; {{ trial_credits }} credits</button>{% endif %}
+      <button class="quiet" type="submit" name="decision" value="deny">Cancel</button>
+    </form>
+
+    <div class="rows small">
+      <div class="row"><span>App</span><span>{{ client_name }}{% if client_host %} &middot; {{ client_host }}{% endif %}</span></div>
+      <div class="row"><span>Returns to</span><span class="host">{{ redirect_host }}</span></div>
+    </div>
+    {% if loopback %}<div class="warn small">This request will return to a program on <b>this computer</b> ({{ redirect_host }}).
+      Only continue if you just started the connection yourself.</div>{% endif %}
+    <p class="foot">Plans renew until you cancel, from Settings &rarr; Plan in the studio. Credits pay for what you render.</p>
+  </div>
   {% else %}
   <h1>Allow {{ client_name }} to use Phantra?</h1>
+  {% if just_paid %}<div class="note">You're subscribed. Allow {{ client_name }} to finish connecting.</div>{% endif %}
   <p class="sub">{% if email %}Signed in as <b>{{ email }}</b>. {% endif %}You will be sent back to
     <span class="host">{{ redirect_host }}</span>.</p>
 
