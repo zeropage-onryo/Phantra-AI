@@ -32,6 +32,11 @@ What a signed-in person has:
   a move is LTX 2.5's own `camera_motion` where it has one ("Exact"), else fixed words placed
   where the model's vendor puts them ("Guided"); lens is always words; a reference clip of the
   move (@Video1 on Seedance, fal only) is wired and OFF until `PHANTRA_CAMERA_CLIPS=1`.
+  Wider than a phone (2026-11-03, boards 11 and 12, Krea's shape) both pages are a Home |
+  Generations view beside a black panel of cards (Image/Video switch, model, pictures, prompt,
+  a grid of setting cards, Generate pinned at its foot); Home is the stage plus rows of camera
+  moves (each tile plays its move on a grey box) and starters. A phone keeps the docked box
+  (`useWide` in `direct-generator.tsx` picks the tree).
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
   work. A brand lives inside a project, never studio-wide.
 - **Ad Studio** (`/studio/ads`, 2026-10-26, `docs/tasks/task-ad-studio.md`): a page over the one

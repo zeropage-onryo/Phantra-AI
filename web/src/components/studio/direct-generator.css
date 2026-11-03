@@ -1310,3 +1310,426 @@
   border-color: var(--signal);
   color: var(--on-signal);
 }
+
+/* ── WIDER THAN A PHONE: the card panel (2026-11-03, Mike's pick: boards 11
+   and 12 of the Image & Video canvas, Krea's shape) ──
+   main (Home | Generations) beside a black panel of cards; every menu flies
+   out to the panel's left, into the page, never off the screen's edge. */
+.dg.dgk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 356px;
+  grid-template-rows: minmax(0, 1fr);
+  height: var(--dg-h);
+  min-height: 640px;
+}
+.dg .dgk-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.dg .dgk-tabs {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.dg .dgk-tabs > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone-2);
+  font-size: 14px;
+  font-weight: 500;
+}
+.dg .dgk-tabs > button[aria-selected="true"] {
+  background: var(--text);
+  color: var(--ground);
+}
+.dg .dgk-tabs i {
+  font-style: normal;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.dg .dgk-home {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dg .dgk-home > .dg-stage,
+.dg .dgk-home > .dg-stage-wrap {
+  flex: none;
+  height: min(62vh, 620px);
+  min-height: 380px;
+}
+.dg .dgk-home > .dg-stage-wrap > .dg-stage {
+  min-height: 0;
+}
+.dg .dgk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dg .dgk-row h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+.dg .dgk-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.dg .dgk-tiles[data-text="1"] {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.dg .dgk-move {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--edge-lo);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+}
+.dg .dgk-move:hover {
+  border-color: var(--edge-hi);
+}
+.dg .dgk-move[aria-pressed="true"] {
+  border-color: var(--signal);
+}
+.dg .dgk-move-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 2px;
+}
+.dg .dgk-move-name b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.dg .dgk-move-name em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--raise);
+  color: var(--bone-2);
+  white-space: nowrap;
+}
+.dg .dgk-move-name em[data-mode="exact"],
+.dg .dgk-move-name em[data-mode="clip"] {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+/* each tile plays its move on a grey box when hovered or picked (board 12) */
+.dg .dgk-mini {
+  position: relative;
+  height: 84px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--raise);
+  perspective: 240px;
+}
+.dg .dgk-w {
+  position: absolute;
+  inset: -30%;
+}
+.dg .dgk-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 55%;
+  background-image: linear-gradient(var(--edge) 1px, transparent 1px), linear-gradient(90deg, var(--edge) 1px, transparent 1px);
+  background-size: 22px 22px;
+  transform: rotateX(62deg);
+  transform-origin: 50% 100%;
+}
+.dg .dgk-subj,
+.dg .dgk-b1,
+.dg .dgk-b2 {
+  position: absolute;
+  border-radius: 5px;
+}
+.dg .dgk-subj {
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 34px;
+  margin: -10px 0 0 -12px;
+  background: var(--bone-3);
+}
+.dg .dgk-b1 {
+  left: 24%;
+  top: 42%;
+  width: 14px;
+  height: 14px;
+  background: var(--edge-hi);
+}
+.dg .dgk-b2 {
+  right: 22%;
+  top: 44%;
+  width: 11px;
+  height: 20px;
+  background: var(--edge-hi);
+}
+.dg .dgk-move:hover .dgk-w,
+.dg .dgk-move[aria-pressed="true"] .dgk-w {
+  animation: var(--mv) 2.4s ease-in-out infinite alternate;
+}
+.dg .dgk-mini[data-move="push_in"] { --mv: dgk-push; }
+.dg .dgk-mini[data-move="pull_out"] { --mv: dgk-pull; }
+.dg .dgk-mini[data-move="truck_left"] { --mv: dgk-left; }
+.dg .dgk-mini[data-move="truck_right"] { --mv: dgk-right; }
+.dg .dgk-mini[data-move="crane_up"] { --mv: dgk-up; }
+.dg .dgk-mini[data-move="crane_down"] { --mv: dgk-down; }
+.dg .dgk-mini[data-move="rack_focus"] { --mv: dgk-rack; }
+.dg .dgk-mini[data-move="orbit"] { --mv: dgk-orbit; }
+.dg .dgk-mini[data-move="dolly_zoom"] { --mv: dgk-zoom; }
+.dg .dgk-mini[data-move="whip_pan"] { --mv: dgk-whip; }
+.dg .dgk-mini[data-move="fpv"] { --mv: dgk-fpv; }
+.dg .dgk-mini[data-move="static"] { --mv: none; }
+.dg .dgk-mini[data-move] .dgk-w { animation-name: var(--mv); }
+@keyframes dgk-push { to { transform: scale(1.55); } }
+@keyframes dgk-pull { from { transform: scale(1.5); } to { transform: scale(1); } }
+@keyframes dgk-left { to { transform: translateX(18%); } }
+@keyframes dgk-right { to { transform: translateX(-18%); } }
+@keyframes dgk-up { to { transform: translateY(22%) rotateX(-10deg); } }
+@keyframes dgk-down { from { transform: translateY(22%); } to { transform: translateY(-6%); } }
+@keyframes dgk-orbit { from { transform: rotateY(-35deg); } to { transform: rotateY(35deg); } }
+@keyframes dgk-zoom { to { transform: scale(1.7); } }
+@keyframes dgk-whip { 0% { transform: none; filter: none; } 45% { transform: translateX(-40%); filter: blur(4px); } 100% { transform: translateX(-40%); filter: none; } }
+@keyframes dgk-fpv { from { transform: translateY(10%) scale(0.9) rotate(-4deg); } to { transform: translateY(-8%) scale(1.9) rotate(5deg); } }
+@keyframes dgk-rack { to { filter: blur(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .dg .dgk-move .dgk-w {
+    animation: none !important;
+  }
+}
+.dg .dgk-starter {
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid var(--edge-lo);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: left;
+  display: flex;
+  align-items: flex-end;
+}
+.dg .dgk-starter:hover {
+  border-color: var(--edge-hi);
+}
+.dg .dgk-gens .dg-history {
+  background: transparent;
+  padding: 0;
+  overflow: visible;
+}
+.dg .dgk-gens .dg-history .dg-lab {
+  text-align: left;
+}
+.dg .dg-history[data-grid="1"] ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+/* the panel */
+.dg .dgk-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--edge-lo);
+  border-radius: var(--r2);
+  background: var(--panel-black);
+  min-height: 0;
+  overflow-y: auto;
+}
+.dg[data-over="1"] .dgk-panel {
+  outline: 2px dashed var(--signal);
+  outline-offset: -2px;
+}
+.dg .dgk-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--edge-lo);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.dg .dgk-mode > a {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--bone-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.dg .dgk-mode > a[aria-selected="true"] {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.dg .dgk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge-lo);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.dg .dgk-lab {
+  font-size: 12px;
+  color: var(--bone-3);
+}
+.dg .dgk-lab-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dg .dgk-prompt {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  outline: none;
+}
+.dg .dgk-promptcard:focus-within {
+  border-color: var(--edge-hi);
+}
+.dg .dgk-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+/* a settings chip drawn as a card: its name over its value */
+.dg .dgk-grid .dg-pop {
+  position: static;
+}
+.dg .dgk-grid .dgv-chip,
+.dg .dgk-follow {
+  width: 100%;
+  height: auto;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 6px;
+  padding: 9px 12px;
+  border: 1px solid var(--edge-lo);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+.dg .dgk-follow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  font-weight: 500;
+  color: var(--bone-2);
+  font-size: 13px;
+}
+.dg .dgk-follow small,
+.dg .dgk-chip-lab {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--bone-3);
+}
+.dg .dgk-grid .dgv-chip .dgk-chip-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg .dgk-grid .dgv-chip[aria-expanded="true"] {
+  border-color: var(--signal);
+}
+/* every menu in the panel flies out to its left, at the panel's top */
+.dg .dgk-panel .dg-pop-up,
+.dg .dgk-panel .dg-pop-up[data-wide="1"] {
+  position: fixed;
+  top: 88px;
+  bottom: auto;
+  left: auto;
+  right: 392px;
+  width: 400px;
+}
+.dg .dgk-panel .dg-menu,
+.dg .dgk-panel .dg-menu[data-scroll="1"] {
+  max-height: calc(100vh - 120px);
+}
+.dg .dgk-panel .mp-sheet {
+  width: 100%;
+}
+.dg .dgk-panel .dg-tray[data-size="lg"] {
+  flex-wrap: wrap;
+}
+.dg .dgk-go {
+  flex: none;
+  width: 100%;
+  min-height: 48px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  box-shadow: 0 0 0 10px var(--panel-black);
+}
+.dg .dgk-go:disabled,
+.dg .dgk-go[data-busy="1"]:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--signal) 40%, var(--panel-black));
+  color: color-mix(in srgb, var(--on-signal) 55%, var(--panel-black));
+}
+.dg .dgk-gens .dg-hist-more {
+  align-self: flex-start;
+}
+.dg .dgk-panel .dg-hint {
+  text-align: center;
+}
+@media (max-width: 1100px) {
+  .dg.dgk {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+  .dg .dgk-panel .dg-pop-up,
+  .dg .dgk-panel .dg-pop-up[data-wide="1"] {
+    right: 356px;
+    width: min(400px, calc(100vw - 400px));
+  }
+}
