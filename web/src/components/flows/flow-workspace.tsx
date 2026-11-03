@@ -80,7 +80,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { apiFetch, API_URL, goToSignIn } from "@/lib/api";
+import { apiFetch, ApiError, API_URL, goToSignIn } from "@/lib/api";
 import { sceneHref, sceneMenu, uploadRefs, type SceneMenuRow } from "@/lib/studio-api";
 import { creditsText } from "@/lib/render-choice";
 import {
@@ -675,6 +675,9 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
   const [scene, setScene] = useState<Concept | null>(null);
   const [activeShot, setActiveShot] = useState<number | undefined>(shotN);
   const [sceneError, setSceneError] = useState("");
+  // Sign in is offered only to someone signed out (QA 2026-11-02 T17: a
+  // signed-in person opening a missing scene was asked to sign in)
+  const [signedOut, setSignedOut] = useState(false);
   const [saveState, setSaveState] = useState("Loading scene…");
   const [saveRevision, setSaveRevision] = useState(0);
   const [caps, setCaps] = useState<Capabilities>({});
@@ -807,7 +810,10 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
           toLegacy(loaded.nodes, loaded.edges, graphBase.current, { conceptId, shotN: shot.n }).graph,
         );
       } catch (error) {
-        if (!cancelled) setSceneError(error instanceof Error ? error.message : "Could not load scene");
+        if (cancelled) return;
+        const gone = error instanceof ApiError && error.status === 404;
+        setSignedOut(error instanceof ApiError && error.status === 401);
+        setSceneError(gone ? "This scene isn't in your workspace. It may have been removed." : error instanceof Error ? error.message : "Could not load scene");
       }
     })();
     return () => {
@@ -1717,7 +1723,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
               {sceneError && (
                 <div>
                   {/* the same sign-in every other page uses: it comes back here */}
-                  <button onClick={() => goToSignIn()}>Sign in</button>
+                  {signedOut ? <button onClick={() => goToSignIn()}>Sign in</button> : null}
                   <button onClick={() => window.location.reload()}>Retry</button>
                   <a href={backHref}>{backLabel}</a>
                 </div>

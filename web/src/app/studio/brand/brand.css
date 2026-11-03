@@ -37,7 +37,7 @@
   font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--dimmer);
+  color: var(--dim);
 }
 .bk .bk-hint {
   margin: 0;
@@ -307,6 +307,8 @@
   gap: 6px;
   opacity: 0;
   transition: opacity var(--t);
+  /* above the open button's cover */
+  z-index: 1;
 }
 .bk .bk-card:hover .bk-card-acts,
 .bk .bk-card:focus-within .bk-card-acts,
@@ -338,7 +340,7 @@
   align-items: center;
   padding: 0 8px;
   background: var(--well);
-  color: var(--dimmer);
+  color: var(--dim);
   font-size: 11px;
 }
 .bk .bk-card-type {
@@ -364,10 +366,27 @@
   align-items: baseline;
   gap: 8px;
 }
-.bk .bk-card-name b {
+.bk .bk-card-open {
   flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
   font-size: 15px;
   font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.bk .bk-card-open:focus-visible {
+  outline: none;
+}
+.bk .bk-card-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r2);
 }
 .bk .bk-card-name small {
   font-family: var(--mono);

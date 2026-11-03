@@ -99,8 +99,7 @@ export function ShowcaseList({ toast }: { toast: (text: string, kind?: "ok" | "e
     return (
       <div
         key={item.id}
-        className="qrow"
-        style={{ alignItems: "flex-start", gridTemplateColumns: "128px minmax(0, 1fr) 96px minmax(0, max-content)" }}
+        className="qrow showrow"
       >
         <Take item={item} />
         <div className="qinfo">
@@ -125,7 +124,7 @@ export function ShowcaseList({ toast }: { toast: (text: string, kind?: "ok" | "e
           {item.note ? <div className="qm" style={{ color: "var(--danger)" }}>{item.note}</div> : null}
           {item.price_note ? <div className="qm m">{item.price_note}</div> : null}
           {acts.includes("pick") ? (
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <input
                 className="w-[120px] rounded-[4px] border border-[var(--line)] bg-transparent px-2 py-1 text-[12px]"
                 placeholder="gen:123"
@@ -135,7 +134,7 @@ export function ShowcaseList({ toast }: { toast: (text: string, kind?: "ok" | "e
               />
               <button
                 type="button"
-                className="tag"
+                className="tag whitespace-nowrap"
                 disabled={busy === item.id || !(picks[item.id] ?? "").trim()}
                 onClick={() => run(item.id, showcasePick(item.id, picks[item.id].trim()), "Picked; keep it to go live")}
               >
@@ -145,7 +144,7 @@ export function ShowcaseList({ toast }: { toast: (text: string, kind?: "ok" | "e
           ) : null}
         </div>
         <span className="m">{STATUS_WORDS[item.status] ?? item.status}</span>
-        <span className="flex flex-col items-end gap-2 whitespace-nowrap">
+        <span className="showacts">
           {draft !== undefined && draft !== item.prompt ? (
             <button
               type="button"

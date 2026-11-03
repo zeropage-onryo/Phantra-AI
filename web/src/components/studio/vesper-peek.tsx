@@ -38,7 +38,8 @@ export function VesperPeek({
   making,
   typing,
   failed,
-  kind,
+  landedKey,
+  landedKind,
   onFill,
   onWake,
 }: {
@@ -50,8 +51,10 @@ export function VesperPeek({
   typing: boolean;
   /** the newest send did not go through */
   failed: boolean;
-  /** what the box makes now, for the line when a make lands */
-  kind: "image" | "video";
+  /** the newest still or clip that landed (lib/vesper-voice.ts landedFrom):
+   *  he cheers when it changes, never when a turn only wrote a scene */
+  landedKey: string | null;
+  landedKind: "image" | "video";
   /** a tip was tapped: these words go in the box */
   onFill: (text: string) => void;
   /** he was clicked: the cursor goes in the box */
@@ -81,19 +84,20 @@ export function VesperPeek({
   // a make lands, a wince when a send fails
   const [flash, setFlash] = useState<"nod" | "hop" | "wince" | null>(null);
   const [cheer, setCheer] = useState(false);
-  const was = useRef({ busy, making, failed });
+  // what was already there when the page opened is not news
+  const was = useRef({ busy, failed, landedKey });
   useEffect(() => {
     const before = was.current;
-    was.current = { busy, making, failed };
+    was.current = { busy, failed, landedKey };
     let next: typeof flash = null;
     if (busy && !before.busy) next = "nod";
     else if (failed && !before.failed) {
       next = "wince";
       say(failedLine(), true);
-    } else if (before.making && !making && !failed) {
+    } else if (landedKey && landedKey !== before.landedKey) {
       next = "hop";
       setCheer(true);
-      say(landed(kind), true);
+      say(landed(landedKind), true);
     }
     if (!next) return;
     setFlash(next);
@@ -102,7 +106,7 @@ export function VesperPeek({
       setCheer(false);
     }, FLASH_MS);
     return () => clearTimeout(t);
-  }, [busy, making, failed, kind, say]);
+  }, [busy, failed, landedKey, landedKind, say]);
 
   // the hello, once per tab (the corner shares the key, so he says it once)
   useEffect(() => {

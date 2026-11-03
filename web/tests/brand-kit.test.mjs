@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   emptySpec, withDefaults, normaliseHex, splitList, problems, roleColour, logoFor,
   fontFaces, fontStack, fontAlias, kitSummary, fileFor, isSvg, captionSample, CAPTION_SAMPLE,
-  contrastRatio, contrastChecks, primaryChoices, evidenceFor, parseAesthetics, formatAesthetics, splitLines,
+  contrastRatio, contrastChecks, inkOn, primaryChoices, evidenceFor, parseAesthetics, formatAesthetics, splitLines,
 } from '../src/lib/brand-kit.ts';
 
 test('a hex is normalised or refused', () => {
@@ -132,4 +132,12 @@ test("the caption preview reads the kit's own tagline, never another client's", 
   assert.equal(captionSample(emptySpec()), CAPTION_SAMPLE);
   assert.equal(captionSample(null), CAPTION_SAMPLE);
   assert.ok(!CAPTION_SAMPLE.includes("Gyg"), "the sample names no client");
+});
+
+test('a swatch is labelled in black or white, whichever reads (QA T14)', () => {
+  assert.equal(inkOn('#F2C94C'), '#000000');
+  assert.equal(inkOn('#151514'), '#FFFFFF');
+  for (const hex of ['#F2C94C', '#151514', '#0A2540', '#FFFFFF', '#777777']) {
+    assert.ok(contrastRatio(inkOn(hex), hex) >= 4.5, hex);
+  }
 });

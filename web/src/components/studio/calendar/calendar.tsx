@@ -598,7 +598,7 @@ function WeekView({ monday, posts, slots, wall, clock, onOpen, onMove, onDropSou
           </div>
         ))}
       </div>
-      <div className="cal-week-body" ref={scroller}>
+      <div className="cal-week-body" ref={scroller} tabIndex={0} role="region" aria-label="The week, by hour">
         <div className="cal-hours" aria-hidden="true">
           {Array.from({ length: 24 }, (_, h) => (
             <span key={h} style={{ top: h * HOUR_PX }}>

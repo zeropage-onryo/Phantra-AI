@@ -49,19 +49,7 @@ function KitCard({ kit, onOpen, onCopy, onDelete }: {
   const logo = fileFor(kit, logoFor(bg)) ?? fileFor(kit, "logo_light") ?? fileFor(kit, "logo_dark");
   const fonts = (kit.files ?? []).filter((f) => f.role.startsWith("font_"));
   return (
-    <article
-      className="bk-card"
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-    >
+    <article className="bk-card">
       <div className="bk-card-face" style={{ background: bg }}>
         {logo ? (
           <img src={`${API_URL}${logo.url}`} alt="" />
@@ -70,7 +58,7 @@ function KitCard({ kit, onOpen, onCopy, onDelete }: {
             {kit.name}
           </span>
         )}
-        <div className="bk-card-acts" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <div className="bk-card-acts">
           <UseKitMenu kit={{ id: kit.id, name: kit.name }} buttonClassName="bk-pill bk-pill-sm" label="Use" />
           <span className="bk-grow" />
           <button type="button" className="bk-icon" title="Duplicate" aria-label={`Duplicate ${kit.name}`} onClick={onCopy}>
@@ -100,7 +88,11 @@ function KitCard({ kit, onOpen, onCopy, onDelete }: {
           </small>
         </div>
         <div className="bk-card-name">
-          <b>{kit.name}</b>
+          {/* the card's one open control; its ::after covers the card, so a
+              click anywhere opens it while Use / Duplicate / Delete sit above */}
+          <button type="button" className="bk-card-open" onClick={onOpen}>
+            {kit.name}
+          </button>
           <small>
             {kit.projects ? `${kit.projects} project${kit.projects === 1 ? "" : "s"}` : "on no project"}
           </small>

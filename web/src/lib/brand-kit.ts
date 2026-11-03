@@ -230,6 +230,11 @@ export function contrastRatio(a: string, b: string): number {
   return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
 }
 
+/** black or white, whichever reads better on `bg` (a swatch's label) */
+export function inkOn(bg: string): string {
+  return contrastRatio("#000000", bg) >= contrastRatio("#FFFFFF", bg) ? "#000000" : "#FFFFFF";
+}
+
 /** body text needs 4.5:1 (WCAG AA) */
 export const CONTRAST_MIN = 4.5;
 

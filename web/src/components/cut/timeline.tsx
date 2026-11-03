@@ -531,7 +531,7 @@ export function Timeline({ only }: { only?: Track["kind"] } = {}) {
         </div>
       </div>
 
-      <div className="cx-scroll" ref={scrollRef}>
+      <div className="cx-scroll" ref={scrollRef} tabIndex={0} role="region" aria-label="Timeline">
         <div className="cx-lanes" style={{ width: contentW, height: Math.max(lanesHeight, view.height) }}>
           {tracks.map((t, i) => {
             const m = mix[t.id];

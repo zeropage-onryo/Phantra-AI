@@ -74,3 +74,36 @@ test("on a phone the element shelf under the box is not drawn", () => {
   const css = src("../src/components/studio/composer/composer.css");
   assert.match(css, /\.view\[data-page\] > \.row \{\s*display: none;/);
 });
+
+test("Voice is in the phone menu, behind the rail's own flag (QA 2026-11-02 T15)", () => {
+  const code = strip(src("../src/components/studio/phone/phone-chrome.tsx"));
+  const menu = code.slice(code.indexOf("export function PhoneMenu"));
+  assert.match(menu, /caps\.voice_tab === true \? row\("\/studio\/voice", "Voice", AudioLines\)/);
+  const shell = strip(src("../src/components/studio/shell.tsx"));
+  assert.match(shell, /<PhoneMenu open=\{pmenu\} onClose=\{closePmenu\} caps=\{caps\} \/>/);
+  assert.match(shell, /id: "voice", label: "Voice", href: "\/studio\/voice", icon: AudioLines, cap: "voice_tab"/);
+});
+
+// QA 2026-11-02 T6 / T7: the two studio pages wider than a phone.
+const rule = (css, sel) => {
+  const i = css.indexOf(`\n${sel} {`);
+  return i < 0 ? "" : css.slice(i, css.indexOf("}", i));
+};
+
+test("the Elements cover is never wider than the page (T6: 752px at 390)", () => {
+  const css = src("../src/app/studio/studio.css");
+  const cover = rule(css, ".elcover");
+  assert.match(cover, /width: 100%;/);
+  assert.match(cover, /minmax\(min\(320px, 100%\), 1fr\)/);
+});
+
+test("the Showcase row stacks on a phone, its columns in CSS where the media query can reach them (T7)", () => {
+  const list = src("../src/components/studio/showcase/showcase-list.tsx");
+  assert.doesNotMatch(list, /gridTemplateColumns/);
+  assert.match(list, /className="qrow showrow"/);
+  const css = src("../src/app/studio/studio.css");
+  assert.match(rule(css, ".qrow.showrow"), /grid-template-columns: 128px minmax\(0, 1fr\) 96px minmax\(0, max-content\);/);
+  assert.match(css, /@media \(max-width: 720px\) \{\s*\.qrow\.showrow \{\s*grid-template-columns: minmax\(0, 1fr\);/);
+  // a button's words never wrap into a circle
+  assert.match(list, /className="tag whitespace-nowrap"[\s\S]{0,300}Use this Library item/);
+});

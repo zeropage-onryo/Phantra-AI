@@ -182,8 +182,8 @@ export default function ElementsPage() {
                   it. Studio attaches its frames as references; the canvas drops an element card wired into the chain.
                 </li>
                 <li>
-                  <b>Let the notes do work.</b> What you write becomes a searchable chunk on the RAG assets shelf, so the
-                  writer can retrieve the jacket by description, not only by name.
+                  <b>Let the notes do work.</b> The writer reads what you write here, so it can find the jacket by
+                  description, not only by name.
                 </li>
               </ol>
             </div>
