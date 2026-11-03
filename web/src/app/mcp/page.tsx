@@ -19,6 +19,7 @@ import { pagesIn, makePath } from "@/landing-pages/pages";
 import { IMAGE_MODELS, pageLabel } from "@/landing-pages/shared";
 import { MODELS } from "@/lib/catalog";
 import { CONNECTOR_NAME } from "@/lib/connect-claude";
+import { CHATGPT_INSTALL_URL } from "@/lib/connect-chatgpt";
 import { pageMeta } from "@/lib/page-meta";
 import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 
@@ -43,7 +44,8 @@ import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 //   on both addresses; balance / credit_history / recommend_model read only
 // - the screenshots under public/mcp/ were taken in Mike's own Chrome on
 //   2026-10-12: claude.ai's Add custom connector dialog (filled, not saved),
-//   his connected Phantra connector, and ChatGPT's Plugins page
+//   and his connected Phantra connector (ChatGPT's Plugins page went with the
+//   copy-the-address steps, 2026-11-02)
 // - the plugin: github.com/zeropage-onryo/phantra-claude-plugin (MIT, the
 //   connector plus 22 skills, per its README that day)
 // - model names come off the catalog and the image list, never typed; no
@@ -51,8 +53,6 @@ import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 const ORIGIN = "https://api.phantra.ai";
 const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 const PLUGIN_URL = "https://github.com/zeropage-onryo/phantra-claude-plugin";
-const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
-const CHATGPT_HELP_URL = "https://help.openai.com/en/articles/11487775-connected-apps-in-chatgpt";
 
 export const metadata: Metadata = pageMeta({
   title: "MCP Server for Claude and ChatGPT",
@@ -68,14 +68,10 @@ export const metadata: Metadata = pageMeta({
 // pill the page opens on (it comes first here, and McpClientProvider takes these
 // ids). Claude's button opens claude.ai's Add custom connector dialog with the
 // name and address already filled in (claude.ai reads `connectorName` and
-// `connectorUrl`; found on higgsfield.ai/mcp 2026-10-16). ChatGPT's cannot be
-// opened filled in: its "Add custom MCP server" dialog lives at chatgpt.com/plugins
-// with no URL of its own and reads no URL parameters (checked in a real session,
-// 2026-10-16). So the ChatGPT button opens that page AND copies the address in
-// the same click.
-// TODO: once the ChatGPT directory listing is approved, point the ChatGPT button
-// at `https://chatgpt.com/plugins/<slug>?open_in_app=1` (a one-click install, the
-// way higgsfield.ai/mcp does it) and drop `copyAlso`.
+// `connectorUrl`; found on higgsfield.ai/mcp 2026-10-16). ChatGPT's opens the
+// Phantra AI listing in ChatGPT's plugin directory (approved 2026-11-02,
+// lib/connect-chatgpt.ts), whose own Add button signs the person in; adding by
+// address stays as one fallback line.
 const START_PROMPT = "Using Phantra, draw me a poster for a coffee brand and show me the price first.";
 const CLAUDE_ADD = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(CONNECTOR_NAME)}&connectorUrl=${encodeURIComponent(RENDER_ADDRESS)}`;
 const CLAUDE_START = `https://claude.ai/new?q=${encodeURIComponent(START_PROMPT)}`;
@@ -92,9 +88,7 @@ const HERO_CLIENTS: HeroClient[] = [
     label: "ChatGPT",
     button: {
       label: "Connect Phantra",
-      href: CHATGPT_PLUGINS_URL,
-      copyAlso: RENDER_ADDRESS,
-      copiedHint: "Paste it in ChatGPT: Add → Add custom MCP server",
+      href: CHATGPT_INSTALL_URL,
       logo: "openai",
       ...WHITE_TONE,
     },
@@ -109,9 +103,8 @@ const HERO_CLIENTS: HeroClient[] = [
         },
         {
           title: "Add Phantra and sign in",
-          body: `Open chatgpt.com/plugins, press Add and choose Add custom MCP server. Name it ${CONNECTOR_NAME}, paste this address: ${RENDER_ADDRESS}, and sign in with your Phantra account. The button below opens the page and copies the address for you. Custom MCP servers depend on your ChatGPT plan and workspace settings; if you don't see Add, your plan doesn't allow them yet.`,
-          link: { label: "OpenAI's own steps", href: CHATGPT_HELP_URL },
-          action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL, copyAlso: RENDER_ADDRESS, logo: "openai" },
+          body: `Press Connect Phantra: it opens the Phantra AI plugin in ChatGPT. Add it, then sign in with your Phantra account. Or add it by address: Add → Add custom MCP server → ${RENDER_ADDRESS}.`,
+          action: { label: "Connect Phantra", href: CHATGPT_INSTALL_URL, logo: "openai" },
         },
         {
           title: "Create with Phantra in ChatGPT",
@@ -358,18 +351,10 @@ const SETUP_INTRO: Record<string, string> = {
   other: "Cursor, and any client that adds a remote MCP server by its address and signs in with OAuth.",
   plugin: "The connector plus the skills that teach Claude how to plan with the studio.",
 };
-// The ChatGPT screenshot was taken in Mike's own Chrome on 2026-10-12 (public/mcp/);
-// the Claude walkthrough is his screen recording (public/mcp/how/).
+// The Claude walkthrough is Mike's screen recording (public/mcp/how/). ChatGPT has
+// no still since its listing went live (2026-11-02): the old one showed the
+// Add custom MCP server route.
 const SETUP_SHOTS: Record<string, SetupTab["shots"]> = {
-  chatgpt: [
-    {
-      src: "/mcp/chatgpt-plugins.png",
-      alt: "ChatGPT's Plugins page, where Add custom MCP server takes the Phantra address",
-      width: 982,
-      height: 350,
-      caption: "Step 2: chatgpt.com/plugins, then Add → Add custom MCP server.",
-    },
-  ],
   // no still for Claude here: public/mcp/claude-add.png shows the /mcp/claude
   // address (it belongs to that page); the walkthrough video shows this one.
 };
@@ -459,10 +444,10 @@ const FAQS = [
   },
   // The setup steps live in the hero's modal, which renders only when opened;
   // this answer keeps them in the page's HTML, since /mcp is the documentation
-  // address the ChatGPT directory submission names (2026-10-16).
+  // address the ChatGPT listing names (2026-10-16; listed 2026-11-02).
   {
     q: "How do I add Phantra to ChatGPT?",
-    a: `Open chatgpt.com/plugins, press Add and choose Add custom MCP server. Name it ${CONNECTOR_NAME}, paste ${RENDER_ADDRESS}, and sign in with your Phantra account. Then start a chat and ask for an image or a video. Custom MCP servers depend on your ChatGPT plan and workspace settings; if you don't see Add, your plan doesn't allow them yet.`,
+    a: `Log in to ChatGPT, then press Connect Phantra at the top of this page: it opens the Phantra AI plugin in ChatGPT. Add it and sign in with your Phantra account, then start a chat and ask for an image or a video. You can also add it by address: in ChatGPT, Add → Add custom MCP server → ${RENDER_ADDRESS}.`,
   },
   {
     q: "How do I add Phantra to Claude?",
@@ -487,7 +472,7 @@ const FAQS = [
   },
   {
     q: "How do I disconnect?",
-    a: `Remove ${CONNECTOR_NAME} where you added it. In Claude that is Customize, then Connectors; in ChatGPT, at chatgpt.com/plugins.`,
+    a: `Remove ${CONNECTOR_NAME} where you added it. In Claude that is Customize, then Connectors; in ChatGPT, open the Phantra AI plugin and press Manage.`,
   },
   {
     q: "Who do I contact for help?",
@@ -538,7 +523,7 @@ export default function McpPage() {
               <p
                 className={`mt-5 max-w-[44ch] text-[clamp(1rem,1.5vw,1.125rem)] leading-normal text-[var(--ink-2)] ${REVEAL} motion-safe:duration-700 motion-safe:delay-150`}
               >
-                Use Phantra in ChatGPT, Claude, and other compatible agents.
+                Available in ChatGPT. Use Phantra there, in Claude, and in other compatible agents.
               </p>
             </HeroConnect>
           </div>
@@ -665,8 +650,16 @@ export default function McpPage() {
             <h2 className="serif text-[clamp(2.25rem,5.5vw,4rem)]">Make it from the chat you already use.</h2>
             <div className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
               <a
-                href="#claude"
+                href={CHATGPT_INSTALL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-6 text-[15px] font-semibold text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
+              >
+                Add to ChatGPT <ArrowUpRight className="size-4" aria-hidden />
+              </a>
+              <a
+                href="#claude"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-border bg-background px-6 text-[15px] font-semibold text-foreground transition-colors hover:bg-secondary"
               >
                 Connect to Claude <ArrowRight className="size-4" aria-hidden />
               </a>

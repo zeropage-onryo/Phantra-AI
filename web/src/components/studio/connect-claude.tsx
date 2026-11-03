@@ -22,6 +22,7 @@ import {
   connectPlan,
   connectedLine,
 } from "@/lib/connect-claude";
+import { CHATGPT_INSTALL_URL } from "@/lib/connect-chatgpt";
 import { getMcpConnection, type McpConnection, type Me } from "@/lib/studio-api";
 
 type Toast = (text: string, kind?: "ok" | "err") => void;
@@ -125,9 +126,13 @@ export function ConnectMcpBody({ me, toast }: { me: Me | null; toast: Toast }) {
             "render",
             "ChatGPT and other MCP apps",
             "can render",
-            "Also draws stills and approves renders from chat, always after a price in credits and your yes.",
+            "Also draws stills and approves renders from chat, always after a price in credits and your yes. Other apps add it by this address.",
             plan.url,
           )}
+          {/* ChatGPT adds Phantra from its plugin directory (listed 2026-11-02) */}
+          <a className="zbtn pri ccgo" href={CHATGPT_INSTALL_URL} target="_blank" rel="noopener noreferrer">
+            Add {CONNECTOR_NAME} in ChatGPT <ExternalLink strokeWidth={1.8} />
+          </a>
 
           {row(
             "desktop",
@@ -142,7 +147,11 @@ export function ConnectMcpBody({ me, toast }: { me: Me | null; toast: Toast }) {
             <a href={CLAUDE_CONNECTORS_URL} target="_blank" rel="noopener noreferrer">
               Customize → Connectors
             </a>
-            ). Nothing here deletes a connection.
+            ; in ChatGPT: the{" "}
+            <a href={CHATGPT_INSTALL_URL} target="_blank" rel="noopener noreferrer">
+              Phantra AI plugin
+            </a>
+            , then Manage). Nothing here deletes a connection.
           </p>
         </>
       )}

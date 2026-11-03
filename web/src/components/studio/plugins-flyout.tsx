@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
+import { CHATGPT_INSTALL_URL } from "@/lib/connect-chatgpt";
 
 /** `logo` is the company's own icon, saved from its live site into
  *  web/public/brand/plugins/ (2026-10-16). */
@@ -19,7 +20,8 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "MCP",
     items: [
-      { name: "ChatGPT", href: "https://chatgpt.com/plugins", logo: "/brand/plugins/chatgpt.svg" },
+      // the Phantra AI listing in ChatGPT's plugin directory (2026-11-02)
+      { name: "ChatGPT", href: CHATGPT_INSTALL_URL, logo: "/brand/plugins/chatgpt.svg" },
       { name: "Claude", href: "https://claude.ai/customize/connectors", logo: "/brand/plugins/claude.svg" },
       { name: "Grok Bot", logo: "/brand/plugins/grok.svg" },
       { name: "Muse", icon: Music2 },
