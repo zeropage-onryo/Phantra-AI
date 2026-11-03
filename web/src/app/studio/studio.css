@@ -508,7 +508,8 @@
 
 /* ── SHELL + BAR ── */
 .shell {
-  margin-left: 84px;
+  /* no rail any more (2026-11-02): the nav is the header's dropdowns */
+  margin-left: 0;
   min-height: 100vh;
   position: relative;
   z-index: 1;
@@ -2648,7 +2649,7 @@ textarea.zin {
   align-items: center;
   gap: 8px;
   width: max-content;
-  max-width: min(640px, calc(100vw - 84px - 48px));
+  max-width: min(640px, calc(100vw - 48px));
   pointer-events: none;
 }
 .ztoast {
@@ -5178,5 +5179,203 @@ p.zkeys {
   .zps .ztoasts {
     top: auto;
     bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}
+
+
+/* ── THE TOP NAV (2026-11-02, Mike's call) ── the rail's pages moved into
+   the header as dropdowns (shell.tsx GROUPS): each trigger is its icon, its
+   name and a chevron; each menu lists its pages with the rail's icons and a
+   line under the name. The page you are on lights its group's trigger. The
+   phone draws neither (the block above hides .bar.hdr under 720px). */
+.hnav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.hnav-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.hnav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 10px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dim);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--t),
+    background var(--t),
+    border-color var(--t);
+}
+.hnav-btn svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+.hnav-btn .hnav-chev {
+  width: 13px;
+  height: 13px;
+  margin-left: -2px;
+  color: var(--dimmer);
+  transition: transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.hnav-btn:hover {
+  color: var(--text);
+  background: rgb(255 255 255 / 0.05);
+}
+.hnav-btn[aria-expanded="true"] {
+  color: var(--text);
+  background: rgb(255 255 255 / 0.07);
+  border-color: var(--line);
+}
+.hnav-btn[aria-expanded="true"] .hnav-chev {
+  transform: rotate(180deg);
+}
+.hnav-btn[data-here] {
+  color: var(--text);
+}
+.hnav-btn[data-here] > svg:first-child {
+  color: var(--signal);
+}
+.hnav-btn .nbadge.dot {
+  top: -7px;
+  margin-left: -6px;
+}
+.hnav-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  min-width: 268px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgb(14 14 17 / 0.97);
+  box-shadow: 0 22px 60px -20px rgb(0 0 0 / 0.85);
+  backdrop-filter: blur(16px);
+  animation: hnav-in 140ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes hnav-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hnav-menu {
+    animation: none;
+  }
+}
+.hnav-menu a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  color: var(--dim);
+  text-decoration: none;
+  transition:
+    background var(--t),
+    color var(--t);
+}
+.hnav-menu a:hover,
+.hnav-menu a:focus-visible {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--text);
+  outline: none;
+}
+.hnav-ic {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 0.03);
+}
+.hnav-ic svg {
+  width: 17px;
+  height: 17px;
+}
+.hnav-menu a[aria-current] {
+  color: var(--text);
+  background: var(--signal-soft);
+}
+.hnav-menu a[aria-current] .hnav-ic {
+  border-color: transparent;
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.hnav-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.hnav-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: inherit;
+}
+.hnav-name .nbadge {
+  position: static;
+}
+.hnav-sub {
+  font-size: 11.5px;
+  color: var(--dimmer);
+  white-space: nowrap;
+}
+.hnav-menu [data-neon] .hnav-ic svg {
+  color: #ffd2a8;
+  filter: drop-shadow(0 0 3px #ff7a1a) drop-shadow(0 0 8px #ff7a1a);
+}
+.hnav-menu .rneon {
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff1e0;
+  text-shadow: 0 0 2px #fff, 0 0 6px #ff7a1a, 0 0 14px #ff7a1a;
+  animation: rneon-buzz 4s infinite;
+}
+/* the last menu on the bar (Plugins) is portalled; the one before it sits
+   at the right of the nav, so it hangs from its trigger's right edge */
+.hnav-wrap[data-group="edit"] .hnav-menu {
+  left: auto;
+  right: 0;
+  transform: none;
+  animation-name: hnav-in-r;
+}
+@keyframes hnav-in-r {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+/* a laptop-width window: the names go, the icons and chevrons stay, and
+   the trigger's title still says which is which */
+@media (max-width: 1180px) {
+  .hnav-btn .hnav-l {
+    display: none;
+  }
+  .hnav-btn {
+    padding: 0 8px 0 10px;
+    gap: 6px;
   }
 }

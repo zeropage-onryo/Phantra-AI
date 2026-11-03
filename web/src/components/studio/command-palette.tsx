@@ -39,7 +39,6 @@ import {
   Loader2,
   LogOut,
   MessageSquarePlus,
-  PanelLeft,
   Plus,
   RectangleHorizontal,
   RectangleVertical,
@@ -82,16 +81,12 @@ export function CommandPalette({
   workspace,
   signedOut,
   toast,
-  pinned,
-  onTogglePin,
   onSwitchAccount,
 }: {
   me: Me | null;
   workspace: string;
   signedOut: boolean;
   toast: (text: string, kind?: "ok" | "err") => void;
-  pinned: boolean;
-  onTogglePin: () => void;
   onSwitchAccount: (slug: string) => void;
 }) {
   const router = useRouter();
@@ -268,17 +263,6 @@ export function CommandPalette({
           },
         })),
         {
-          key: "act:pin",
-          title: pinned ? "Let the rail collapse" : "Keep the rail open",
-          icon: PanelLeft,
-          keywords: "sidebar navigation pin",
-          verb: pinned ? "Collapse" : "Pin",
-          run: () => {
-            close();
-            onTogglePin();
-          },
-        },
-        {
           key: "act:credits",
           title: "Buy credits",
           icon: CreditCard,
@@ -299,7 +283,7 @@ export function CommandPalette({
         },
       ],
     };
-  }, [me?.accounts, workspace, pinned, go, close, router, toast, onSwitchAccount, onTogglePin]);
+  }, [me?.accounts, workspace, go, close, router, toast, onSwitchAccount]);
 
   // what is drawn: the server's groups for THIS query, plus the commands
   const groups = useMemo<Group[]>(() => {
