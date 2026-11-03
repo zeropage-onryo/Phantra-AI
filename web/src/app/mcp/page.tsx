@@ -483,7 +483,7 @@ const FAQS = [
   },
   {
     q: "How do I disconnect?",
-    a: `Remove ${CONNECTOR_NAME} where you added it. In Claude that is Customize, then Connectors; in ChatGPT, at chatgpt.com/plugins.`,
+    a: `Remove ${CONNECTOR_NAME} where you added it. In Claude that is Customize, then Connectors; in ChatGPT, open the Phantra AI plugin and press Manage.`,
   },
   {
     q: "Who do I contact for help?",
@@ -534,7 +534,7 @@ export default function McpPage() {
               <p
                 className={`mt-5 max-w-[44ch] text-[clamp(1rem,1.5vw,1.125rem)] leading-normal text-[var(--ink-2)] ${REVEAL} motion-safe:duration-700 motion-safe:delay-150`}
               >
-                Use Phantra in ChatGPT, Claude, and other compatible agents.
+                Available in ChatGPT. Use Phantra there, in Claude, and in other compatible agents.
               </p>
             </HeroConnect>
           </div>
@@ -661,8 +661,16 @@ export default function McpPage() {
             <h2 className="serif text-[clamp(2.25rem,5.5vw,4rem)]">Make it from the chat you already use.</h2>
             <div className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
               <a
-                href="#claude"
+                href={CHATGPT_PLUGIN_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-6 text-[15px] font-semibold text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
+              >
+                Add to ChatGPT <ArrowUpRight className="size-4" aria-hidden />
+              </a>
+              <a
+                href="#claude"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-border bg-background px-6 text-[15px] font-semibold text-foreground transition-colors hover:bg-secondary"
               >
                 Connect to Claude <ArrowRight className="size-4" aria-hidden />
               </a>

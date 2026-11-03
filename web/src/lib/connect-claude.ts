@@ -20,7 +20,8 @@ export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors";
 
 /** Phantra's listing in ChatGPT's plugin directory (live and published 2026-11-02).
  *  Opening it is the one-click add: the page's own button installs Phantra and
- *  starts the sign-in. The studio's Plugins flyout and /mcp both point here. */
+ *  starts the sign-in. /mcp, the studio's Plugins flyout and the Connect MCP
+ *  panel all point here. */
 export const CHATGPT_PLUGIN_URL = "https://chatgpt.com/plugins/plugin_asdk_app_6ad7a4325484819188bf181eeae543e2";
 
 /** the name the steps suggest typing, so "remove it" names the same thing */
