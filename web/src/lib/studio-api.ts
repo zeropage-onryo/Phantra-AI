@@ -466,6 +466,9 @@ export type Concept = {
   holds_person?: boolean;
   people_refusers?: string[];
   people_note?: string;
+  /** shots whose clip is a draft on a quick sibling (Veo 3.1 Fast), and the
+   *  model that redoes them (src/drafts.py redo_of, 2026-11-03); null: none */
+  redo?: { model: string; from: string; slots: { shot_n: number; part: number | null; label: string }[] } | null;
   /** where each reference came from, parallel to `refs` (app/api.py _ref_sources) */
   ref_sources?: import("./refs").RefSource[];
   /** the drawable size of each reference, parallel to `refs` (app/api.py
@@ -522,6 +525,9 @@ export type ModelSpec = {
   price?: { kind: "per_second" | "flat" | "unknown"; usd?: number; usd_by_frame?: Record<string, number> };
   /** the frame a draft renders at (src/drafts.py), or null: none offered */
   draft?: string | null;
+  /** the quick sibling a draft renders on when there is no cheaper frame
+   *  (Veo 3.1 -> Veo 3.1 Fast, fal.DRAFT_MODELS), or null */
+  draft_model?: string | null;
 };
 export type RendererSpec = {
   label: string;
@@ -652,6 +658,11 @@ export const sceneQuote = (id: number, choice: RenderChoice) => {
   for (const [k, v] of Object.entries(choice)) if (v !== undefined && v !== null) q.set(k, String(v));
   return apiFetch<RenderQuote>(`/scenes/${id}/quote?${q}`);
 };
+/** Take this scene's Veo 3.1 Fast drafts off their shots so the Render
+ *  button renders them on Veo 3.1 (src/drafts.py). Spends nothing; the
+ *  drafts stay in the Library. */
+export const sceneRedo = (id: number) =>
+  apiFetch<{ ok: boolean; model: string; from: string; cleared: number }>(`/scenes/${id}/redo`, { method: "POST" });
 /** THE CLICK THAT SPENDS: render this scene with this pick and the signed
  *  quotes for it. Credit is held before anything is submitted. */
 export const sceneApprove = (id: number, choice?: RenderChoice) =>

@@ -185,6 +185,9 @@ def _fal_models() -> list[dict]:
             # the frame a DRAFT renders at, or None when this model has no
             # cheaper tier than its default (src/drafts.py, 2026-10-11)
             "draft": fal.draft_resolution(name),
+            # the quick sibling a draft renders on when the model has no
+            # cheaper frame (fal.DRAFT_MODELS, 2026-11-03), else None
+            "draft_model": fal.draft_model(name),
         })
     return out
 

@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote, keyframeCount, keyframePrice, keyframeButton, keyframeCeilingNote, keyframesOnSale, oneClipNote } from '../src/lib/render-choice.ts';
+import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, draftPair, isSiblingDraft, withSiblingDraft, shotsToDraw, keyframeNote, keyframeCount, keyframePrice, keyframeButton, keyframeCeilingNote, keyframesOnSale, oneClipNote } from '../src/lib/render-choice.ts';
 
 const choices = (values, d) => ({ kind: 'choices', values, default: d });
 const renderers = {
@@ -236,4 +236,24 @@ test('a scene rendered as one clip is not sold keyframes; a pick that splits it 
   assert.equal(keyframesOnSale({ oneClip: false }, q), q);
   assert.equal(keyframesOnSale(null, q), q);
   assert.equal(keyframesOnSale({ oneClip: false }, undefined), null);
+});
+
+test('a flat-rate model drafts on its quick sibling, keeping the length and frame', () => {
+  const veoPair = { fal: { label: 'fal.ai', available: true, models: [
+    { id: 'veo3.1', label: 'Veo 3.1', available: true, draft_model: 'veo3.1-fast', duration: choices([4, 6, 8], 4), frame: choices(['720p', '1080p'], '720p') },
+    { id: 'veo3.1-fast', label: 'Veo 3.1 Fast', available: true, draft_model: null, duration: choices([4, 6, 8], 4), frame: choices(['720p', '1080p'], '720p') },
+    { id: 'wan3', label: 'Wan', available: true, draft: '480p', duration: choices([5], 5), frame: choices(['480p', '720p'], '720p') }] } };
+  const pick = { provider: 'fal', model: 'veo3.1', duration: 8, frame: '1080p' };
+  assert.equal(draftPair(veoPair, pick).quick.id, 'veo3.1-fast');
+  assert.equal(isSiblingDraft(veoPair, pick), false);
+  const drafting = withSiblingDraft(veoPair, pick, true);
+  assert.deepEqual(drafting, { ...pick, model: 'veo3.1-fast' });
+  assert.equal(isSiblingDraft(veoPair, drafting), true);
+  // the pair is found from either end, and off is the full model again
+  assert.equal(draftPair(veoPair, drafting).full.id, 'veo3.1');
+  assert.deepEqual(withSiblingDraft(veoPair, drafting, false), pick);
+  // a model with no sibling is left alone
+  const wan = { provider: 'fal', model: 'wan3', duration: 5, frame: '720p' };
+  assert.equal(draftPair(veoPair, wan), null);
+  assert.equal(withSiblingDraft(veoPair, wan, true), wan);
 });

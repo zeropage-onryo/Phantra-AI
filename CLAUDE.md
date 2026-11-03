@@ -394,7 +394,10 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
   Render card (`checks`, by shot; OWNED `render_qc`, `ensure(dsn)`). Free, advice only, never
   fails a render; `PHANTRA_RENDER_QC=0` turns it off.
 - **Draft then finish** (`src/drafts.py`): where a model's cheapest resolution is strictly cheaper,
-  the card offers a draft; Finish upscales the liked take (Topaz) rather than re-rendering it.
+  the card offers a draft; Finish upscales the liked take (Topaz) rather than re-rendering it. A flat-rate
+  model drafts on its quick sibling instead (2026-11-03, `fal.DRAFT_MODELS`: Veo 3.1 on Veo 3.1
+  Fast, `docs/tasks/task-veo-draft.md`); that draft is finished by the card's free Redo
+  (`POST /api/scenes/{id}/redo` takes the drafts off their shots) and the ordinary priced Render.
 - **Pricing** (`src/pricing.py`): `estimate()` is the provider's USD, `quote()` is credits
   (`MARKUP = "2.4"`, read through `Fraction`; `CREDIT_FLOOR = 10`), `display()` is what every card
   reads. Video models carry their own markup (`MARKUP_BY_MODEL`, floor `MIN_MARKUP`): since

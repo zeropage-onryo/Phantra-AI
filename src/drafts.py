@@ -22,6 +22,16 @@ draft's place. It is the effects door with a target, never a second way to
 spend: the same checks, the same quote, the same hold. The draft stays on
 the Assets wall.
 
+A DRAFT ON A SIBLING (2026-11-03, `fal.DRAFT_MODELS`): a flat-rate model
+(Veo 3.1) has no cheaper frame, so its draft renders on its quick tier
+(Veo 3.1 Fast). Upscaling cannot turn one model's take into another's, so
+that draft is finished by RE-RENDERING the shot on the full model:
+`redo_of` says which shots carry such a clip, `clear_for_redo` takes them
+off their shots (free; the clips stay in the Library), and the scene's
+ordinary priced Render then renders exactly those shots. Kept apart from
+`of_row` on purpose: the Library and Renders read `of_row` to offer the
+UPSCALE Finish, which would be wrong for a sibling draft.
+
 `src/` never imports `app/`: the routes call in.
 """
 from __future__ import annotations
@@ -157,3 +167,48 @@ def attach(target: dict, media_url: str, asset_id: Optional[int], *,
     if asset_id:
         render_assets.link(int(asset_id), dsn, account_id=account_id,
                            concept_id=target["concept_id"], shot_n=target["shot_n"])
+
+
+def redo_of(concept: dict, *, account_id: Optional[int], dsn: Optional[str] = None,
+            index: Optional[dict] = None) -> Optional[dict[str, Any]]:
+    """The shots of this scene whose clip is a SIBLING draft (Veo 3.1 Fast
+    for Veo 3.1), and the model that finishes them:
+    {"model", "from", "slots": [{"shot_n", "part", "label"}]}, or None. One
+    full model per scene: shots drafted on two different quick tiers name
+    the first, in shot order."""
+    from .cut import assemble
+    index = index if index is not None else _index(account_id, dsn)
+    found: list[dict] = []
+    model = source = None
+    for slot in assemble.clip_slots(concept):
+        row = _row_for(index, slot["media_url"])
+        if not row or row.get("deleted_at") or row.get("media_kind") != "video":
+            continue
+        made_on = row.get("model") or (row.get("metadata") or {}).get("model")
+        full = fal.finish_model(str(made_on or ""))
+        if not full or (model and full != model):
+            continue
+        model, source = full, str(made_on)
+        found.append({"shot_n": slot["shot_n"], "part": slot["part"], "label": slot["label"]})
+    if not found:
+        return None
+    return {"model": model, "from": source, "slots": found}
+
+
+def clear_for_redo(concept_id: int, *, account_id: Optional[int],
+                   dsn: Optional[str] = None) -> Optional[dict[str, Any]]:
+    """Take this scene's sibling drafts off their shots so the next approve
+    renders them on the full model. Spends nothing; the drafts stay in the
+    Library. Returns redo_of's answer with `cleared`, or None when the scene
+    carries no such draft."""
+    from . import preprod, timeline
+    kwargs = {"dsn": dsn} if dsn is not None else {}
+    concept = preprod.get_concept(concept_id, **kwargs, account_id=account_id)
+    if concept is None:
+        raise ValueError("no such scene")
+    redo = redo_of(concept, account_id=account_id, dsn=dsn)
+    if not redo:
+        return None
+    cleared = timeline.clear_clips(concept_id, redo["slots"], db_path=dsn,
+                                   account_id=account_id)
+    return {**redo, "cleared": cleared}

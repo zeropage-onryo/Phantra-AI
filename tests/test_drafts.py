@@ -264,3 +264,92 @@ def test_a_finish_whose_shot_has_gone_keeps_the_paid_clip_and_says_so(scene, mon
     # paid for and on the wall: a done job that says what did not happen
     assert job["status"] == "done" and job["finished"] is False
     assert "in your Library" in job["detail"] and "no concept" not in job["detail"]
+
+
+# ---------- a draft on a quick sibling (Veo 3.1 Fast for Veo 3.1) ----------
+
+def test_a_flat_rate_model_drafts_on_its_quick_sibling_with_the_same_inputs():
+    assert fal.draft_model("veo3.1") == "veo3.1-fast"
+    assert fal.finish_model("veo3.1-fast") == "veo3.1"
+    for none in ("veo3.1-fast", "wan3", "kling4", "no-such-model"):
+        assert fal.draft_model(none) is None
+    assert fal.finish_model("veo3.1") is None and fal.finish_model("wan3") is None
+    for full, quick in fal.DRAFT_MODELS.items():
+        a, b = fal.VIDEO_MODELS[full], fal.VIDEO_MODELS[quick]
+        # a pick legal on one is legal on the other, so toggling never refuses
+        for key in ("params", "durations", "duration_values", "resolutions",
+                    "default_resolution", "platform"):
+            assert a.get(key) == b.get(key), (full, key)
+        # and the draft is really cheaper at every frame
+        assert all(b["prices"][r] < a["prices"][r] for r in a["resolutions"])
+        # a sibling draft is never ALSO a frame draft of the same model
+        assert fal.draft_resolution(full) is None
+    by = {m["id"]: m for m in providers.models_for("fal")}
+    assert by["veo3.1"]["draft_model"] == "veo3.1-fast"
+    assert by["veo3.1-fast"]["draft_model"] is None and by["wan3"]["draft_model"] is None
+
+
+def _veo_scene(pg, models):
+    parts = [{"n": n, "start": (n - 1) * 6, "end": n * 6, "seconds": 6, "text": f"beat {n}",
+              "prompt": f"shot {n}", "refs": ["/refs/a.jpg"], "reference_image": None,
+              "media_url": f"/renders/fal/veo-{n}.mp4"} for n in (1, 2)]
+    from src import timeline
+    prompt = "(0-6s) a (6-12s) b"
+    shot = {"n": 1, "type": "BROLL", "source": "AI", "tool": "VEO", "prompt": prompt,
+            "refs": ["/refs/a.jpg"], "media_url": parts[0]["media_url"],
+            # a CURRENT plan, so the quote reads its parts rather than the windows
+            "timeline": {"seconds": 12, "planner": "split",
+                         "source": timeline.source_hash(prompt, ["/refs/a.jpg"]),
+                         "continuity": "", "parts": parts}}
+    cid = preprod.save_concept({"title": "The Pour", "hook": "h", "logline": "l",
+                                "duration": "12s", "shots": [shot]}, spark="pour",
+                               account_id=WHO["mine"], dsn=pg)
+    ids = [render_assets.record(
+        generation_id=100 + n, tool="veo", model=m, media_kind="video", prompt=f"shot {n}",
+        media_url=f"/renders/fal/veo-{n}.mp4", output_path=None, concept_id=cid, shot_n=1,
+        metadata={"model": m, "resolution": "720p", "part": n},
+        dsn=pg, account_id=WHO["mine"])["id"] for n, m in zip((1, 2), models)]
+    return cid, ids
+
+
+def test_a_veo_fast_take_is_redone_on_veo_by_the_scenes_own_priced_render(scene):
+    client, pg = scene["client"], scene["pg"]
+    cid, ids = _veo_scene(pg, ["veo3.1-fast", "veo3.1"])
+    # the Library's upscale Finish never offers itself on a sibling draft
+    concept = preprod.get_concept(cid, pg, account_id=WHO["mine"])
+    assert drafts.in_concept(concept, account_id=WHO["mine"], dsn=pg) == []
+    # the card names the one shot drafted on Fast, and what finishes it
+    state = client.get(f"/api/scenes/{cid}/render").json()["scene"]
+    assert state["redo"] == {"model": "veo3.1", "from": "veo3.1-fast",
+                             "slots": [{"shot_n": 1, "part": 1, "label": "shot 1 part 1"}]}
+    # the redo spends nothing and takes only that clip off its shot
+    got = client.post(f"/api/scenes/{cid}/redo").json()
+    assert got["ok"] and got["model"] == "veo3.1" and got["cleared"] == 1
+    urls = [p["media_url"] for p in
+            preprod.get_concept(cid, pg, account_id=WHO["mine"])["shots"][0]["timeline"]["parts"]]
+    assert urls == [None, "/renders/fal/veo-2.mp4"]
+    concept = preprod.get_concept(cid, pg, account_id=WHO["mine"])
+    assert not concept["shots"][0].get("media_url")          # no longer "rendered"
+    # the draft is still on the wall, and nothing was held
+    assert render_assets.get(ids[0], pg, account_id=WHO["mine"])["deleted_at"] is None
+    # the scene's ordinary quote now prices exactly that shot on Veo 3.1
+    q = client.get(f"/api/scenes/{cid}/quote",
+                   params={"provider": "fal", "model": "veo3.1", "frame": "720p"}).json()
+    assert q["model"] == "veo3.1" and [r["part"] for r in q["renders"]] == [1]
+    # nothing left to redo
+    assert client.post(f"/api/scenes/{cid}/redo").status_code == 409
+    assert client.get(f"/api/scenes/{cid}/render").json()["scene"]["redo"] is None
+
+
+def test_a_scene_with_no_sibling_draft_or_someone_elses_has_nothing_to_redo(scene):
+    client, pg = scene["client"], scene["pg"]
+    # the 480p Wan drafts of the fixture are finished by upscaling, not redone
+    assert client.get(f"/api/scenes/{scene['concept']}/render").json()["scene"]["redo"] is None
+    assert client.post(f"/api/scenes/{scene['concept']}/redo").status_code == 409
+    # another account's scene is not found, and is left alone
+    theirs = preprod.save_concept({"title": "T", "hook": "h", "logline": "l", "duration": "6s",
+                                   "shots": [{"n": 1, "prompt": "p", "refs": ["/refs/a.jpg"],
+                                              "media_url": "/renders/fal/t.mp4"}]},
+                                  spark="t", account_id=WHO["theirs"], dsn=pg)
+    assert client.post(f"/api/scenes/{theirs}/redo").status_code == 404
+    assert preprod.get_concept(theirs, pg, account_id=WHO["theirs"])["shots"][0]["media_url"]
