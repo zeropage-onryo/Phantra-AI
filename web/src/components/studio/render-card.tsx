@@ -42,6 +42,7 @@ import {
   sceneApprove,
   sceneHref,
   sceneQuote,
+  sceneRedo,
   sceneRender,
   type Concept,
   type RenderChoice,
@@ -57,8 +58,10 @@ import {
   chipText,
   creditsText,
   draftFrame,
+  draftPair,
   held,
   isDraft,
+  isSiblingDraft,
   keyframeButton,
   keyframeCeilingNote,
   keyframeCount,
@@ -80,6 +83,7 @@ import {
   specOf,
   withDraft,
   withModel,
+  withSiblingDraft,
   type AxisLike,
   type Pick,
   type Renderers,
@@ -121,7 +125,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   const [renderers, setRenderers] = useState<Record<string, RendererSpec>>({});
   const [error, setError] = useState("");
   const [quotes, setQuotes] = useState<Record<string, RenderQuote | { error: string }>>({});
-  const [busy, setBusy] = useState<"" | "render" | "keyframes">("");
+  const [busy, setBusy] = useState<"" | "render" | "keyframes" | "redo">("");
   const [popOpen, setPopOpen] = useState(false);
   const [, repaint] = useState(0); // `held` lives outside state: it outlives the card
   const seq = useRef(0);
@@ -243,7 +247,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
               ? `${spec.id} renders ${spec.duration.min}-${spec.duration.max}s`
               : short
                 ? `Need ${plan.credits!.toLocaleString("en-US")} cr · have ${Math.max(balance!.available, 0).toLocaleString("en-US")}`
-                : renderText(plan, exempt, isDraft(spec, pick));
+                : renderText(plan, exempt, isDraft(spec, pick) || isSiblingDraft(catalogue, pick));
   const providerIds = Object.keys(renderers);
   // Seedance refuses a real person's photo on every host (src/people_refs.py):
   // said before the click, never a lock, since a drawn character renders fine
@@ -307,6 +311,32 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
       setBusy("");
     }
   };
+
+  // REDO a Veo 3.1 Fast draft on Veo 3.1 (src/drafts.py, 2026-11-03): free --
+  // it takes the drafts off their shots and picks the full model, and the
+  // priced Render button below is still the one click that spends
+  const redo = scene.redo && !locked ? scene.redo : null;
+  const redoName = redo ? (renderers.fal?.models || []).find((m) => m.id === redo.model)?.label || redo.model : "";
+  const redoDrafts = async () => {
+    if (!redo || busy || working) return;
+    setBusy("redo");
+    try {
+      const res = await sceneRedo(scene.id);
+      const next = withModel(catalogue, "fal", res.model);
+      if (next) {
+        const keep = pick && pick.provider === "fal" ? withSiblingDraft(catalogue, { ...pick }, false) : null;
+        hold(keep && keep.model === res.model ? keep : next);
+      }
+      toast(`${res.cleared} shot${res.cleared === 1 ? "" : "s"} ready to redo on ${redoName} · the drafts stay in your Library`);
+      await load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "That did not go through", "err");
+      void load();
+    } finally {
+      setBusy("");
+    }
+  };
+  const siblings = draftPair(catalogue, pick);
 
   if (approveOnly) {
     const modelName = pick ? (r?.models || []).find((m) => m.id === pick.model)?.label || pick.model : "";
@@ -620,6 +650,39 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
           onClick={() => hold(withDraft(spec, pick, !isDraft(spec, pick)))}
         >
           {isDraft(spec, pick) ? `Drafting at ${draftFrame(spec)} · tap for full quality` : `Draft first · ${draftFrame(spec)} · cheaper`}
+        </button>
+      ) : null}
+
+      {pick && siblings && !draftFrame(spec) && !locked && done.state !== "done" ? (
+        // A draft on the quick sibling (fal.DRAFT_MODELS): Veo 3.1 has one flat
+        // rate, so its draft is Veo 3.1 Fast. Only the pick changes.
+        <button
+          type="button"
+          data-draft-model={scene.id}
+          aria-pressed={isSiblingDraft(catalogue, pick)}
+          disabled={working}
+          title={`Render on ${siblings.quick.label} first: same shots, a fraction of the price. Redo the takes you keep on ${siblings.full.label} from this card.`}
+          className={`${pill(isSiblingDraft(catalogue, pick))} w-full`}
+          onClick={() => hold(withSiblingDraft(catalogue, pick, !isSiblingDraft(catalogue, pick)))}
+        >
+          {isSiblingDraft(catalogue, pick)
+            ? `Drafting on ${siblings.quick.label} · tap for ${siblings.full.label}`
+            : `Draft first · ${siblings.quick.label} · cheaper`}
+        </button>
+      ) : null}
+
+      {redo && !working ? (
+        <button
+          type="button"
+          data-redo={scene.id}
+          disabled={!!busy}
+          title={`Takes the ${redo.slots.length === 1 ? "draft" : "drafts"} off ${redo.slots.length === 1 ? "its shot" : "their shots"} (they stay in your Library) and prices ${redoName} below. Nothing is charged until you press Render.`}
+          className={`${pill(false)} w-full`}
+          onClick={() => void redoDrafts()}
+        >
+          {busy === "redo"
+            ? "Clearing the drafts…"
+            : `Redo ${redo.slots.length === 1 ? "the draft" : `${redo.slots.length} draft shots`} on ${redoName} · priced next`}
         </button>
       ) : null}
 

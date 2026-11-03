@@ -1945,6 +1945,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             if prefs.get("draft_first") and fal.draft_resolution(model):
                 frame = fal.draft_resolution(model)
                 applied["frame"] = frame
+            elif prefs.get("draft_first") and fal.draft_model(model):
+                # a flat-rate model drafts on its quick sibling (Veo 3.1 Fast)
+                model = fal.draft_model(model)
+                applied["model"] = model
     try:
         clip = pricing.display(account_id=account_id, shot=shot, shot_id=int(scene_id),
                                provider=provider, model=model, seconds=duration, frame=frame)

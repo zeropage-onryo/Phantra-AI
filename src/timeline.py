@@ -930,6 +930,43 @@ def attach_part(concept_id: int, shot_n, part: int, field: str, url: str, *,
     return True
 
 
+def clear_clips(concept_id: int, slots: list, *, db_path=None,
+                account_id: Optional[int] = None) -> int:
+    """Take clips OFF their shots so the next approve renders them again
+    (2026-11-03, src/drafts.py `clear_for_redo`). `slots` are
+    {"shot_n", "part"} as cut.assemble.clip_slots lists them; a part None is
+    the shot's own clip. The clips stay in the Library -- only the shot
+    forgets them -- and a shot that loses a part's clip loses its own
+    "rendered" marker too, as attach_part would never have set it. Returns
+    how many slots it cleared."""
+    concept = preprod.get_concept(concept_id, dsn=db_path, account_id=account_id)
+    if concept is None:
+        raise ValueError(f"no concept {concept_id}")
+    shots = [dict(s) for s in concept["shots"]]
+    cleared = 0
+    for slot in slots or []:
+        shot = _shot({"shots": shots}, slot.get("shot_n"))
+        if shot is None:
+            continue
+        if slot.get("part") is None:
+            if shot.get("media_url"):
+                shot["media_url"] = None
+                cleared += 1
+            continue
+        tl = dict(shot.get("timeline") or {})
+        parts = [dict(p) for p in tl.get("parts") or []]
+        for p in parts:
+            if p.get("n") == slot["part"] and p.get("media_url"):
+                p["media_url"] = None
+                shot["media_url"] = None
+                cleared += 1
+        tl["parts"] = parts
+        shot["timeline"] = tl
+    if cleared:
+        _save(concept_id, concept, shots, db_path=db_path, account_id=account_id)
+    return cleared
+
+
 def pending_parts(shot: dict) -> list:
     """The parts still without a clip, in order -- what an approve renders."""
     return [p for p in ((shot or {}).get("timeline") or {}).get("parts") or []

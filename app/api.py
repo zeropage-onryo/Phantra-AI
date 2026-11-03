@@ -5046,9 +5046,36 @@ def scene_render_state(concept_id: int, account_id: int = Depends(auth.current_a
     # what a look at each landed clip saw (src/render_qc.py), by shot
     from src import render_qc
     card["checks"] = render_qc.for_concept(concept_id, account_id=account_id)
+    # shots drafted on a quick sibling (Veo 3.1 Fast for Veo 3.1, src/drafts.py),
+    # which the card offers to redo on the full model; None when there are none
+    from src import drafts
+    try:
+        card["redo"] = drafts.redo_of(concept, account_id=account_id)
+    except Exception as e:                  # an offer, never a reason to lose the card
+        print(f"  redo lookup skipped: {type(e).__name__}: {e}", file=sys.stderr)
+        card["redo"] = None
     return {"scene": card,
             "renderer": _render_state(account_id),
             "renderers": _renderers_state(account_id, ctx)}
+
+
+@router.post("/scenes/{concept_id}/redo")
+def scene_redo(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+    """FINISH a sibling draft (2026-11-03, src/drafts.py): take the shots
+    drafted on Veo 3.1 Fast off their shots so the scene's own priced
+    Render renders them on Veo 3.1. Spends nothing -- the click that
+    spends is still the Render button, at the price it shows -- and the
+    drafts stay in the Library. 404 for a scene that is not this account's,
+    409 `no_drafts` when it carries no sibling draft."""
+    from src import drafts
+    try:
+        redo = drafts.clear_for_redo(concept_id, account_id=account_id)
+    except ValueError:
+        return _error(404, "not_found", "no such scene")
+    if not redo:
+        return _error(409, "no_drafts", "this scene has no draft to redo")
+    return {"ok": True, "model": redo["model"], "from": redo["from"],
+            "cleared": redo["cleared"], "slots": redo["slots"]}
 
 
 @router.get("/scenes/{concept_id}/quote")

@@ -1092,6 +1092,31 @@ def is_draft(model: str, resolution: Optional[str]) -> bool:
     return bool(resolution) and draft_resolution(model) == resolution
 
 
+# A DRAFT ON A SIBLING MODEL (2026-11-03, Mike: "go ahead with the next cost
+# cut"). A model with one flat rate has no cheaper frame to draft at, so its
+# draft is its own family's quick tier: the same inputs, the same lengths and
+# frames, read off both rows above. Veo 3.1 is the dearest clip in the table
+# ($0.40/s) and the thinnest margin (pricing.MARKUP_BY_MODEL 1.15); Veo 3.1
+# Fast is $0.15/s at 1.5x, so a draft costs the person about 40% of a take and
+# leaves more on each second. A different model cannot reproduce a take, so
+# FINISHING one is a new render on the model it drafts for (src/drafts.py
+# `redo_of`), never an upscale. Only pairs that share every legal input go here.
+DRAFT_MODELS: dict[str, str] = {"veo3.1": "veo3.1-fast"}
+
+
+def draft_model(model: str) -> Optional[str]:
+    """The quick sibling a draft of `model` renders on, or None."""
+    sibling = DRAFT_MODELS.get(model)
+    return sibling if sibling in VIDEO_MODELS else None
+
+
+def finish_model(model: str) -> Optional[str]:
+    """The model a clip of `model` is a draft FOR (Veo 3.1 Fast -> Veo 3.1),
+    or None when `model` drafts for nothing."""
+    return next((full for full, quick in DRAFT_MODELS.items()
+                 if quick == model and full in VIDEO_MODELS), None)
+
+
 def model_for_platform(platform: str) -> str:
     """The fal model a shot planned for `platform` renders on."""
     model = PLATFORM_MODELS.get((platform or "").lower())

@@ -51,6 +51,9 @@ export type ModelLike = {
   /** the frame a DRAFT renders at -- the catalogue says (src/drafts.py) --
    *  or null when this model has no cheaper tier than its default */
   draft?: string | null;
+  /** the quick sibling a draft renders on when the model has no cheaper
+   *  frame (Veo 3.1 -> Veo 3.1 Fast, fal.DRAFT_MODELS), or null */
+  draft_model?: string | null;
 };
 export type RendererLike = { label: string; available: boolean; frame_axis?: string; models: ModelLike[] };
 export type Renderers = Record<string, RendererLike>;
@@ -227,6 +230,37 @@ export const withDraft = (spec: ModelLike, pick: Pick, on: boolean): Pick => {
   if (!d) return pick;
   return { ...pick, frame: on ? d : spec.frame.default != null ? String(spec.frame.default) : pick.frame };
 };
+
+/* ── a draft on a quick sibling (2026-11-03; fal.DRAFT_MODELS) ──
+   Veo 3.1 has one flat rate, so its draft is Veo 3.1 Fast: same lengths and
+   frames, so the pick carries over. Finishing one is the card's Redo. */
+
+/** The full model and its quick sibling this pick toggles between, or null.
+ *  Either end of the pair may be the pick. */
+export function draftPair(renderers: Renderers, pick: Pick | null | undefined): { full: ModelLike; quick: ModelLike } | null {
+  if (!pick) return null;
+  const models = renderers[pick.provider]?.models || [];
+  const here = models.find((m) => m.id === pick.model);
+  if (!here) return null;
+  const full = here.draft_model ? here : models.find((m) => m.draft_model === here.id);
+  const quick = full ? models.find((m) => m.id === full.draft_model) : undefined;
+  return full && quick ? { full, quick } : null;
+}
+/** Is this pick the quick sibling of a model it drafts for? */
+export const isSiblingDraft = (renderers: Renderers, pick: Pick | null | undefined): boolean =>
+  !!pick && draftPair(renderers, pick)?.quick.id === pick.model;
+/** Draft on: the quick sibling. Off: the full model. Length and frame are
+ *  kept when the other model takes them, else its defaults. */
+export function withSiblingDraft(renderers: Renderers, pick: Pick, on: boolean): Pick {
+  const pair = draftPair(renderers, pick);
+  if (!pair) return pick;
+  const to = on ? pair.quick : pair.full;
+  const fresh = withModel(renderers, pick.provider, to.id);
+  if (!fresh) return pick;
+  const frameOk = pick.frame != null && (to.frame.values || []).map(String).includes(pick.frame);
+  const lengthOk = pick.duration != null && legalDuration(to.duration, pick.duration);
+  return { ...fresh, frame: frameOk ? pick.frame : fresh.frame, duration: lengthOk ? pick.duration : fresh.duration };
+}
 
 /** The scene's own priced button (2026-10-11): the same plan and the same
  *  price as `approveText`, said as what the click does. A pick at the
