@@ -316,3 +316,25 @@ def test_a_paid_invoice_unlocks_the_accounts_renders(acct, monkeypatch):
                              "lines": {"data": [{"price": {"id": "price_creator"}}]}}}},
         dsn=dsn)
     assert out["action"] == "granted" and called == [a]
+
+
+def test_the_mark_is_the_yellow_lockup():
+    """2026-11-03 (Mike): the mark is the site's lockup (the owl behind the
+    lowercase "phantra"), the owl in the landing page's yellow and the
+    lettering white, not a red dot."""
+    layer = watermark.mark_layer(720, 1280)
+    box = layer.getbbox()
+    assert box is not None and box[0] > 360 and box[1] > 1088
+    yellow = sum(1 for r, g, b, a in layer.crop(box).getdata()
+                 if a > 150 and r > 200 and g > 200 and b < 180)
+    white = sum(1 for r, g, b, a in layer.crop(box).getdata()
+                if a > 150 and r > 220 and g > 220 and b > 220)
+    assert yellow > 200, "no yellow owl drawn in the mark"
+    assert white > 200, "no white lettering drawn in the mark"
+    assert watermark.LOGO_PATH.is_file()
+
+
+def test_a_missing_lockup_still_marks_with_the_name(monkeypatch, tmp_path):
+    monkeypatch.setattr(watermark, "LOGO_PATH", tmp_path / "gone.png")
+    layer = watermark.mark_layer(720, 1280)
+    assert layer.getbbox() is not None
