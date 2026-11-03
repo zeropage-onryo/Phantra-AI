@@ -1,0 +1,256 @@
+/* The Image / Video / Voice model picker (model-pins.tsx): starred chips in
+   a row, and the "All models" sheet. Colours come from studio.css's :root. */
+.mp {
+  position: relative;
+  min-width: 0;
+}
+.mp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--edge);
+  border-radius: var(--rp);
+  background: var(--raise);
+  color: var(--bone);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--t), color var(--t), background var(--t);
+}
+.mp-chip span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-chip:hover {
+  border-color: var(--edge-hi);
+  color: var(--text);
+}
+.mp-chip[aria-checked="true"] {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+.mp-chip[aria-checked="true"] .mp-logo {
+  background: var(--on-signal);
+  border-color: var(--on-signal);
+  color: var(--signal);
+}
+.mp-chip .mp-logo {
+  border-radius: var(--rp);
+}
+.mp-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px dashed var(--edge-hi);
+  border-radius: var(--rp);
+  background: transparent;
+  color: var(--bone);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mp-all svg {
+  width: 14px;
+  height: 14px;
+}
+.mp-all:hover,
+.mp-all[aria-expanded="true"] {
+  border-color: var(--dim);
+  color: var(--text);
+}
+.mp-chip:disabled,
+.mp-all:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mp-chip:focus-visible,
+.mp-all:focus-visible,
+.mp-pick:focus-visible,
+.mp-star:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* the logo tile: a one-colour mark, tinted by currentColor */
+.mp-logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--slate);
+  color: var(--bone);
+}
+.mp-logo i {
+  display: block;
+  width: 60%;
+  height: 60%;
+  background: currentColor;
+  -webkit-mask: var(--mp-logo) center / contain no-repeat;
+  mask: var(--mp-logo) center / contain no-repeat;
+}
+.mp-logo svg {
+  width: 60%;
+  height: 60%;
+}
+.mp-logo b {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* the sheet */
+.mp-sheet {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(520px, 70vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: var(--r2);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.55);
+  overflow: hidden;
+}
+.mp-sheet[data-up="1"] {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+.mp-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--edge-lo);
+}
+.mp-head b {
+  font-size: 15px;
+  color: var(--text);
+}
+.mp-head span {
+  font-size: 12px;
+  color: var(--dim);
+}
+.mp-list {
+  overflow: auto;
+  padding: 6px;
+}
+.mp-sec {
+  display: block;
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.mp-line {
+  display: flex;
+  align-items: center;
+  border-radius: var(--r1);
+}
+.mp-line:hover {
+  background: var(--raise);
+}
+.mp-line[data-on="1"] {
+  background: var(--signal-wash);
+}
+.mp-line[data-on="1"] .mp-logo {
+  color: var(--signal);
+  border-color: color-mix(in srgb, var(--signal) 35%, var(--edge));
+}
+.mp-pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mp-txt b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.mp-txt small {
+  font-size: 12px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-star {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-right: 4px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--rp);
+  background: none;
+  color: var(--dimmer);
+  cursor: pointer;
+}
+.mp-star svg {
+  width: 18px;
+  height: 18px;
+}
+.mp-star:hover {
+  color: var(--bone);
+  background: var(--edge-lo);
+}
+.mp-star[aria-pressed="true"] {
+  color: var(--signal);
+}
+.mp-star[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+.mp-foot {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--edge-lo);
+  font-size: 12px;
+  color: var(--dim);
+}
+@media (max-width: 640px) {
+  .mp-sheet {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: 8px;
+    width: auto;
+    max-height: 75vh;
+  }
+}
+/* inside the Image page's side panel the list is as wide as the panel, so
+   it never pushes the panel sideways */
+.dg-panel .mp-sheet {
+  width: 100%;
+}

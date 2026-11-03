@@ -38,10 +38,8 @@ test('"New element" beats the studio button reset', () => {
   assert.match(colorOf(scoped.body), /var\(--on-signal/);
 });
 
-test('the composer\'s "Which model renders" menu prints no price', () => {
+test('the composer has no clip-model menu to print a price in (Vesper chooses, 2026-11-02)', () => {
   const view = read('app/studio/(create)/create-view.tsx');
-  const at = view.indexOf('heading="Which model renders"');
-  assert.ok(at > 0);
-  const menu = view.slice(at, view.indexOf('/>', at));
-  assert.doesNotMatch(menu, /credits/);
+  assert.equal(view.indexOf('heading="Which model renders"'), -1);
+  assert.equal(view.indexOf('heading="Which model draws"'), -1);
 });

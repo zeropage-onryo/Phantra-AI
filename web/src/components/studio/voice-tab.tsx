@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { cardFonts } from "@/components/studio/card-fonts";
 import { ModelMenu, type MenuItem } from "@/components/studio/direct-generator";
+import { ModelPins } from "@/components/studio/model-pins";
 import { useShell } from "@/components/studio/shell";
 import { ApiError } from "@/lib/api";
 import { mediaSrc, newMadeId } from "@/lib/composer";
@@ -812,15 +813,17 @@ export function VoiceTab() {
       >
         <div className="dg-field">
           <span className="dg-lab">Model</span>
-          <ModelMenu
+          <ModelPins
+            kind="voice"
             open={open === "model"}
             onOpen={() => setOpen(open === "model" ? null : "model")}
             onClose={() => setOpen(null)}
-            label={model?.title ?? (menuError ? "Unavailable" : "Loading…")}
-            sub={model?.label ?? ""}
             items={modelItems}
             picked={picked}
-            onPick={choose}
+            onPick={(id) => {
+              choose(id);
+              setOpen(null);
+            }}
             title={`${modelItems.length} voice models`}
             foot="Each one keeps what you typed while you look at another."
             disabled={!modelItems.length}

@@ -1204,3 +1204,9 @@
     display: none;
   }
 }
+
+/* the Video dock's model row (2026-11-02): starred models as chips above the
+   settings line, "All models" opens upward (model-pins.tsx) */
+.dg .dgv-pins {
+  padding: 2px 0 6px;
+}
