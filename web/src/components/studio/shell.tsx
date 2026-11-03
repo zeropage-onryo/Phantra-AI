@@ -39,7 +39,8 @@ import {
   AudioLines,
   AtSign,
   CalendarDays,
-  ChevronsUpDown,
+  Film,
+  ChevronDown,
   Clapperboard,
   Coins,
   FolderKanban,
@@ -50,7 +51,6 @@ import {
   LogOut,
   Megaphone,
   Palette,
-  PanelLeft,
   Plug,
   Scissors,
   Search,
@@ -83,6 +83,7 @@ import { requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 import { halloweenOn } from "@/lib/effects-wall";
+import { EDITOR_IN_UI } from "@/lib/editor-flag";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
@@ -115,16 +116,47 @@ const NAV: NavItem[] = [
   { id: "calendar", label: "Calendar", href: "/studio/calendar", icon: CalendarDays },
 ];
 
-/* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
-   mock): Create is the box, Library the Assets wall, Timeline the editor.
-   The rail still carries every page; these are the three the mock names. */
-const TABS: { label: string; href: string; view: ViewId }[] = [
-  { label: "Projects", href: "/studio/projects", view: "projects" },
-  { label: "Create", href: "/studio", view: "studio" },
-  { label: "Library", href: "/studio/assets", view: "assets" },
-  { label: "Timeline", href: "/studio/cut", view: "cut" },
-  { label: "Calendar", href: "/studio/calendar", view: "calendar" },
+/* THE TOP NAV (2026-11-02, Mike's call): the left rail is gone and its
+   pages moved into the header, replacing the old Projects / Create /
+   Library / Timeline / Calendar text tabs. Every entry is a dropdown: the
+   trigger keeps its icon, and each page in it keeps the rail's icon. The
+   phone's chrome (phone/phone-chrome.tsx) is untouched -- under 720px the
+   header is not drawn at all. */
+/* (later the same day) Image, Video and Voice sit on the bar as plain
+   links, not in a menu; Ad Studio is a plain link too, after Plugins and a
+   divider. A `link` entry is one page, drawn as a button with no menu. */
+type NavGroup =
+  | { id: string; label: string; icon: typeof House; items: ViewId[]; link?: never }
+  | { id: string; link: ViewId };
+const GROUPS: NavGroup[] = [
+  { id: "projects", label: "Projects", icon: FolderKanban, items: ["projects", "calendar"] },
+  { id: "create", label: "Create", icon: House, items: ["studio", "effects"] },
+  { id: "image", link: "image" },
+  { id: "video", link: "video" },
+  { id: "voice", link: "voice" },
+  // Renders sits with the work it made while the editor is off the UI
+  // (lib/editor-flag.ts); with it back on, Edit holds both again
+  { id: "library", label: "Library", icon: Layers, items: EDITOR_IN_UI ? ["assets", "elements", "brand"] : ["assets", "elements", "brand", "renders"] },
+  ...(EDITOR_IN_UI ? [{ id: "edit", label: "Edit", icon: Scissors, items: ["cut", "renders"] as ViewId[] }] : []),
 ];
+/* Renders is off the old rail (2026-10-20) but has a home in the menus */
+const EXTRA: NavItem[] = [{ id: "renders", label: "Renders", href: "/studio/renders", icon: Film }];
+/* a line under each page's name in its menu */
+const BLURB: Partial<Record<ViewId, string>> = {
+  projects: "Every project and its scenes",
+  calendar: "What goes out, where and when",
+  studio: "Talk it through with Vesper",
+  image: "Pick a model, make a still",
+  video: "Pick a model, make a clip",
+  ads: "Formats, product and brief",
+  effects: "One photo, one effect",
+  voice: "Speech, dubbing and voices",
+  assets: "Everything you have made",
+  elements: "People, places and props",
+  brand: "Kits for every client",
+  cut: "The timeline editor",
+  renders: "What is rendering and done",
+};
 
 const VIEW_BY_PATH: [string, ViewId][] = [
   // settings is reached from the account menus, not the rail (2026-10-03):
@@ -197,30 +229,29 @@ const Ctx = createContext<ShellContext>({
 });
 export const useShell = () => useContext(Ctx);
 
-const PIN_KEY = "phantra.rail.pinned";
-const PIN_EVENT = "phantra:rail-pin";
-/* the pin lives in localStorage; read through an external-store
-   subscription so the server renders it collapsed and the client
-   snaps to the saved state without a setState-in-effect */
-const subscribePin = (cb: () => void) => {
-  window.addEventListener(PIN_EVENT, cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener(PIN_EVENT, cb);
-    window.removeEventListener("storage", cb);
-  };
-};
 const subscribeNothing = () => () => {};
-const readPin = () => {
-  try {
-    return localStorage.getItem(PIN_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
+/* one page on the top bar as a plain link (no menu): its rail icon and name */
+function NavLinkItem({ id, view, caps }: { id: ViewId; view: ViewId; caps: Record<string, boolean> }) {
+  const n = NAV.find((x) => x.id === id);
+  if (!n || (n.cap && caps[n.cap] !== true)) return null;
+  const Icon = n.icon;
+  return (
+    <Link
+      href={n.href}
+      className="hnav-btn hnav-link"
+      data-nav={id}
+      title={n.label}
+      aria-current={id === view ? "page" : undefined}
+      data-here={id === view ? "1" : undefined}
+    >
+      <Icon strokeWidth={1.5} />
+      <span className="hnav-l">{n.label}</span>
+    </Link>
+  );
+}
 
-/* The end of both account menus -- the rail's profile row and the header's
-   avatar -- as ONE component, so the two menus cannot drift apart. */
+/* The end of the account menu -- the header's avatar -- as ONE component,
+   so a second menu can never drift from it. */
 function MenuTail({ close }: { close: () => void }) {
   return (
     <>
@@ -259,11 +290,10 @@ export function StudioShell({ children }: { children: ReactNode }) {
   const stage = canvas || editor;
   const [me, setMe] = useState<Me | null>(null);
   const [signedOut, setSignedOut] = useState(false);
-  const pinned = useSyncExternalStore(subscribePin, readPin, () => false);
-  const [menu, setMenu] = useState(false);
-  // the header's avatar menu (accounts, sign out) -- its own flag, so the
-  // rail's account row and the avatar never open each other's
+  // the header's avatar menu (accounts, sign out)
   const [hmenu, setHmenu] = useState(false);
+  // which of the nav's dropdowns is open (GROUPS id, or "plugins"); one at a time
+  const [navOpen, setNavOpen] = useState<string | null>(null);
   // the phone's full-screen menu (phone-chrome.tsx)
   const [pmenu, setPmenu] = useState(false);
   const closePmenu = useCallback(() => setPmenu(false), []);
@@ -404,24 +434,28 @@ export function StudioShell({ children }: { children: ReactNode }) {
     () => "⌘" as const,
   );
 
-  const togglePin = () => {
-    try {
-      localStorage.setItem(PIN_KEY, pinned ? "0" : "1");
-    } catch {
-      /* private window: the pin just forgets */
-    }
-    window.dispatchEvent(new Event(PIN_EVENT));
-  };
-
-  // the rail's account menu closes on a tap outside it, as the header's does
+  // the nav's dropdown closes on a tap outside it, on Escape, and on any
+  // change of page
   useEffect(() => {
-    if (!menu) return;
+    if (!navOpen) return;
     const off = (e: PointerEvent) => {
-      if (!(e.target as Element | null)?.closest?.(".racct-wrap")) setMenu(false);
+      if (!(e.target as Element | null)?.closest?.(".hnav-wrap")) setNavOpen(null);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(null);
     };
     document.addEventListener("pointerdown", off);
-    return () => document.removeEventListener("pointerdown", off);
-  }, [menu]);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", off);
+      document.removeEventListener("keydown", key);
+    };
+  }, [navOpen]);
+  const [navPath, setNavPath] = useState(pathname);
+  if (navPath !== pathname) {
+    setNavPath(pathname);
+    setNavOpen(null);
+  }
 
   useEffect(() => {
     if (!hmenu) return;
@@ -534,7 +568,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // `workspace` this context hands out, so re-reading /api/me is what makes
   // every page re-ask -- no reload (BACKLOG #19).
   const pickAccount = (slug: string) => {
-    setMenu(false);
     setHmenu(false);
     if (slug === workspace) return;
     switchAccount(slug)
@@ -561,110 +594,12 @@ export function StudioShell({ children }: { children: ReactNode }) {
       >
         <div className="zps-field" aria-hidden />
 
-        <nav className={`rail${pinned ? " pinned" : ""}`} aria-label="Primary">
-          <div className="rhead">
-            <span className="rl rtitle">Studio</span>
-            <button
-              type="button"
-              className="rpin"
-              onClick={togglePin}
-              aria-pressed={pinned}
-              title={pinned ? "Let the rail collapse" : "Keep the rail open"}
-            >
-              <PanelLeft size={14} strokeWidth={1.5} />
-            </button>
-          </div>
-          <div className="rnav">
-            {NAV.filter((n) => !n.cap || caps[n.cap] === true).map(({ id, label, href, icon: Icon, external }) => {
-              const current = id === view;
-              const inner = (
-                <>
-                  <Icon strokeWidth={1.35} />
-                  <span className="rl">{label}</span>
-                  {id === "effects" && halloweenOn() ? (
-                    <span className="rl rneon" aria-label="Halloween effects">
-                      Halloween
-                    </span>
-                  ) : null}
-                  {id === "studio" && unseen > 0 ? (
-                    <span className="nbadge" aria-label={`${unseen} new`}>
-                      {unseen > 9 ? "9+" : unseen}
-                    </span>
-                  ) : null}
-                </>
-              );
-              // data-nav names the entry, so a size can drop one (Edit on a phone)
-              return external ? (
-                <a key={id} href={`${API_URL}${href}`} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
-                  {inner}
-                </a>
-              ) : (
-                <Link key={id} href={href} data-nav={id} data-neon={id === "effects" && halloweenOn() ? "1" : undefined} aria-current={current ? "page" : undefined} title={label}>
-                  {inner}
-                </Link>
-              );
-            })}
-            <PluginsRailItem />
-          </div>
-          <div className="rfoot">
-            {/* the hint that had nothing behind it until 2026-10-08: it opens
-                the palette (command-palette.tsx), as ⌘K / Ctrl+K does */}
-            <button type="button" className="rl rkbd" onClick={() => openPalette()} title="Search and commands">
-              <span>Search</span>
-              <kbd>{mod === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
-            </button>
-            {/* the menu is the button's SIBLING, not its child (2026-10-20):
-                inside the button its items were buttons nested in a button */}
-            <span className="racct-wrap">
-              <button
-                type="button"
-                className="racct"
-                onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
-                aria-haspopup="menu"
-                aria-expanded={menu}
-                title={signedOut ? "Sign in" : `${who} · switch account`}
-              >
-                <span className="ravatar">
-                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "P"}
-                </span>
-                <span className="rl rwho">
-                  <span className="rname">{signedOut ? "Sign in" : who}</span>
-                  <span className="rrole">
-                    {signedOut
-                      ? "Google, Discord or email"
-                      : me?.account
-                        ? `${me.account.label} · ${me.account.role || "member"}`
-                        : "no account"}
-                  </span>
-                </span>
-                <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
-              </button>
-              {menu && me ? (
-                <span className="rmenu" role="menu">
-                  <span className="m">Accounts</span>
-                  {me.accounts.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      aria-current={a.slug === workspace ? "true" : undefined}
-                      onClick={() => pickAccount(a.slug)}
-                    >
-                      {a.label}
-                    </button>
-                  ))}
-                  <MenuTail close={() => setMenu(false)} />
-                </span>
-              ) : null}
-            </span>
-          </div>
-        </nav>
-
         <div className="shell">
           {/* THE PHONE (2026-10-26): under 720px these replace the rail and
               the header below; above it they are not drawn (phone.css) */}
           <PhoneTop onMenu={() => setPmenu(true)} />
           {/* THE HEADER (2026-10-02, the composer mock): the brand with its
-              red dot, Create / Library / Timeline in the middle, and on the
+              red dot, the nav's dropdowns in the middle, and on the
               right the balance, New session and the account's avatar. Every
               piece is wired: the tabs are pages, New session archives the
               open conversation (lib/assistant.ts requestNewSession, taken by
@@ -676,18 +611,84 @@ export function StudioShell({ children }: { children: ReactNode }) {
               <span className="hdot" aria-hidden />
               <OwlLockup intro className="hlockup" />
             </Link>
-            <nav className="htabs" aria-label="Studio">
-              {TABS.map((t) => (
-                <Link
-                  key={t.href}
-                  href={t.href}
-                  aria-current={view === t.view ? "page" : undefined}
-                  className={t.view === "cut" ? "htab-cut" : t.view === "assets" ? "htab-lib" : undefined}
-                >
-                  {t.label}
-                  {t.view === "studio" && unseen > 0 ? <span className="nbadge dot" aria-label={`${unseen} new`} /> : null}
-                </Link>
-              ))}
+            <nav className="hnav" aria-label="Primary">
+              {GROUPS.map((g) => {
+                if (g.link) return <NavLinkItem key={g.id} id={g.link} view={view} caps={caps} />;
+                const items = g.items
+                  .map((id) => NAV.find((n) => n.id === id) ?? EXTRA.find((n) => n.id === id))
+                  .filter((n): n is NavItem => !!n && (!n.cap || caps[n.cap] === true));
+                if (!items.length) return null;
+                const Icon = g.icon;
+                const here = items.some((n) => n.id === view);
+                const open = navOpen === g.id;
+                return (
+                  <span key={g.id} className="hnav-wrap" data-group={g.id}>
+                    <button
+                      type="button"
+                      className="hnav-btn"
+                      aria-haspopup="menu"
+                      aria-expanded={open}
+                      title={g.label}
+                      data-here={here ? "1" : undefined}
+                      onClick={() => setNavOpen(open ? null : g.id)}
+                      // a menubar: once one menu is open, pointing at the next opens it
+                      onMouseEnter={() => navOpen && navOpen !== g.id && setNavOpen(g.id)}
+                    >
+                      <Icon strokeWidth={1.5} />
+                      <span className="hnav-l">{g.label}</span>
+                      {g.id === "create" && unseen > 0 ? <span className="nbadge dot" aria-label={`${unseen} new`} /> : null}
+                      <ChevronDown className="hnav-chev" strokeWidth={1.8} />
+                    </button>
+                    {open ? (
+                      <span className="hnav-menu" role="menu" aria-label={g.label}>
+                        {items.map(({ id, label, href, icon: ItemIcon, external }) => {
+                          const neon = id === "effects" && halloweenOn();
+                          const inner = (
+                            <>
+                              <span className="hnav-ic" aria-hidden>
+                                <ItemIcon strokeWidth={1.5} />
+                              </span>
+                              <span className="hnav-tx">
+                                <span className="hnav-name">
+                                  {label}
+                                  {neon ? <span className="rneon">Halloween</span> : null}
+                                  {id === "studio" && unseen > 0 ? (
+                                    <span className="nbadge" aria-label={`${unseen} new`}>
+                                      {unseen > 9 ? "9+" : unseen}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                {BLURB[id] ? <span className="hnav-sub">{BLURB[id]}</span> : null}
+                              </span>
+                            </>
+                          );
+                          const current = id === view ? "page" : undefined;
+                          return external ? (
+                            <a key={id} role="menuitem" href={`${API_URL}${href}`} data-nav={id} aria-current={current}>
+                              {inner}
+                            </a>
+                          ) : (
+                            <Link
+                              key={id}
+                              role="menuitem"
+                              href={href}
+                              data-nav={id}
+                              data-neon={neon ? "1" : undefined}
+                              aria-current={current}
+                              onClick={() => setNavOpen(null)}
+                            >
+                              {inner}
+                            </Link>
+                          );
+                        })}
+                      </span>
+                    ) : null}
+                  </span>
+                );
+              })}
+              <PluginsRailItem top />
+              <span className="hnav-sep" aria-hidden />
+              <NavLinkItem id="ads" view={view} caps={caps} />
             </nav>
             {/* the right-hand cluster is one grid cell, so the tabs between
                 it and the brand can never be drawn underneath it */}
@@ -767,8 +768,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
           workspace={workspace}
           signedOut={signedOut}
           toast={toast}
-          pinned={pinned}
-          onTogglePin={togglePin}
           onSwitchAccount={pickAccount}
         />
 

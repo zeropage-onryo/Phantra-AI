@@ -6,6 +6,7 @@ import { AnimatePresence, animate, motion } from "motion/react";
 import type { Mood } from "@/lib/mascot";
 import { useStill } from "@/components/motion/use-still";
 import { Flicker } from "@/components/landing/vesper-motion";
+import { EDITOR_IN_UI } from "@/lib/editor-flag";
 import {
   BRIEFS,
   CLIP_SECONDS,
@@ -1033,9 +1034,11 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
                 <button type="button" className="vh-btn vh-btn-white vh-btn-sm" onClick={greet}>
                   Make another
                 </button>
-                <Link className="vh-btn vh-btn-quiet vh-btn-sm" href="/studio/cut">
-                  Open in the editor
-                </Link>
+                {EDITOR_IN_UI ? (
+                  <Link className="vh-btn vh-btn-quiet vh-btn-sm" href="/studio/cut">
+                    Open in the editor
+                  </Link>
+                ) : null}
               </div>
             </div>
           )}

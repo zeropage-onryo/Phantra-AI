@@ -10,7 +10,8 @@
   --zpa-small: 64px;
   --zpa-seat: 420px;
   --zpa-edge: 28px;
-  --zpa-rail: 84px;
+  /* the rail went 2026-11-02; the nav is in the header now */
+  --zpa-rail: 0px;
   --zpa-min-y: 12px;
   --zpa-paper: #efe9df;
   --zpa-paper-2: #e6e0d6;
