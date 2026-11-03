@@ -1406,6 +1406,15 @@ export const runImage = (form: FormData) =>
    button, held to `expect_credits` (409 price_changed if it moved). */
 export const getDirectVideo = () => apiFetch<VideoMenu>("/direct/video");
 export const getDirectImage = () => apiFetch<ImageMenu>("/direct/image");
+/** The same menus for a signed-out visitor (2026-11-03): the public catalogue
+ *  outside /api (app/direct_public.py), so the picker is not empty. */
+async function publicMenu<T>(kind: "video" | "image"): Promise<T> {
+  const res = await fetch(`${API_URL}/public/direct/${kind}`);
+  if (!res.ok) throw new ApiError("The models could not be listed", res.status);
+  return (await res.json()) as T;
+}
+export const getPublicDirectVideo = () => publicMenu<VideoMenu>("video");
+export const getPublicDirectImage = () => publicMenu<ImageMenu>("image");
 export const quoteDirectVideo = (body: {
   model: string;
   seconds: number;

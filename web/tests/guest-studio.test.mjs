@@ -100,3 +100,22 @@ test("on a phone, Generate keeps the box focused so the dock does not jump under
   assert.match(code, /const keepBoxFocus = \{\s*onPointerDown: \(e: \{ preventDefault\(\): void \}\) => e\.preventDefault\(\),\s*onMouseDown: \(e: \{ preventDefault\(\): void \}\) => e\.preventDefault\(\),\s*\};/);
   assert.equal((code.match(/<button type="submit" className="dg-go[^"]*" \{\.\.\.keepBoxFocus\}/g) ?? []).length, 3);
 });
+
+test("signed out, Image and Video list their models (the menus are public), never price", () => {
+  // Found on the live site 2026-11-03: GET /api/direct/{image,video} is 401
+  // signed out (the /api router needs a session), so the picker was empty.
+  const code = src("../src/components/studio/direct-generator.tsx");
+  assert.match(code, /if \(!workspace && !signedOut\) return;\s*let live = true;\s*const linked = params\.get\("model"\);/);
+  assert.match(code, /\}, \[workspace, signedOut, kind\]\);/);
+  // signed out the menus come from the public catalogue (app/direct_public.py)
+  assert.match(code, /\(signedOut \? getPublicDirectVideo\(\) : getDirectVideo\(\)\)/);
+  assert.match(code, /\(signedOut \? getPublicDirectImage\(\) : getDirectImage\(\)\)/);
+  const api = src("../src/lib/studio-api.ts");
+  assert.match(api, /fetch\(`\$\{API_URL\}\/public\/direct\/\$\{kind\}`\)/);
+  // and the studio's origin proxies it to the API, like /api
+  assert.match(src("../next.config.ts"), /"\/public\/direct\/:path\*",/);
+  // the tray is the person's own Library: not asked for signed out
+  assert.match(code, /if \(!signedOut\)\s*getMedia\(\{ kind \}\)/);
+  // no quote is asked for signed out: the button says "Sign up to generate"
+  assert.match(code, /const priceKey = pick && !signedOut \? JSON\.stringify\(/);
+});
