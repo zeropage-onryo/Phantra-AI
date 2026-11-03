@@ -86,7 +86,7 @@ export default function Home() {
         </div>
         <ClosingCtaSection />
       </main>
-      <SiteFooter compact />
+      <SiteFooter compact lemon />
     </EditorialSkin>
   );
 }
