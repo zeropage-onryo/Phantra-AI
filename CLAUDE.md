@@ -428,7 +428,7 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
   connector (`voice_preview`, `talking_photo`) and the composer's card (`/api/talking-photo/*`),
   page `/make/photo-to-talking-video` (its CTA opens `/studio?open=talking-photo`).
 - **The free trial's renders are watermarked** (`src/watermark.py`, 2026-10-11, Mike's call): an
-  account with no plan that is not `credit_exempt` gets a small "Phantra" mark (the site lockup in the landing yellow since 2026-11-03, `src/assets/watermark_lockup.png` from `ops/watermark_lockup_png.py`,
+  account with no plan that is not `credit_exempt` gets a small "Phantra" mark (the site lockup since 2026-11-03: the owl in the landing yellow, the word white, `src/assets/watermark_lockup.png` from `ops/watermark_lockup_png.py`,
   bottom-right) on what it publishes through `fal._publish` (fal clips and stills, every effect),
   `nano_banana` stills on the wall (`bank=True`; sheets are not) and `cut/render.py` (exports,
   joins, trims). The MARKED copy goes up at the render's normal key, so no stored name changes;

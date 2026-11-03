@@ -69,8 +69,9 @@ from . import db
 ENV = "PHANTRA_WATERMARK"
 TEXT = "Phantra"                # the fallback mark when the lockup file cannot be read
 # The site's lockup -- the owl hiding behind the hand-drawn lowercase
-# "phantra" -- in the landing page's yellow (--lemon), since 2026-11-03 (Mike:
-# "the yellow logo one and replicate the lettering on the main landing page");
+# "phantra" -- with the owl in the landing page's yellow (--lemon) and the
+# lettering white, since 2026-11-03 (Mike: "the yellow logo one and replicate
+# the lettering on the main landing page", then "keep phantra lettering white");
 # it replaced the red dot. Drawn from the site's own paths by
 # ops/watermark_lockup_png.py and kept beside the code so `src` reads no file
 # from `web/`.
@@ -220,7 +221,7 @@ def _name_only(short: int):
 def mark_layer(width: int, height: int):
     """A transparent RGBA layer the size of the frame with the mark drawn
     in its bottom-right corner: the site's lockup (the owl behind the
-    lowercase "phantra") in the landing page's yellow, over a soft dark
+    lowercase "phantra"), the owl yellow and the word white, over a soft dark
     shadow so it reads on a light frame as well as a dark one. The same
     layer marks a still and every frame of a clip."""
     from PIL import Image, ImageFilter

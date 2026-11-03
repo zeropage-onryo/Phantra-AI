@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Draw src/assets/watermark_lockup.png: the Phantra lockup (the owl hiding behind
-the hand-drawn lowercase "phantra", at rest) in the landing page's yellow, on a
-transparent background -- the free plan's watermark since 2026-11-03 (Mike:
-"the yellow logo one and replicate the lettering on the main landing page").
+the hand-drawn lowercase "phantra", at rest) on a transparent background -- the
+free plan's watermark since 2026-11-03. The owl is in the landing page's yellow
+and the lettering stays white (Mike: "the yellow logo one and replicate the
+lettering on the main landing page", then "keep phantra lettering white").
 
 The geometry is read from web/src/components/owl-lockup-paths.ts, the same paths
 the site header draws, so the mark and the site never disagree. Every path is
@@ -22,7 +23,8 @@ from PIL import Image, ImageChops, ImageDraw
 ROOT = Path(__file__).resolve().parent.parent
 PATHS = ROOT / "web" / "src" / "components" / "owl-lockup-paths.ts"
 OUT = ROOT / "src" / "assets" / "watermark_lockup.png"
-LEMON = (243, 244, 139)          # --lemon on the landing page (#f3f48b)
+LEMON = (243, 244, 139)          # --lemon on the landing page (#f3f48b): the owl
+WHITE = (250, 250, 250)          # the header lockup's own colour on the site: the word
 SCALE = 2.0                      # pixels per lockup unit (viewbox 960 x 204 -> 1920 x 408)
 
 
@@ -72,9 +74,13 @@ def draw() -> Image.Image:
     owl = _mask(_const(src, "OWL"), size, (x, y))
     wall = _mask(_const(src, "WALL"), size, (x, y))
     shown = ImageChops.multiply(owl, ImageChops.invert(wall))      # owl outside the wall
-    alpha = ImageChops.lighter(word, shown)
-    im = Image.new("RGBA", size, (*LEMON, 0))
-    im.putalpha(alpha)
+    im = Image.new("RGBA", size, (0, 0, 0, 0))
+    owl_layer = Image.new("RGBA", size, (*LEMON, 0))
+    owl_layer.putalpha(shown)
+    word_layer = Image.new("RGBA", size, (*WHITE, 0))
+    word_layer.putalpha(word)
+    im.alpha_composite(owl_layer)
+    im.alpha_composite(word_layer)
     return im.crop(im.getbbox())
 
 
