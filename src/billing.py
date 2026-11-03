@@ -381,10 +381,17 @@ def _customer_for(account_id: int, email: Optional[str], dsn: Optional[str] = No
 
 
 def checkout_url(account_id: int, key: str, *, interval: str = "month",
-                 email: Optional[str] = None, dsn: Optional[str] = None) -> str:
+                 email: Optional[str] = None, dsn: Optional[str] = None,
+                 success_url: Optional[str] = None,
+                 cancel_url: Optional[str] = None) -> str:
     """A Stripe Checkout Session URL for one plan (monthly or yearly) or
     the pack. Raises BillingUnconfigured (no key, or no Price for this
-    item at this interval) and ValueError (no such item / interval)."""
+    item at this interval) and ValueError (no such item / interval).
+
+    `success_url` / `cancel_url` default to the pricing page; the OAuth
+    consent page's plan picker (app/oauth_consent.py) passes its own, so a
+    person who subscribes while connecting ChatGPT lands back on the
+    consent step, not in the studio."""
     item = products().get(key)
     if item is None:
         raise ValueError(f"no such plan or pack: {key!r}")
@@ -445,6 +452,25 @@ def checkout_url(account_id: int, key: str, *, interval: str = "month",
         **({"discounts": discount} if discount else {"allow_promotion_codes": True}),
     )
     return session["url"]
+
+
+def checkout_completed(session_id: str, account_id: int) -> bool:
+    """True when Stripe says this Checkout Session is complete, was a
+    subscription, and was opened for THIS account. The consent page asks
+    it on the way back from Checkout because the webhook that sets the
+    plan may land a few seconds AFTER the browser does. Never raises: an
+    unconfigured install, a bad id or a network failure is False, and the
+    page falls back to the plan on the row."""
+    if not session_id or not session_id.startswith("cs_"):
+        return False
+    try:
+        session = _stripe().checkout.Session.retrieve(session_id)
+    except Exception as exc:  # noqa: BLE001 -- see docstring
+        _log(f"checkout session {session_id} unreadable: {exc}")
+        return False
+    return (session.get("status") == "complete"
+            and session.get("mode") == "subscription"
+            and str(session.get("client_reference_id") or "") == str(account_id))
 
 
 def portal_url(account_id: int, *, dsn: Optional[str] = None) -> str:

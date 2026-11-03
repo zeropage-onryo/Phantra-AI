@@ -213,7 +213,12 @@ No Supabase token is stored after sign-in.
   `GET /auth/confirm?token_hash=&type=` (no verifier cookie, any browser).
 - The OAuth consent page for the connector is ours (`app/oauth_consent.py`): Supabase's OAuth
   server sends the person to `<Site URL>/oauth/consent`, the page signs them in and answers as
-  them.
+  them. Since 2026-11-03 it shows the three plans first, Krea's shape (`oauth_consent.offer`):
+  a workspace made within the hour (signed up in this connection) may also "Continue with free
+  trial"; an older one with no plan must pick one (Checkout returns to the consent step, and
+  `billing.checkout_completed` covers the webhook landing late); a plan, unspent paid or granted
+  credit, or `credit_exempt` goes straight to Allow. Only the connect step is gated, never the
+  connector; `PHANTRA_CONNECT_PAYWALL=0` turns it off, and no Stripe key means no picker.
 
 ## Architecture
 

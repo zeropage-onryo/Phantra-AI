@@ -40,10 +40,12 @@ spends money or reads the board.
 from __future__ import annotations
 
 import hmac
+import os
 import re
 import secrets as _secrets
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import quote, urlsplit
@@ -53,7 +55,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from src import accounts, mcp_connections
+from src import accounts, billing, ledger, mcp_connections, pricing
 
 from . import auth
 
@@ -91,8 +93,27 @@ PENDING_MAX_AGE = 15 * 60
 # studio with no word about the app. Bounded, so a forgotten tab cannot
 # turn a sign-in hours later into a connection screen.
 RESUME_MAX_AGE = 60 * 60
-EXPIRED =("This connection request has expired -- they last about ten minutes. "
+PAID_EXPIRED = ("Your plan is active. The connection request timed out while you were "
+                "checking out -- they last about ten minutes. Go back to the app you came "
+                "from and connect again; it goes straight through this time.")
+EXPIRED = ("This connection request has expired -- they last about ten minutes. "
            "Go back to the app you came from and connect again.")
+
+
+# THE PLAN PICKER (2026-11-03, Mike: "do what Krea does, but still have
+# the free plan for people that don't have accounts"). Connecting an app
+# shows the three plans first, Krea's shape. A workspace made in THIS
+# connection -- the person had no account and signed up on the way here --
+# may also continue on the free trial. An older workspace with no plan
+# must pick one. Passing straight through: a plan, credit_exempt, or paid
+# credit still unspent (a top-up, or the adjustment grant a directory
+# reviewer's account is given). Only the connect step is gated: the
+# connector itself still serves every workspace (pricing.py, 2026-10-21),
+# so an app connected before this keeps working, and Supabase skips this
+# page for a person who already consented to that app.
+PAYWALL_ENV = "PHANTRA_CONNECT_PAYWALL"      # "0" turns the picker off
+NEW_ACCOUNT_WINDOW = 60 * 60                # "made in this connection"
+PAID_KINDS = ledger.BEYOND_TRIAL_KINDS
 
 
 def _valid_id(authorization_id: str) -> bool:
@@ -244,6 +265,77 @@ def _host(uri: Any) -> str:
     return (parts.hostname or "").lower()
 
 
+def _account_for(grant: dict) -> Optional[dict]:
+    """The workspace this sign-in connects: the person's OLDEST membership,
+    the rule mcp_auth.account_for_token resolves every MCP call by."""
+    user_id = (auth.verify_token(grant.get("token") or "") or {}).get("sub")
+    if not user_id:
+        return None
+    member_of = accounts.memberships(str(user_id))
+    if not member_of:
+        return None
+    return min(member_of, key=lambda a: int(a["id"]))
+
+
+def _age_seconds(stamp: Any) -> Optional[float]:
+    try:
+        made = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if made.tzinfo is None:
+        made = made.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - made).total_seconds()
+
+
+def _has_paid_credit(account_id: int) -> bool:
+    return any(lot["kind"] in PAID_KINDS and int(lot["credits_remaining"] or 0) > 0
+               for lot in ledger.lots(account_id, include_expired=False))
+
+
+def offer(account: Optional[dict]) -> dict:
+    """What the consent page asks of this workspace before Allow:
+    {"paywall": bool, "free_trial": bool}. `paywall` False is the old page
+    (Allow straight away). `free_trial` True puts "Continue with free
+    trial" under the plans. Fails OPEN on any read error: connecting
+    spends nothing, so a broken read must never lock a person out."""
+    through = {"paywall": False, "free_trial": False}
+    if account is None or os.environ.get(PAYWALL_ENV, "1").strip() == "0":
+        return through
+    if not billing.configured():
+        return through          # nothing could be bought: never a dead end
+    try:
+        account_id = int(account["id"])
+        if accounts.plan_of(account_id) or accounts.is_credit_exempt(account_id):
+            return through
+        if _has_paid_credit(account_id):
+            return through
+        age = _age_seconds(account.get("created_at"))
+    except Exception as exc:  # noqa: BLE001 -- see docstring
+        print(f"[oauth-consent] plan check failed, letting through: {exc}", file=sys.stderr)
+        return through
+    return {"paywall": True,
+            "free_trial": age is not None and age <= NEW_ACCOUNT_WINDOW}
+
+
+def plan_cards() -> list[dict]:
+    """The three plans as the picker draws them, both intervals at once
+    (the toggle only shows one or the other)."""
+    cards = []
+    for plan in pricing.PLANS.values():
+        cards.append({
+            "key": plan.key, "name": plan.name, "blurb": plan.blurb,
+            "credits": f"{plan.credits:,}", "monthly_usd": plan.monthly_usd,
+            "yearly_monthly_usd": plan.yearly_monthly_usd, "yearly_usd": plan.yearly_usd,
+            "popular": plan.popular, "storage_gb": plan.storage_gb,
+        })
+    return cards
+
+
+def _consent_url(request: Request, authorization_id: str, extra: str = "") -> str:
+    base = str(request.url_for("consent_page"))
+    return f"{base}?authorization_id={quote(authorization_id)}{extra}"
+
+
 def describe(details: dict) -> dict:
     """The details Supabase returned, as the page draws them. Pure, so the
     exact words a person approves are testable without a server."""
@@ -260,8 +352,9 @@ def describe(details: dict) -> dict:
     }
 
 
-@router.get(CONSENT_PATH)
-def consent_page(request: Request, authorization_id: str = ""):
+@router.get(CONSENT_PATH, name="consent_page")
+def consent_page(request: Request, authorization_id: str = "", checkout: str = "",
+                 session_id: str = ""):
     if not _valid_id(authorization_id):
         return _problem(request, "This link is missing its authorization request. "
                                  "Start the connection again from the app you came from.")
@@ -280,7 +373,7 @@ def consent_page(request: Request, authorization_id: str = ""):
     if status >= 400:
         request.session.pop(GRANT_KEY, None)
         if _gone(status, body):
-            return _problem(request, EXPIRED)
+            return _problem(request, PAID_EXPIRED if checkout == "success" else EXPIRED)
         return _problem(request, auth._error_text(
             body, "This authorization request has expired or was already used. "
                   "Start the connection again from the app you came from."))
@@ -295,9 +388,23 @@ def consent_page(request: Request, authorization_id: str = ""):
     # what the person is about to approve, kept beside the grant so the
     # POST can record WHICH client was allowed (the "Connected to Claude"
     # line in the studio's account menus) -- the POST gets only a decision
+    account = _account_for(grant)
+    asked = offer(account)
+    paid = bool(grant.get("paid"))
+    if asked["paywall"] and not paid and checkout == "success" and account is not None:
+        # back from Checkout before the webhook set the plan: Stripe's own
+        # word for THIS session, opened for THIS account, settles it
+        paid = billing.checkout_completed(session_id, int(account["id"]))
     request.session[GRANT_KEY] = {**grant, "client_name": shown["client_name"],
-                                  "redirect_host": _host(body.get("redirect_uri"))}
-    return _page(request, authorization_id=authorization_id, csrf=grant["csrf"], **shown)
+                                  "redirect_host": _host(body.get("redirect_uri")),
+                                  "paid": paid}
+    paywall = asked["paywall"] and not paid
+    return _page(request, authorization_id=authorization_id, csrf=grant["csrf"],
+                 paywall=paywall, free_trial=asked["free_trial"],
+                 trial_credits=accounts.signup_credits(), plans=plan_cards() if paywall else [],
+                 save_pct=round(float(pricing.YEARLY_DISCOUNT) * 100),
+                 just_paid=paid and checkout == "success",
+                 cancelled=checkout == "cancelled", **shown)
 
 
 def _remember(grant: dict) -> None:
@@ -336,6 +443,12 @@ def consent_decision(request: Request, authorization_id: str = Form(""),
     if not hmac.compare_digest(str(csrf), str(grant.get("csrf") or "")):
         return _problem(request, "This form has expired. Go back and try again.", 403)
     action = "approve" if decision == "approve" else "deny"
+    if action == "approve" and not grant.get("paid"):
+        asked = offer(_account_for(grant))
+        if asked["paywall"] and not asked["free_trial"]:
+            # the form had no Allow on it; a hand-made POST gets no further
+            return _problem(request, "Pick a plan to connect this app. "
+                                     "Go back and choose one.", 402)
     status, body = auth.gotrue(
         "POST", f"/oauth/authorizations/{quote(authorization_id)}/consent",
         json={"action": action}, token=grant["token"])
@@ -353,3 +466,39 @@ def consent_decision(request: Request, authorization_id: str = Form(""),
     if action == "approve":
         _remember(grant)
     return _back_to(request, target, str(grant.get("client_name") or ""))
+
+
+@router.post(CONSENT_PATH + "/plan")
+def consent_plan(request: Request, authorization_id: str = Form(""), csrf: str = Form(""),
+                 item: str = Form(""), interval: str = Form("month")):
+    """A plan picked on the consent page: a Stripe Checkout for the
+    workspace this sign-in connects, returning to this same consent step
+    (then Allow sends the person back to the app)."""
+    if not _valid_id(authorization_id):
+        return _problem(request, "This form is missing its authorization request.")
+    if auth._rate_limited(request, "consent"):
+        return _problem(request, "Too many attempts -- wait a minute and try again.", 429)
+    grant = _grant(request, authorization_id)
+    if grant is None:
+        return _to_signin(request, authorization_id)
+    if not hmac.compare_digest(str(csrf), str(grant.get("csrf") or "")):
+        return _problem(request, "This form has expired. Go back and try again.", 403)
+    key = (item or "").strip().lower()
+    if not billing.is_plan(key):
+        return _problem(request, "Pick one of the plans shown.")
+    account = _account_for(grant)
+    if account is None:
+        return _problem(request, "This sign-in has no workspace yet. Sign in to the studio "
+                                 "once, then connect again.", 403)
+    email = (auth.verify_token(grant.get("token") or "") or {}).get("email")
+    try:
+        url = billing.checkout_url(
+            int(account["id"]), key, interval=(interval or "month"), email=email,
+            success_url=_consent_url(request, authorization_id,
+                                     "&checkout=success&session_id={CHECKOUT_SESSION_ID}"),
+            cancel_url=_consent_url(request, authorization_id, "&checkout=cancelled"))
+    except billing.BillingUnconfigured:
+        return _problem(request, "Plans can't be bought on this server right now.", 503)
+    except ValueError as exc:
+        return _problem(request, str(exc))
+    return RedirectResponse(url, status_code=303)
