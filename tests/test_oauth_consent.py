@@ -356,6 +356,60 @@ def test_a_redirect_that_is_not_http_is_never_followed(gotrue):
     assert "location" not in response.headers
 
 
+CURSOR_CALLBACK = "cursor://anysphere.cursor-mcp/oauth/callback"
+
+
+def _approve():
+    csrf = _csrf(_get().text)
+    return client.post("/oauth/consent", data={"authorization_id": AUTHZ,
+                                               "decision": "approve", "csrf": csrf},
+                       follow_redirects=False)
+
+
+def test_allow_returns_to_a_desktop_app_through_a_page_that_opens_it(gotrue):
+    """Cursor's redirect is its own scheme. Measured 2026-11-03: an
+    http-only rule answered every Allow with "no way back to the app"."""
+    gotrue.requests[AUTHZ]["redirect_uri"] = CURSOR_CALLBACK
+    gotrue.requests[AUTHZ]["client"]["name"] = "Cursor"
+    _arrive_and_sign_in()
+    page = _get()
+    assert page.status_code == 200 and "anysphere.cursor-mcp" in page.text
+    response = _approve()
+    assert response.status_code == 200
+    assert "location" not in response.headers
+    target = f"{CURSOR_CALLBACK}?code=c0de&amp;state=s"
+    assert f'<meta http-equiv="refresh" content="0;url={target}">' in response.text
+    assert f'href="{target}"' in response.text
+    assert "Return to Cursor" in response.text
+    assert gotrue.decisions == [(AUTHZ, "approve", "ana@example.com")]
+
+
+def test_a_desktop_app_consented_before_also_gets_the_page(gotrue):
+    gotrue.requests[AUTHZ]["redirect_uri"] = CURSOR_CALLBACK
+    gotrue.consented[AUTHZ] = "ana@example.com"
+    _arrive_and_sign_in()
+    response = _get()
+    assert response.status_code == 200 and "location" not in response.headers
+    assert f'href="{CURSOR_CALLBACK}?code=again&amp;state=s"' in response.text
+
+
+@pytest.mark.parametrize("url", [
+    "javascript://x%0aalert(1)", "data://text/html,hi", "file://etc/passwd",
+    "vbscript://x", "blob://x/y", "/oauth/elsewhere", "cursor:no-host",
+    "9bad://x/y", "",
+])
+def test_no_dangerous_or_hostless_address_is_followed(url):
+    assert oauth_consent._safe_redirect(url) is None
+
+
+@pytest.mark.parametrize("url", [
+    "https://claude.ai/api/mcp/auth_callback?code=c", "http://localhost:3334/cb?code=c",
+    CURSOR_CALLBACK + "?code=c", "vscode://vscode.mcp/cb?code=c",
+])
+def test_web_and_desktop_app_addresses_are_followed(url):
+    assert oauth_consent._safe_redirect(url) == url
+
+
 # ---------- the workspace, and time ----------
 
 def test_signing_in_here_creates_the_workspace(clean_slate, gotrue, monkeypatch):
