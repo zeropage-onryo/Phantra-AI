@@ -5372,7 +5372,7 @@ p.zkeys {
    the trigger's title still says which is which */
 @media (max-width: 1180px) {
   .hnav-btn .hnav-l {
-    display: none;
+    display: none; /* superseded by the 1200px rule below; kept harmless */
   }
   .hnav-btn {
     padding: 0 8px 0 10px;
@@ -5423,17 +5423,14 @@ p.zkeys {
   padding: 0 10px;
 }
 
-/* Making room as the window narrows, in this order (measured 2026-11-02;
-   everything labelled needs ~1560px): the word "credits", then the dropdown
-   triggers' names (their icons and chevrons stay, the plain links keep
-   theirs), then every name, then New session (⌘K still has it), then the
-   chevrons. The 1180px rule above is superseded by these. */
-@media (max-width: 1180px) {
-  .hnav-link .hnav-l {
-    display: inline;
-  }
-}
-@media (max-width: 1580px) {
+/* Making room as the window narrows (re-measured 2026-11-02 for eleven
+   entries; side by side they need ~1760px):
+   - under 1760px each entry stacks its icon over a small name, and the
+     balance drops the word "credits";
+   - under 1320px New session goes (⌘K still has it);
+   - under 1200px the names go and the icons stay;
+   - under 860px the chevron goes and the padding tightens. */
+@media (max-width: 1760px) {
   .zps .hdr .zcredit-word {
     display: none;
   }
@@ -5445,30 +5442,78 @@ p.zkeys {
   }
   .hnav-sep {
     margin: 0 4px;
+    height: 28px;
+  }
+  .hnav .hnav-btn,
+  .hnav .hnav-link {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    height: 50px;
+    min-width: 54px;
+    padding: 0 8px;
+    border-radius: 12px;
+    font-size: 10.5px;
+    letter-spacing: 0.01em;
+  }
+  .hnav-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  /* the chevron rides beside the icon, not under it */
+  .hnav-btn .hnav-chev {
+    position: absolute;
+    top: 9px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    margin: 0;
+  }
+  .hnav-btn .nbadge.dot {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    margin: 0;
   }
 }
-@media (max-width: 1460px) {
-  .hnav-wrap .hnav-btn .hnav-l,
-  .hnav > .pfbtn .hnav-l {
-    display: none;
-  }
-}
-@media (max-width: 1240px) {
-  .hnav-link .hnav-l {
-    display: none;
-  }
-}
-@media (max-width: 1100px) {
+@media (max-width: 1320px) {
   .zps .hdr .hnew {
     display: none;
+  }
+}
+@media (max-width: 1200px) {
+  .hnav .hnav-l {
+    display: none;
+  }
+  .hnav .hnav-btn,
+  .hnav .hnav-link {
+    min-width: 0;
+    height: 38px;
+    padding: 0 9px;
+  }
+  .hnav-btn .hnav-chev {
+    position: static;
+    margin-left: -2px;
+  }
+  .hnav .hnav-btn:has(.hnav-chev) {
+    flex-direction: row;
   }
 }
 @media (max-width: 860px) {
   .hnav-btn .hnav-chev {
     display: none;
   }
-  .hnav-btn,
-  .hnav-link {
-    padding: 0 8px;
+  .hnav .hnav-btn,
+  .hnav .hnav-link {
+    padding: 0 6px;
   }
+}
+
+/* (2026-11-02, later) the bar is all plain links but Plugins: eleven
+   entries. Effects keeps its Halloween glow as a link; the dropdown-only
+   step of the narrowing below no longer applies to anything but Plugins. */
+.hnav-link[data-neon] svg {
+  color: #ffd2a8;
+  filter: drop-shadow(0 0 3px #ff7a1a) drop-shadow(0 0 8px #ff7a1a);
 }
