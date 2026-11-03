@@ -50,7 +50,7 @@ test("a signed-out send opens the sign-up sheet and asks the server nothing", ()
 
 test("the sign-up sheet keeps the prompt and never sends it", () => {
   const code = strip(src("../src/components/studio/phone/signup-sheet.tsx"));
-  assert.match(code, /keepPendingPrompt\(prompt\)/);
+  assert.match(code, /keepPendingPrompt\(prompt, back\)/);
   assert.doesNotMatch(code, /send\(|approve|runCreativeGuide|apiFetch/);
   // Google and Discord go straight on; email opens the sign-up page
   assert.match(code, /go\("google"\)/);

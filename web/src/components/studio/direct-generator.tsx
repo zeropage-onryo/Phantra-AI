@@ -78,6 +78,7 @@ import {
 } from "@/lib/studio-api";
 import "@/components/studio/direct-generator.css";
 import { ModelPins } from "@/components/studio/model-pins";
+import { SignupSheet, takePendingPrompt } from "@/components/studio/phone/signup-sheet";
 /* eslint-disable @next/next/no-img-element */
 
 /** A still's `thumb` names where its 480px derivative WOULD be, not that R2
@@ -90,6 +91,8 @@ const toMaster = (url: string | null | undefined) => (e: { currentTarget: HTMLIm
 };
 
 type Kind = "image" | "video";
+/** where each page lives: a signed-out Generate comes back here after sign-up */
+const PAGE: Record<Kind, string> = { image: "/studio/image", video: "/studio/video" };
 
 /** one picture this make is sent with: a file dropped or chosen here, or a
  *  render / element photo (sent by its address, as the composer sends a pick) */
@@ -179,7 +182,7 @@ export function DirectGenerator({ kind }: { kind: Kind }) {
 }
 
 function Generator({ kind }: { kind: Kind }) {
-  const { toast, me } = useShell();
+  const { toast, me, signedOut } = useShell();
   const params = useSearchParams();
   const video = kind === "video";
   const workspace = me?.account?.slug ?? "";
@@ -216,6 +219,9 @@ function Generator({ kind }: { kind: Kind }) {
   const [made, setMade] = useState<Shown[]>([]);
   const [recent, setRecent] = useState<Shown[]>([]);
   const [shownId, setShownId] = useState<string | null>(null);
+  // the sign-up sheet a signed-out Generate opens (null = closed), as on Create
+  const [signup, setSignup] = useState<string | null>(null);
+  const closeSignup = useCallback(() => setSignup(null), []);
 
   /* ── the menu, and the pick it opens on ── */
   useEffect(() => {
@@ -414,6 +420,27 @@ function Generator({ kind }: { kind: Kind }) {
   /* ── Generate: the one click that spends, at the price the button showed ── */
   const ready = video ? !!(vMenu?.ready && vPick) : !!(iMenu?.ready && iPick);
   const canSend = ready && !!prompt.trim() && !!quote && !pricing && !sending && !quoteError;
+  // signed out (2026-11-03, QA P14): the prompt can be typed and Generate
+  // pressed, which opens the sign-up sheet with the prompt kept for this
+  // page. Nothing is asked of the server and nothing is spent.
+  function go() {
+    if (signedOut) {
+      setSignup(prompt.trim());
+      return;
+    }
+    void generate();
+  }
+  // back from that sign-up: the kept prompt goes in the box, once, if it is
+  // empty. Never sent: Generate is still the one click that spends.
+  const tookPending = useRef(false);
+  useEffect(() => {
+    if (!workspace || tookPending.current) return;
+    tookPending.current = true;
+    const kept = takePendingPrompt(PAGE[kind]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
+    if (kept && !prompt.trim()) setPrompt(kept);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival signed in
+  }, [workspace]);
   async function generate() {
     if (!canSend || !quote) return;
     const label = (video ? vModel?.label : iModel?.label) ?? "";
@@ -528,7 +555,14 @@ function Generator({ kind }: { kind: Kind }) {
       el?.setSelectionRange(at + tag.length + 1, at + tag.length + 1);
     });
   };
-  const goLabel = sending ? "Starting…" : buttonLabel(quote, pricing, exempt);
+  // a press on Generate never takes focus from the box: on a phone, typing
+  // hides the tab bar and drops the dock 64px, so a blur on press brought the
+  // bar back, moved the button up and the click landed on nothing (2026-11-03)
+  const keepBoxFocus = {
+    onPointerDown: (e: { preventDefault(): void }) => e.preventDefault(),
+    onMouseDown: (e: { preventDefault(): void }) => e.preventDefault(),
+  };
+  const goLabel = signedOut ? "Sign up to generate" : sending ? "Starting…" : buttonLabel(quote, pricing, exempt);
   const notes = (
     <>
       {pickNote || resNote ? <p className="dg-kept">{[pickNote, resNote].filter(Boolean).join(" ")}</p> : null}
@@ -615,7 +649,7 @@ function Generator({ kind }: { kind: Kind }) {
           className="dg-panel"
           onSubmit={(e) => {
             e.preventDefault();
-            void generate();
+            go();
           }}
         >
           <div className="dg-field">
@@ -689,7 +723,7 @@ function Generator({ kind }: { kind: Kind }) {
 
           <span className="dg-grow" />
           {notes}
-          <button type="submit" className="dg-go" disabled={!canSend} data-busy={pricing || sending ? "1" : undefined}>
+          <button type="submit" className="dg-go" {...keepBoxFocus} disabled={signedOut ? !prompt.trim() : !canSend} data-busy={!signedOut && (pricing || sending) ? "1" : undefined}>
             {sending ? <span className="dg-spin sm" aria-hidden /> : <Wand2 strokeWidth={1.8} />}
             {goLabel}
           </button>
@@ -720,7 +754,7 @@ function Generator({ kind }: { kind: Kind }) {
           className="dgv-dock dgi-dock"
           onSubmit={(e) => {
             e.preventDefault();
-            void generate();
+            go();
           }}
         >
           <div className="dgv-dock-top">
@@ -774,13 +808,14 @@ function Generator({ kind }: { kind: Kind }) {
               />
             ) : null}
             <span className="dg-grow" />
-            <button type="submit" className="dg-go dgv-go" disabled={!canSend} data-busy={pricing || sending ? "1" : undefined}>
+            <button type="submit" className="dg-go dgv-go" {...keepBoxFocus} disabled={signedOut ? !prompt.trim() : !canSend} data-busy={!signedOut && (pricing || sending) ? "1" : undefined}>
               {sending ? <span className="dg-spin sm" aria-hidden /> : <Wand2 strokeWidth={1.8} />}
               {goLabel}
             </button>
           </div>
         </form>
         {picker}
+        <SignupSheet prompt={signup} onClose={closeSignup} back={PAGE[kind]} />
       </section>
     );
   }
@@ -803,7 +838,7 @@ function Generator({ kind }: { kind: Kind }) {
           className="dgv-dock"
           onSubmit={(e) => {
             e.preventDefault();
-            void generate();
+            go();
           }}
         >
           {picker}
@@ -914,7 +949,7 @@ function Generator({ kind }: { kind: Kind }) {
             <span className="dg-count">
               {prompt.length.toLocaleString("en-US")} / {(vModel?.prompt_max ?? 4000).toLocaleString("en-US")}
             </span>
-            <button type="submit" className="dg-go dgv-go" disabled={!canSend} data-busy={pricing || sending ? "1" : undefined}>
+            <button type="submit" className="dg-go dgv-go" {...keepBoxFocus} disabled={signedOut ? !prompt.trim() : !canSend} data-busy={!signedOut && (pricing || sending) ? "1" : undefined}>
               {sending ? <span className="dg-spin sm" aria-hidden /> : <Wand2 strokeWidth={1.8} />}
               {goLabel}
             </button>
@@ -923,6 +958,7 @@ function Generator({ kind }: { kind: Kind }) {
       </div>
 
       <History made={made} recent={recent} shownId={shownId} onShow={setShownId} video />
+      <SignupSheet prompt={signup} onClose={closeSignup} back={PAGE[kind]} />
     </section>
   );
 }
