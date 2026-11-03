@@ -47,6 +47,7 @@ from src import (
     autonomy,
     autopilot,
     brand_kits,
+    creators,
     db,
     entities,
     evalstore,
@@ -220,6 +221,7 @@ def init_tables() -> None:
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     plugin_tokens.init()    # editing-app panels' sign-in codes and tokens
     affiliates.init()       # partners, referrals and held commissions
+    creators.init()         # Phantra Creators applications
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
     upload_links.init()     # the connector's one-time upload links, spent once
