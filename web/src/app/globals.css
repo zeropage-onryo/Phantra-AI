@@ -190,6 +190,10 @@
      the scrolled nav's glass, the hero grid's hairlines. */
   --ink-2: #afafaf;
   --ink-3: #82807d;
+  /* Phantra lemon (2026-11-02, Mike: the main brand colour): the homepage
+     news bar, the hero accent and the footer; always with dark ink on it */
+  --lemon: #f3f48b;
+  --lemon-ink: #0b0a08;
   --nav-fg: #c6c4c0;
   --line-hover: #343331;
   /* a card's outline (features, model and how-to cards); the hairline by
