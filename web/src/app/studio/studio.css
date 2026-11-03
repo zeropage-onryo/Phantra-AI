@@ -5379,3 +5379,96 @@ p.zkeys {
     gap: 6px;
   }
 }
+
+/* the plain links on the bar (Image, Video, Voice, Ad Studio): a trigger
+   with no chevron, a little tighter on the right */
+.hnav-link {
+  padding: 0 12px;
+  text-decoration: none;
+}
+/* the divider between Plugins and Ad Studio */
+.hnav-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 8px;
+  background: rgb(255 255 255 / 0.16);
+  flex: none;
+}
+@media (max-width: 1180px) {
+  .hnav-link {
+    padding: 0 10px;
+  }
+  .hnav-sep {
+    margin: 0 4px;
+  }
+}
+
+/* the bar holds eight entries now (2026-11-02): a little tighter, and the
+   header's columns become brand | nav | cluster so the nav takes whatever
+   the other two leave and centres itself in it */
+.hdr {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 16px;
+}
+.hdr .hnav {
+  justify-self: center;
+  gap: 2px;
+}
+.hnav-btn {
+  gap: 7px;
+  padding: 0 8px 0 10px;
+  font-size: 13.5px;
+}
+.hnav-link {
+  padding: 0 10px;
+}
+
+/* Making room as the window narrows, in this order (measured 2026-11-02;
+   everything labelled needs ~1560px): the word "credits", then the dropdown
+   triggers' names (their icons and chevrons stay, the plain links keep
+   theirs), then every name, then New session (⌘K still has it), then the
+   chevrons. The 1180px rule above is superseded by these. */
+@media (max-width: 1180px) {
+  .hnav-link .hnav-l {
+    display: inline;
+  }
+}
+@media (max-width: 1580px) {
+  .zps .hdr .zcredit-word {
+    display: none;
+  }
+  .zps .hdr .hright {
+    gap: 8px;
+  }
+  .hdr {
+    column-gap: 12px;
+  }
+  .hnav-sep {
+    margin: 0 4px;
+  }
+}
+@media (max-width: 1460px) {
+  .hnav-wrap .hnav-btn .hnav-l,
+  .hnav > .pfbtn .hnav-l {
+    display: none;
+  }
+}
+@media (max-width: 1240px) {
+  .hnav-link .hnav-l {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .zps .hdr .hnew {
+    display: none;
+  }
+}
+@media (max-width: 860px) {
+  .hnav-btn .hnav-chev {
+    display: none;
+  }
+  .hnav-btn,
+  .hnav-link {
+    padding: 0 8px;
+  }
+}

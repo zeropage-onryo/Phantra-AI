@@ -122,10 +122,18 @@ const NAV: NavItem[] = [
    trigger keeps its icon, and each page in it keeps the rail's icon. The
    phone's chrome (phone/phone-chrome.tsx) is untouched -- under 720px the
    header is not drawn at all. */
-type NavGroup = { id: string; label: string; icon: typeof House; items: ViewId[] };
+/* (later the same day) Image, Video and Voice sit on the bar as plain
+   links, not in a menu; Ad Studio is a plain link too, after Plugins and a
+   divider. A `link` entry is one page, drawn as a button with no menu. */
+type NavGroup =
+  | { id: string; label: string; icon: typeof House; items: ViewId[]; link?: never }
+  | { id: string; link: ViewId };
 const GROUPS: NavGroup[] = [
   { id: "projects", label: "Projects", icon: FolderKanban, items: ["projects", "calendar"] },
-  { id: "create", label: "Create", icon: House, items: ["studio", "image", "video", "ads", "effects", "voice"] },
+  { id: "create", label: "Create", icon: House, items: ["studio", "effects"] },
+  { id: "image", link: "image" },
+  { id: "video", link: "video" },
+  { id: "voice", link: "voice" },
   // Renders sits with the work it made while the editor is off the UI
   // (lib/editor-flag.ts); with it back on, Edit holds both again
   { id: "library", label: "Library", icon: Layers, items: EDITOR_IN_UI ? ["assets", "elements", "brand"] : ["assets", "elements", "brand", "renders"] },
@@ -222,6 +230,26 @@ const Ctx = createContext<ShellContext>({
 export const useShell = () => useContext(Ctx);
 
 const subscribeNothing = () => () => {};
+/* one page on the top bar as a plain link (no menu): its rail icon and name */
+function NavLinkItem({ id, view, caps }: { id: ViewId; view: ViewId; caps: Record<string, boolean> }) {
+  const n = NAV.find((x) => x.id === id);
+  if (!n || (n.cap && caps[n.cap] !== true)) return null;
+  const Icon = n.icon;
+  return (
+    <Link
+      href={n.href}
+      className="hnav-btn hnav-link"
+      data-nav={id}
+      title={n.label}
+      aria-current={id === view ? "page" : undefined}
+      data-here={id === view ? "1" : undefined}
+    >
+      <Icon strokeWidth={1.5} />
+      <span className="hnav-l">{n.label}</span>
+    </Link>
+  );
+}
+
 /* The end of the account menu -- the header's avatar -- as ONE component,
    so a second menu can never drift from it. */
 function MenuTail({ close }: { close: () => void }) {
@@ -585,6 +613,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
             </Link>
             <nav className="hnav" aria-label="Primary">
               {GROUPS.map((g) => {
+                if (g.link) return <NavLinkItem key={g.id} id={g.link} view={view} caps={caps} />;
                 const items = g.items
                   .map((id) => NAV.find((n) => n.id === id) ?? EXTRA.find((n) => n.id === id))
                   .filter((n): n is NavItem => !!n && (!n.cap || caps[n.cap] === true));
@@ -658,6 +687,8 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 );
               })}
               <PluginsRailItem top />
+              <span className="hnav-sep" aria-hidden />
+              <NavLinkItem id="ads" view={view} caps={caps} />
             </nav>
             {/* the right-hand cluster is one grid cell, so the tabs between
                 it and the brand can never be drawn underneath it */}
