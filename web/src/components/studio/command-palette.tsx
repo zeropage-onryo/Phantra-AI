@@ -51,6 +51,7 @@ import {
 import { signOut } from "@/lib/api";
 import { createProject as createCut } from "@/lib/cut/api";
 import { EDITOR_IN_UI } from "@/lib/editor-flag";
+import { RENDERS_IN_UI } from "@/lib/renders-flag";
 import { handleOf, kindLabel } from "@/lib/elements";
 import { requestNewSession } from "@/lib/assistant";
 import { PALETTE_EVENT, isPaletteKey, marks, rankCommands, step } from "@/lib/palette";
@@ -200,7 +201,7 @@ export function CommandPalette({
         page("Assets", "/studio/assets", Layers, "library wall renders images clips"),
         ...(EDITOR_IN_UI ? [page("Edit", "/studio/cut", Scissors, "timeline editor cuts")] : []),
         page("Elements", "/studio/elements", AtSign, "characters props products places cast"),
-        page("Renders", "/studio/renders", ListVideo, "rendering jobs running finished clips queue"),
+        ...(RENDERS_IN_UI ? [page("Renders", "/studio/renders", ListVideo, "rendering jobs running finished clips queue")] : []),
         page("Calendar", "/studio/calendar", CalendarDays, "schedule posts publish social week month feed queue"),
         page("Ad Studio", "/studio/ads", Megaphone, "ads advert commercial ugc product showcase tv spot motion ad"),
         page("Settings", SETTINGS_HOME, Settings, "account password email profile"),

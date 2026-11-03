@@ -16,6 +16,7 @@ import { useShell } from "@/components/studio/shell";
 import { createProject, deleteProject, listProjects, restoreProject, type Project } from "@/lib/cut/api";
 import { cutReady, type CutReady } from "@/lib/studio-api";
 import { shortDuration, type Aspect } from "@/lib/cut/timeline";
+import { RENDERS_IN_UI } from "@/lib/renders-flag";
 import "@/components/cut/cut.css";
 
 const ASPECT_ICON = { "9:16": RectangleVertical, "16:9": RectangleHorizontal, "1:1": Square } as const;
@@ -155,11 +156,11 @@ export default function CutProjectsPage() {
                 ? "Start one from scratch, or open a rendered scene below — its clips land on the timeline in order."
                 : "Start one from scratch. A scene whose clips are all rendered shows up here, ready to cut."}
             </span>
-            {fresh.length ? null : (
+            {RENDERS_IN_UI && !fresh.length ? (
               <Link href="/studio/renders" className="cx-btn">
                 Open Renders
               </Link>
-            )}
+            ) : null}
           </div>
         ) : null}
 
