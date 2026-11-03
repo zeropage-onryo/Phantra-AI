@@ -54,7 +54,8 @@ _CAUSES = (
     (re.compile(r"(?i)likeness(es)? of real people|partner_validation"),
      "{model} won't take a photo of a real person as a reference. Render this shot on "
      "Kling 4.0 or Veo 3.1 instead"),
-    (re.compile(r"(?i)content.?policy|safety|nsfw|moderat|prohibited|blocked by"),
+    (re.compile(r"(?i)content.?policy|safety|nsfw|moderat|prohibited|blocked by|"
+                r"flagged as sensitive"),
      "{model} declined this prompt. Reword it and try again"),
     (re.compile(r"(?i)timed? ?out|\b50[0234]\b|unavailable|connection|temporar"),
      "{service} did not answer. Try again"),

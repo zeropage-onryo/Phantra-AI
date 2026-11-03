@@ -96,7 +96,11 @@ from . import ledger, providers, timeline
 # more competitive"): thin on the brand-name models people come for
 # (Seedance 1.4x, Veo 3.1 1.15x), 2.0x on LTX, Veo 3.1 Fast added at 1.5x.
 # A v4 token carries a price this version would not show; v4 is retired.
-PRICING_VERSION = "2026-11-02-fal-v5"
+#
+# v6 (2026-11-02, the same day): Seedance 2.5 at 480p / 720p renders on
+# Replicate at half fal's price (fal.host_for, src/replicate.py), so a v5
+# token for it carries a price this version would not show; v5 is retired.
+PRICING_VERSION = "2026-11-02-fal-v6"
 # A token minted under a version not listed here is refused as
 # `retired_pricing`: prices changed, re-quote. Retire a version by removing
 # it, never by changing what it means.

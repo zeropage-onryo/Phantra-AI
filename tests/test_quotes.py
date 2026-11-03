@@ -127,8 +127,10 @@ def test_a_retired_pricing_version_is_retired_pricing(signing, monkeypatch):
 def test_a_v2_token_refuses_as_retired_pricing(signing, monkeypatch):
     # v4 since 2026-10-27 (a markup per video model): v3 is retired too;
     # v5 since 2026-11-02 (two markups): v4 is retired too
-    assert pricing.PRICING_VERSION == "2026-11-02-fal-v5"
+    # v6 the same day (Seedance 2.5 on Replicate): v5 is retired too
+    assert pricing.PRICING_VERSION == "2026-11-02-fal-v6"
     assert "2026-10-27-fal-v4" not in pricing.SUPPORTED_PRICING_VERSIONS
+    assert "2026-11-02-fal-v5" not in pricing.SUPPORTED_PRICING_VERSIONS
     assert "2026-09-18-video-v2" not in pricing.SUPPORTED_PRICING_VERSIONS
     assert "2026-09-26-fal-v3" not in pricing.SUPPORTED_PRICING_VERSIONS
     monkeypatch.setattr(pricing, "PRICING_VERSION", "2026-09-18-video-v2")
