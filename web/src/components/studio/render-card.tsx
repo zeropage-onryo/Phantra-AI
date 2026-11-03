@@ -245,6 +245,9 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
                 ? `Need ${plan.credits!.toLocaleString("en-US")} cr · have ${Math.max(balance!.available, 0).toLocaleString("en-US")}`
                 : renderText(plan, exempt, isDraft(spec, pick));
   const providerIds = Object.keys(renderers);
+  // Seedance refuses a real person's photo on every host (src/people_refs.py):
+  // said before the click, never a lock, since a drawn character renders fine
+  const peopleNote = pick && (scene.people_refusers || []).includes(pick.model) ? scene.people_note || "" : "";
   const why = locked
     ? `Cannot render yet · ${scene.blocked || "no reference photos attached"}`
     : done.state === "done"
@@ -396,6 +399,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
       <p className={`${NOTE} ${locked ? "text-noir-danger!" : ""}`} role={locked ? "alert" : undefined}>
         {why}
       </p>
+      {peopleNote ? <p className={`${NOTE} text-noir-red2`}>{peopleNote}</p> : null}
       {/* what the shot planner put back and what will not fit (src/timeline.py
           keep): a reference it had left off every shot, a shot with no photos,
           a voiceover longer than its window. Facts, not a lock: Render stays. */}

@@ -341,6 +341,11 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.
+- **Seedance refuses a real person's photo as a reference, on every host** (2026-11-02,
+  `src/people_refs.py`, `docs/tasks/task-seedance-people.md`): the Render card says so when the
+  scene holds a person (a `subject` role or a character's photo) and Seedance is picked, the
+  refusal names Kling 4.0 / Veo 3.1, and Vesper's picks never put a real person on Seedance.
+  Advice, not a lock.
 - **No photographs, no render.** `preprod.reference_gate` is the one predicate: a scene written
   with no refs is a draft (the connector says `needs_reference`) and every quote and approve
   refuses it. This is the ONE place output is rejected rather than warned about. It guards
