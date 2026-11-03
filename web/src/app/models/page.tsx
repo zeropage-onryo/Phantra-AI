@@ -227,8 +227,8 @@ export default function ModelsPage() {
                 Every plan renders every model, with nothing to connect and no second bill. The Render card shows each
                 clip&apos;s price in credits before you approve it.
               </p>
-              <Button size="lg" variant="outline" className="mt-7" render={<Link href="/pricing#models" />}>
-                Compare what a month buys
+              <Button size="lg" variant="outline" className="mt-7" render={<Link href="/pricing" />}>
+                See what each plan buys
                 <ArrowRight data-icon="inline-end" className="size-4" />
               </Button>
             </div>

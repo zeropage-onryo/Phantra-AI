@@ -92,14 +92,17 @@ def commissions(dsn, partner_acct):
 
 def test_the_terms_are_mikes_numbers():
     t = {x.key: (x.rate_bp, x.window_months, x.min_paying) for x in affiliates.TIERS}
-    assert t == {"starter": (2500, 6, 0), "pro": (3000, 6, 10), "partner": (3500, 12, 50)}
+    assert t == {"starter": (2500, 6, 0), "pro": (3000, 6, 10), "partner": (3000, 12, 50)}
     assert affiliates.tier_for_count(0).key == "starter"
     assert affiliates.tier_for_count(9).key == "starter"
     assert affiliates.tier_for_count(10).key == "pro"
     assert affiliates.tier_for_count(49).key == "pro"
-    assert affiliates.tier_for_count(50).key == "partner"
+    # Partner is by approval: 50 alone earns at Pro until Mike grants it
+    assert affiliates.tier_for_count(50).key == "pro"
+    assert affiliates.tier_for_count(50, True).key == "partner"
+    assert affiliates.tier_for_count(49, True).key == "pro"
     pub = affiliates.public_terms()
-    assert [x["percent"] for x in pub["tiers"]] == [25.0, 30.0, 35.0]
+    assert [x["percent"] for x in pub["tiers"]] == [25.0, 30.0, 30.0]
     assert pub["hold_days"] == 60 and pub["buyer_discount_percent"] == 10
 
 
@@ -265,6 +268,31 @@ def test_a_tier_is_locked_at_the_referrals_first_payment(world):
         w = conn.execute("SELECT window_months FROM affiliate_referrals WHERE referred_account_id = %s",
                          (late,)).fetchone()
     assert w["window_months"] == 6
+    assert affiliates.summary(partner, dsn=world)["tier"]["key"] == "pro"
+
+
+def test_partner_tier_needs_fifty_payers_and_mikes_grant(world):
+    partner, _ = approved_partner(world, "ana")
+
+    def pay_one(i):
+        b = make_account(world, f"p{i}")
+        affiliates.attribute(b, "ana", dsn=world)
+        affiliates.on_invoice_paid(b, invoice(300 + i), now=T0, dsn=world)
+
+    for i in range(50):
+        pay_one(i)
+    pay_one(50)                                    # 51st payer, not granted: Pro
+    affiliates.grant_partner("ana", dsn=world)
+    pay_one(51)                                    # granted: Partner, 30% for 12 months
+    by_invoice = {r["invoice_ref"]: r for r in commissions(world, partner)}
+    assert by_invoice["in_350"]["rate_bp"] == 3000
+    assert by_invoice["in_351"]["rate_bp"] == 3000
+    with db.connect(world) as conn:
+        w = {r["referred_account_id"]: r["tier_key"] for r in conn.execute(
+            "SELECT referred_account_id, tier_key FROM affiliate_referrals WHERE tier_key IS NOT NULL").fetchall()}
+    assert sorted(set(w.values())) == ["pro", "partner", "starter"] or set(w.values()) >= {"pro", "partner"}
+    assert affiliates.summary(partner, dsn=world)["tier"]["key"] == "partner"
+    affiliates.grant_partner("ana", False, dsn=world)
     assert affiliates.summary(partner, dsn=world)["tier"]["key"] == "pro"
 
 

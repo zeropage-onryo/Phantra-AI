@@ -79,7 +79,7 @@ export function LinkApp() {
     <main className="zset mx-auto w-full max-w-[600px]">
       <h1 className="text-xl font-semibold">Connect an app</h1>
       <p className="mt-1 text-sm opacity-70">
-        Sign an editing app in to your Phantra studio, like the Phantra panel in DaVinci Resolve or Premiere Pro.
+        Sign an editing app in to your Phantra studio, like the Phantra panel in DaVinci Resolve, Premiere Pro or Blender.
       </p>
 
       <div className="mt-6">

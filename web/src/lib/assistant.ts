@@ -314,11 +314,49 @@ export const putProject = (turns: unknown[], stage: string, draft?: ComposerDraf
     headers: GUARDED_HEADERS,
     body: JSON.stringify(draft ? { turns, stage, draft } : { turns, stage }),
   });
-/* Clear the conversation: DELETED on the server, never archived (2026-10-02,
-   Mike's call -- a conversation is working memory; what it made is on the
-   concept, and a render carries its prompt on the Assets wall). */
-export const clearProject = () =>
-  apiFetch<{ ok: boolean }>("/assistant/project", { method: "DELETE", headers: GUARDED_HEADERS });
+/* Start a new session (2026-11-03): the open chat is KEPT in the history
+   drawer, deleted only if nothing was said in it. `forget` deletes it --
+   for a conversation just filed into a project (save_as_project). */
+export const clearProject = (forget = false) =>
+  apiFetch<{ ok: boolean }>(`/assistant/project${forget ? "?forget=1" : ""}`, {
+    method: "DELETE",
+    headers: GUARDED_HEADERS,
+  });
+
+/* ── the history drawer (2026-11-03, Mike's "C2") ──
+   Every kept chat, grouped by the project it ran in. A chat on its own is
+   deleted `keep_days` after it was last used; its countdown shows only in
+   the last week (COUNTDOWN_DAYS). */
+export type ChatSummary = {
+  id: number;
+  title: string;
+  project_id: number | null;
+  updated_at: string;
+  open: boolean;
+  turns: number;
+  /** whole days until a chat on its own is deleted; null inside a project */
+  days_left: number | null;
+};
+export type ChatProject = { id: number; title: string; updated_at: string; messages: number };
+export type ChatList = { chats: ChatSummary[]; projects: ChatProject[]; keep_days: number };
+export const COUNTDOWN_DAYS = 7;
+export const listChats = () => apiFetch<ChatList>("/assistant/chats");
+export const openChatOnServer = (id: number) =>
+  apiFetch<{ project: SavedProject }>(`/assistant/chats/${id}/open`, { method: "POST", headers: GUARDED_HEADERS });
+export const deleteChat = (id: number) =>
+  apiFetch<{ ok: boolean }>(`/assistant/chats/${id}`, { method: "DELETE", headers: GUARDED_HEADERS });
+/* the header's History button and the sheet's clock ask the drawer to open
+   through a window event, like New session (the shell sits above it) */
+export const HISTORY_EVENT = "phantra:chat-history";
+export function requestHistory() {
+  window.dispatchEvent(new Event(HISTORY_EVENT));
+}
+/* "4 days left" in the last week, else nothing */
+export function countdown(daysLeft: number | null): string {
+  if (daysLeft === null || daysLeft > COUNTDOWN_DAYS) return "";
+  if (daysLeft <= 0) return "clears today";
+  return daysLeft === 1 ? "1 day left" : `${daysLeft} days left`;
+}
 /* the Keep click against the checker, one entry per frame the sheet showed */
 export type FrameVerdict = {
   id: string;

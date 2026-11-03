@@ -55,7 +55,7 @@ const FAQ: { q: string; a: string }[] = [
 
 export default function AffiliatesPage() {
   return (
-    <EditorialSkin style={{ "--mari": "#FFC800" } as CSSProperties}>
+    <EditorialSkin style={{ "--mari": "#F3F48B" } as CSSProperties}>
       <SiteHeader />
       <main className="flex-1">
         {/* hero: one big claim over a frame of real studio output */}
@@ -118,9 +118,9 @@ export default function AffiliatesPage() {
               {T.tiers.map((t) => (
                 <li key={t.key} className="rounded-[14px] border border-border bg-card p-6">
                   <p className="text-[15px] text-[#afafaf]">{t.label}</p>
-                  <p className="serif mt-2 text-[clamp(3rem,6vw,4rem)] tabular-nums text-[var(--mari,#FFC800)]">{t.percent}%</p>
+                  <p className="serif mt-2 text-[clamp(3rem,6vw,4rem)] tabular-nums text-[var(--mari,#F3F48B)]">{t.percent}%</p>
                   <p className="mt-1 text-[16px] text-foreground">for {t.months} months of each referral’s payments</p>
-                  <p className="mt-4 text-[16px] text-[#afafaf]">{t.min_paying === 0 ? "From day one." : `After ${t.min_paying} paying referrals.`}</p>
+                  <p className="mt-4 text-[16px] text-[#afafaf]">{t.min_paying === 0 ? "From day one." : `After ${t.min_paying} paying referrals, with our approval.`}</p>
                 </li>
               ))}
             </ul>

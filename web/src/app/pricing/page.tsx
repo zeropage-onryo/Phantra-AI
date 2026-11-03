@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
 import { EditorialSkin } from "@/components/editorial-skin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -8,7 +9,7 @@ import { PlanButton } from "@/components/site/plan-button";
 import { PlanCards } from "@/components/site/plan-cards";
 import { CheckoutNotice } from "@/components/site/checkout-notice";
 import { FaqList } from "@/components/site/faq-list";
-import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, monthsLabel, num, usd } from "@/lib/catalog";
+import { CATALOG, TOPUP, monthsLabel, num, usd } from "@/lib/catalog";
 import { pageMeta } from "@/lib/page-meta";
 
 export const metadata: Metadata = pageMeta({
@@ -53,53 +54,6 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* compare -- /models links here (2026-10-20) */}
-        <section id="models" className="scroll-mt-20 border-t border-border">
-          <div className="mx-auto max-w-[1200px] px-6 py-20">
-            <div className="max-w-[640px]">
-              <span className="eyebrow">Compare models across plans</span>
-              <h2 className="serif mt-5 text-[clamp(2rem,4.2vw,3.25rem)]">What a month buys.</h2>
-              <p className="mt-5 text-[17px] leading-relaxed text-[#afafaf]">
-                Clips per month, at {CATALOG.clip_seconds} seconds each, priced by the same tables the Render card prices
-                with. Every plan renders every model.
-              </p>
-            </div>
-            <div className="mt-10 overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-[12px] uppercase tracking-[0.06em] text-[#82807d]">
-                    <th className="py-3 pr-4 font-medium">Model</th>
-                    <th className="py-3 pr-4 font-medium">Credits / clip</th>
-                    {PLANS.map((p) => (
-                      <th key={p.key} className="py-3 pr-4 font-medium text-foreground">
-                        {p.name}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {MODELS.map((m) => (
-                    <tr key={m.model} className="border-b border-border">
-                      <td className="py-3.5 pr-4">
-                        <span className="font-medium text-foreground">{m.name}</span>
-                        <span className="ml-2 text-[12px] text-[#82807d]">{TIER_LABEL[m.tier]}</span>
-                      </td>
-                      <td className="py-3.5 pr-4 text-[#c6c4c0]">
-                        {num(m.credits)} / {m.seconds}s
-                      </td>
-                      {PLANS.map((p) => (
-                        <td key={p.key} className="py-3.5 pr-4 text-[#c6c4c0]">
-                          {`${num(clipsPerMonth(p, m))} clips`}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
         {/* billing faq */}
         <section className="border-t border-border">
           <div className="mx-auto max-w-[760px] px-6 py-20">
@@ -123,8 +77,9 @@ const BILLING_FAQ = [
       <p>
         One credit is one US cent. When you render a scene, its Render card shows the price in credits;
         that exact amount is held from your balance, the clip renders, and the hold settles. The price is the
-        model&apos;s own rate for the length you picked, so a {CATALOG.clip_seconds}-second LTX clip and a
-        {CATALOG.clip_seconds}-second Veo clip cost very different amounts — the table above is the honest map.
+        model&apos;s own rate for the length you picked, so a {CATALOG.clip_seconds}-second LTX clip and a{" "}
+        {CATALOG.clip_seconds}-second Veo clip cost very different amounts. Each model&apos;s page under{" "}
+        <Link href="/models">Models</Link> shows its price.
       </p>
     ),
   },

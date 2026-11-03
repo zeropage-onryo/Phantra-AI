@@ -67,9 +67,17 @@ from urllib.parse import urlparse
 from . import db
 
 ENV = "PHANTRA_WATERMARK"
-TEXT = "Phantra"
-SIGNAL_RED = (228, 0, 43)      # the studio's --signal
-OPACITY = 0.78                 # the mark's own alpha, over the picture
+TEXT = "Phantra"                # the fallback mark when the lockup file cannot be read
+# The site's lockup -- the owl hiding behind the hand-drawn lowercase
+# "phantra" -- with the owl in the landing page's yellow (--lemon) and the
+# lettering white, since 2026-11-03 (Mike: "the yellow logo one and replicate
+# the lettering on the main landing page", then "keep phantra lettering white");
+# it replaced the red dot. Drawn from the site's own paths by
+# ops/watermark_lockup_png.py and kept beside the code so `src` reads no file
+# from `web/`.
+LOGO_PATH = Path(__file__).resolve().parent / "assets" / "watermark_lockup.png"
+LOGO_WIDTH_SHARE = 0.24        # the lockup's width against the frame's short side
+OPACITY = 0.9                  # the mark's own alpha, over the picture
 FONT_SHARE = 0.04              # the text's height against the frame's short side
 MIN_FONT = 14
 MARGIN_SHARE = 0.03            # distance from the right and bottom edges
@@ -174,42 +182,67 @@ def markable(path: Path) -> Optional[str]:
 # drawing it
 # --------------------------------------------------------------------------
 
-def mark_layer(width: int, height: int):
-    """A transparent RGBA layer the size of the frame with the mark drawn
-    in its bottom-right corner: a red dot and the studio's name, white,
-    over a soft shadow so it reads on a light frame as well as a dark one.
-    The same layer marks a still and every frame of a clip."""
-    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+def _lockup(width: int):
+    """The yellow lockup scaled to `width` pixels wide, RGBA, or None when the
+    file is missing or unreadable -- the mark then falls back to the name in
+    plain type rather than failing the render (the module fails open)."""
+    from PIL import Image
+    try:
+        with Image.open(LOGO_PATH) as im:
+            im = im.convert("RGBA")
+            height = max(1, int(round(im.height * width / im.width)))
+            return im.resize((width, height), Image.LANCZOS)
+    except Exception as e:  # noqa: BLE001
+        _log(f"lockup not drawn ({type(e).__name__}); marking with the name only")
+        return None
 
-    short = max(1, min(width, height))
+
+def _faded(im, alpha: float):
+    """`im` with every pixel's alpha scaled by `alpha`."""
+    from PIL import Image
+    r, g, b, a = im.split()
+    return Image.merge("RGBA", (r, g, b, a.point(lambda v: int(round(v * alpha)))))
+
+
+def _name_only(short: int):
+    """The fallback mark: the name in white on Pillow's bundled font."""
+    from PIL import Image, ImageDraw, ImageFont
     size = max(MIN_FONT, int(round(short * FONT_SHARE)))
     try:
         font = ImageFont.load_default(size=size)
     except TypeError:                               # Pillow < 10.1
         font = ImageFont.load_default()
-    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    left, top, right, bottom = probe.textbbox((0, 0), TEXT, font=font)
-    text_w, text_h = right - left, bottom - top
-    dot = max(4, int(round(size * 0.42)))
-    gap = max(3, int(round(size * 0.35)))
-    margin = max(8, int(round(short * MARGIN_SHARE)))
-    x1 = width - margin
-    x0 = x1 - (dot + gap + text_w)
-    y1 = height - margin
-    y0 = y1 - text_h
-    alpha = int(round(255 * OPACITY))
+    left, top, right, bottom = ImageDraw.Draw(Image.new("RGBA", (1, 1))).textbbox((0, 0), TEXT, font=font)
+    mark = Image.new("RGBA", (right - left, bottom - top), (0, 0, 0, 0))
+    ImageDraw.Draw(mark).text((-left, -top), TEXT, font=font, fill=(255, 255, 255, 255))
+    return mark
 
+
+def mark_layer(width: int, height: int):
+    """A transparent RGBA layer the size of the frame with the mark drawn
+    in its bottom-right corner: the site's lockup (the owl behind the
+    lowercase "phantra"), the owl yellow and the word white, over a soft dark
+    shadow so it reads on a light frame as well as a dark one. The same
+    layer marks a still and every frame of a clip."""
+    from PIL import Image, ImageFilter
+
+    short = max(1, min(width, height))
+    mark = _lockup(max(24, int(round(short * LOGO_WIDTH_SHARE)))) or _name_only(short)
+    margin = max(8, int(round(short * MARGIN_SHARE)))
+    xy = (width - margin - mark.width, height - margin - mark.height)
+
+    # the shadow is the mark's own silhouette, grown a little and softened:
+    # a dark rim that keeps a pale yellow readable on a white frame
+    grow = max(1, mark.height // 14) * 2 + 1                  # MaxFilter takes an odd size
+    rim = mark.getchannel("A").filter(ImageFilter.MaxFilter(grow))
+    silhouette = Image.new("RGBA", mark.size, (0, 0, 0, 0))
+    silhouette.putalpha(rim.point(lambda v: int(v * 0.6)))
     shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    sd.text((x0 + dot + gap - left, y0 - top), TEXT, font=font, fill=(0, 0, 0, 150))
-    cy = y0 + text_h // 2
-    sd.ellipse((x0, cy - dot // 2, x0 + dot, cy - dot // 2 + dot), fill=(0, 0, 0, 150))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(max(1, size // 8)))
+    shadow.alpha_composite(silhouette, dest=xy)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(max(1, mark.height // 16)))
 
     layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    d.ellipse((x0, cy - dot // 2, x0 + dot, cy - dot // 2 + dot), fill=(*SIGNAL_RED, alpha))
-    d.text((x0 + dot + gap - left, y0 - top), TEXT, font=font, fill=(255, 255, 255, alpha))
+    layer.alpha_composite(_faded(mark, OPACITY), dest=xy)
     return Image.alpha_composite(shadow, layer)
 
 

@@ -45,6 +45,7 @@ import {
   Coins,
   FolderKanban,
   Handshake,
+  History,
   House,
   ImageIcon,
   Layers,
@@ -79,11 +80,12 @@ import { PhoneMenu, PhoneTabs, PhoneTop } from "@/components/studio/phone/phone-
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
-import { requestNewSession } from "@/lib/assistant";
+import { requestHistory, requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 import { halloweenOn } from "@/lib/effects-wall";
 import { EDITOR_IN_UI } from "@/lib/editor-flag";
+import { SignedOutWall } from "@/components/studio/signed-out-wall";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
@@ -163,6 +165,12 @@ const BLURB: Partial<Record<ViewId, string>> = {
   cut: "The timeline editor",
   renders: "What is rendering and done",
 };
+
+/* The pages that need an account (2026-11-03, QA P14): signed out, the
+   shell draws the sign-up wall in their place instead of letting them
+   fire reads that 401. Create, Image and Video take a prompt signed out;
+   Settings draws its own sign-in card. */
+const WALLED = new Set<ViewId>(["projects", "assets", "elements", "brand", "calendar", "ads", "renders", "cut"]);
 
 const VIEW_BY_PATH: [string, ViewId][] = [
   // settings is reached from the account menus, not the rail (2026-10-03):
@@ -602,6 +610,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
     .map((w) => w[0] || "")
     .join("")
     .toUpperCase();
+  // signed in again, a visitor comes back to the page they were on
+  const here = pathname;
+  const page = signedOut && WALLED.has(view) ? <SignedOutWall view={view} /> : children;
 
   return (
     <Ctx.Provider value={{ me, refreshMe, signedOut, workspace, balance, toast, setBar }}>
@@ -731,6 +742,17 @@ export function StudioShell({ children }: { children: ReactNode }) {
               {!signedOut && me?.account ? (
                 <button
                   type="button"
+                  className="hsearch"
+                  onClick={() => requestHistory()}
+                  aria-label="Chat history"
+                  title="Chat history"
+                >
+                  <History size={15} strokeWidth={1.7} />
+                </button>
+              ) : null}
+              {!signedOut && me?.account ? (
+                <button
+                  type="button"
                   className="hnew"
                   title="Start a new session -- this one is kept"
                   onClick={() => {
@@ -741,34 +763,47 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   New session
                 </button>
               ) : null}
-              <span className="havatar-wrap">
-                <button
-                  type="button"
-                  className="havatar"
-                  aria-haspopup="menu"
-                  aria-expanded={hmenu}
-                  title={signedOut ? "Sign in" : `${who} · account`}
-                  onClick={() => (signedOut ? goToSignIn() : setHmenu((v) => !v))}
-                >
-                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "P"}
-                </button>
-                {hmenu && me ? (
-                  <span className="rmenu hmenu" role="menu">
-                    <span className="m">{who}</span>
-                    {me.accounts.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        aria-current={a.slug === workspace ? "true" : undefined}
-                        onClick={() => pickAccount(a.slug)}
-                      >
-                        {a.label}
-                      </button>
-                    ))}
-                    <MenuTail close={() => setHmenu(false)} />
-                  </span>
-                ) : null}
-              </span>
+              {/* signed out (2026-11-03, QA P14): the two doors in words,
+                  where the account's avatar would be */}
+              {signedOut ? (
+                <>
+                  <button type="button" className="hlogin" onClick={() => goToSignIn(undefined, here)}>
+                    Log in
+                  </button>
+                  <button type="button" className="hsignup" onClick={() => goToSignIn("signup", here)}>
+                    Sign up
+                  </button>
+                </>
+              ) : (
+                <span className="havatar-wrap">
+                  <button
+                    type="button"
+                    className="havatar"
+                    aria-haspopup="menu"
+                    aria-expanded={hmenu}
+                    title={`${who} · account`}
+                    onClick={() => setHmenu((v) => !v)}
+                  >
+                    {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "P"}
+                  </button>
+                  {hmenu && me ? (
+                    <span className="rmenu hmenu" role="menu">
+                      <span className="m">{who}</span>
+                      {me.accounts.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          aria-current={a.slug === workspace ? "true" : undefined}
+                          onClick={() => pickAccount(a.slug)}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                      <MenuTail close={() => setHmenu(false)} />
+                    </span>
+                  ) : null}
+                </span>
+              )}
             </span>
           </header>
           {down ? (
@@ -779,7 +814,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
               </button>
             </div>
           ) : null}
-          {stage ? <div className="stage">{children}</div> : children}
+          {stage ? <div className="stage">{page}</div> : page}
         </div>
         <PhoneTabs caps={caps} unseen={unseen} />
         <PhoneMenu open={pmenu} onClose={closePmenu} caps={caps} />

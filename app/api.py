@@ -1036,6 +1036,13 @@ async def creative_guide_reply(request: Request,
     # when the client asks (`remember=1`) and only inside a project: the
     # studio-wide thread outside any project stays working memory.
     remember = project is not None and (form.get("remember") or "").strip() in ("1", "true", "on")
+    # THE HISTORY DRAWER (2026-11-03): a Create turn outside the project's
+    # own workspace files the open chat under the project, so the drawer
+    # lists it in that project's folder and it is kept as long as the
+    # project is. Best-effort, never fails the turn.
+    if project is not None and not remember:
+        from src import assistant_store
+        assistant_store.tag_project(project["id"], account_id=account_id)
     # ... and an ask sent AGAIN ("Switch to Make" on an exploring project's
     # card sends the same message once more) is already in that history:
     # only its new answer is written
@@ -1420,13 +1427,45 @@ async def assistant_project_save(request: Request,
 @router.delete("/assistant/project")
 async def assistant_project_clear(request: Request,
                                   account_id: int = Depends(auth.current_account_id)):
-    """Clear the conversation: the row is DELETED, never archived
-    (2026-10-02, Mike's call -- a conversation is working memory; what it
-    made is on the concept). The pill's button and a finished Create both
-    end here."""
+    """Start a new session. Since 2026-11-03 the open chat is KEPT in the
+    history drawer (deleted only if nothing was said in it); `?forget=1`
+    deletes it instead, for a conversation just filed into a project."""
     model_connections.mutation_header(request)
     from src import assistant_store
-    assistant_store.clear_project(account_id=account_id)
+    forget = (request.query_params.get("forget") or "").strip() in ("1", "true", "on")
+    assistant_store.clear_project(account_id=account_id, forget=forget)
+    return {"ok": True}
+
+
+# --- the history drawer (2026-11-03, Mike's "C2") ------------------------------
+# Every kept chat, grouped in the page by the project it ran in; a chat on
+# its own is deleted 14 days after it was last used (src/assistant_store.py).
+
+@router.get("/assistant/chats")
+def assistant_chats(account_id: int = Depends(auth.current_account_id)):
+    from src import assistant_store
+    return assistant_store.list_chats(account_id=account_id)
+
+
+@router.post("/assistant/chats/{chat_id}/open")
+async def assistant_chat_open(chat_id: int, request: Request,
+                              account_id: int = Depends(auth.current_account_id)):
+    """Make a kept chat the open one; the chat open now is kept."""
+    model_connections.mutation_header(request)
+    from src import assistant_store
+    chat = assistant_store.open_chat(chat_id, account_id=account_id)
+    if chat is None:
+        return _error(404, "no_chat", f"no chat {chat_id}")
+    return {"project": chat}
+
+
+@router.delete("/assistant/chats/{chat_id}")
+async def assistant_chat_delete(chat_id: int, request: Request,
+                                account_id: int = Depends(auth.current_account_id)):
+    model_connections.mutation_header(request)
+    from src import assistant_store
+    if not assistant_store.delete_chat(chat_id, account_id=account_id):
+        return _error(404, "no_chat", f"no chat {chat_id}")
     return {"ok": True}
 
 
