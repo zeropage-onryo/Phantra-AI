@@ -56,7 +56,9 @@ import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card"
 import { EffectStep } from "@/components/studio/effect-step";
 import type { Effect, EffectState } from "@/lib/effects";
 import { TalkingPhotoStep } from "@/components/studio/talking-photo-step";
+import { DubbingStep } from "@/components/studio/dubbing-step";
 import type { PhotoChoice, TalkMenu, TalkState } from "@/lib/talking-photo";
+import type { ClipChoice, DubMenu, DubState } from "@/lib/dubbing";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
 import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
@@ -150,6 +152,14 @@ type Handlers = {
   onTalkPatch: (id: string, fn: (s: TalkState) => TalkState) => void;
   onTalkApprove: (id: string, credits: number, charged: boolean) => void;
   onTalkError: (why: string) => void;
+  /** a dub's card (lib/dubbing.ts): its menu, the clips it offers, the
+   *  project a clip is filed under, a change applied to the card's current
+   *  state, and the Render click */
+  dubMenu: DubMenu | null;
+  dubChoices: ClipChoice[];
+  dubProject: number | null;
+  onDubPatch: (id: string, fn: (s: DubState) => DubState) => void;
+  onDubApprove: (id: string, credits: number, charged: boolean) => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -810,6 +820,17 @@ export function ComposerStream({
                     onPatch={(fn) => handlers.onTalkPatch(t.talk?.id ?? "", fn)}
                     onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
                     onError={handlers.onTalkError}
+                  />
+                ) : null}
+                {t.dub ? (
+                  <DubbingStep
+                    turn={t}
+                    menu={handlers.dubMenu}
+                    choices={handlers.dubChoices}
+                    busy={handlers.busy}
+                    projectId={handlers.dubProject}
+                    onPatch={(fn) => handlers.onDubPatch(t.dub?.id ?? "", fn)}
+                    onApprove={(credits, charged) => handlers.onDubApprove(t.dub?.id ?? "", credits, charged)}
                   />
                 ) : null}
                 {isSheetStep(t) ? (

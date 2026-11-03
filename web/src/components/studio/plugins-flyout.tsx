@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { CHATGPT_PLUGIN_URL } from "@/lib/connect-claude";
 import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
 
 /** `logo` is the company's own icon, saved from its live site into
@@ -10,14 +11,14 @@ import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from 
 type Plugin = { name: string; href?: string; icon?: LucideIcon; logo?: string };
 type Group = { label: string; items: Plugin[] };
 
-/* The rail's Plugins row and its flyout (plan 2026-10-16). Live rows link out
+/* The nav's Plugins entry and its flyout (plan 2026-10-16). Live rows link out
    to the page where each client adds the Phantra connector. Everything else is
    listed so people can see what is coming, and reads as disabled. */
 export const PLUGIN_GROUPS: Group[] = [
   {
     label: "MCP",
     items: [
-      { name: "ChatGPT", href: "https://chatgpt.com/plugins", logo: "/brand/plugins/chatgpt.svg" },
+      { name: "ChatGPT", href: CHATGPT_PLUGIN_URL, logo: "/brand/plugins/chatgpt.svg" },
       { name: "Claude", href: "https://claude.ai/customize/connectors", logo: "/brand/plugins/claude.svg" },
       { name: "Grok Bot", logo: "/brand/plugins/grok.svg" },
       { name: "Muse", icon: Music2 },
@@ -35,10 +36,11 @@ export const PLUGIN_GROUPS: Group[] = [
   { label: "For developers", items: [{ name: "Developer API", icon: Code }] },
 ];
 
-/** The Plugins row for the studio rail. The flyout is portalled to the body
- *  because the rail clips its children, and it opens to the right of the row.
- *  Under 720px it becomes a bottom sheet over a tap-to-close backdrop. */
-export function PluginsRailItem() {
+/** The Plugins entry for the studio's top nav. The flyout is portalled to the
+ *  body because the nav scrolls sideways (and so clips its children), and it
+ *  opens under the button. Under 720px it becomes a bottom sheet over a
+ *  tap-to-close backdrop. */
+export function PluginsNavItem() {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -46,10 +48,10 @@ export function PluginsRailItem() {
 
   useEffect(() => {
     if (!open) return;
-    // Placed once on open, while the pointer is still in the widened rail.
+    // Placed under the button, kept inside the window's right edge.
     const place = () => {
       const r = btn.current?.getBoundingClientRect();
-      if (r) setPos({ top: r.top, left: r.right + 8 });
+      if (r) setPos({ top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 340)) });
     };
     place();
     const onDown = (e: MouseEvent) => {
@@ -83,8 +85,8 @@ export function PluginsRailItem() {
         title="Plugins"
         onClick={() => setOpen((v) => !v)}
       >
-        <Puzzle strokeWidth={1.35} />
-        <span className="rl">Plugins</span>
+        <Puzzle strokeWidth={1.5} />
+        <span className="hl">Plugins</span>
       </button>
       {open && pos && typeof document !== "undefined"
         ? createPortal(

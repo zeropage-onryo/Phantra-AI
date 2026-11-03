@@ -28,6 +28,7 @@ import {
   Film,
   FolderInput,
   Image as ImageIcon,
+  Languages,
   Link2Off,
   Maximize,
   Scissors,
@@ -41,6 +42,7 @@ import {
 import { OpenInEditor } from "@/components/cut/open-in-editor";
 import { API_URL } from "@/lib/api";
 import {
+  getCapabilities,
   getShare,
   renderDownloadHref,
   sceneHref,
@@ -220,6 +222,18 @@ export function AssetViewer({
   const [copied, setCopied] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
+  // the Voice section is on (the `voice_tab` capability): Dub opens it there
+  // rather than in the composer. Asked once; off, or unknown, is the composer.
+  const [voiceTab, setVoiceTab] = useState(false);
+  useEffect(() => {
+    let live = true;
+    getCapabilities()
+      .then((c) => live && setVoiceTab(c.voice_tab === true))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
   // a new render resets everything that described the last one
   const [shownUrl, setShownUrl] = useState(item.url);
   if (shownUrl !== item.url) {
@@ -590,7 +604,7 @@ export function AssetViewer({
               Use in studio <ArrowRight strokeWidth={2.2} />
             </Link>
           )}
-          <div className={`av-second${isClip ? " one" : ""}`}>
+          <div className={`av-second${isClip && !item.generated_id ? " one" : ""}`}>
             {!isClip ? (
               <button type="button" className="av-sec" onClick={onMakeElement} title="Save this still as a character, prop or place">
                 <UserRound strokeWidth={1.8} /> Make element
@@ -601,6 +615,17 @@ export function AssetViewer({
               // opens ON this render (browsing is free, a pick shows its price)
               <Link href={`/studio?on=gen:${item.generated_id}`} className="av-sec" title="Change it with an effect">
                 <Wand2 strokeWidth={1.8} /> Effects
+              </Link>
+            ) : null}
+            {isClip && item.generated_id ? (
+              // dub it: the studio's dub card opens ON this clip (nothing is
+              // spent there; the card shows the price and waits for a click)
+              <Link
+                href={voiceTab ? `/studio/voice?model=dub&on=gen:${item.generated_id}` : `/studio?dub=gen:${item.generated_id}`}
+                className="av-sec"
+                title="Speak it again in another language"
+              >
+                <Languages strokeWidth={1.8} /> Dub
               </Link>
             ) : null}
           </div>

@@ -15,7 +15,7 @@ import { SectionTitle } from "@/landing-pages/components/section-title";
 import { pagesIn, makePath } from "@/landing-pages/pages";
 import { IMAGE_MODELS, pageLabel } from "@/landing-pages/shared";
 import { MODELS } from "@/lib/catalog";
-import { CONNECTOR_NAME } from "@/lib/connect-claude";
+import { CHATGPT_PLUGIN_URL, CONNECTOR_NAME } from "@/lib/connect-claude";
 import { pageMeta } from "@/lib/page-meta";
 import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 
@@ -48,7 +48,6 @@ import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 const ORIGIN = "https://api.phantra.ai";
 const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 const PLUGIN_URL = "https://github.com/zeropage-onryo/phantra-claude-plugin";
-const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
 const CHATGPT_HELP_URL = "https://help.openai.com/en/articles/11487775-connected-apps-in-chatgpt";
 
 export const metadata: Metadata = pageMeta({
@@ -66,13 +65,11 @@ export const metadata: Metadata = pageMeta({
 // ids). Claude's button opens claude.ai's Add custom connector dialog with the
 // name and address already filled in (claude.ai reads `connectorName` and
 // `connectorUrl`; found on higgsfield.ai/mcp 2026-10-16). ChatGPT's cannot be
-// opened filled in: its "Add custom MCP server" dialog lives at chatgpt.com/plugins
-// with no URL of its own and reads no URL parameters (checked in a real session,
-// 2026-10-16). So the ChatGPT button opens that page AND copies the address in
-// the same click.
-// TODO: once the ChatGPT directory listing is approved, point the ChatGPT button
-// at `https://chatgpt.com/plugins/<slug>?open_in_app=1` (a one-click install, the
-// way higgsfield.ai/mcp does it) and drop `copyAlso`.
+// opened filled in, but since 2026-11-02 Phantra is a published plugin in
+// ChatGPT's directory, so the ChatGPT button opens that listing
+// (CHATGPT_PLUGIN_URL), where one Add installs it. The custom-MCP-server route
+// (paste the address) is still described for workspaces that can't install
+// directory plugins.
 const START_PROMPT = "Using Phantra, draw me a poster for a coffee brand and show me the price first.";
 const CLAUDE_ADD = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(CONNECTOR_NAME)}&connectorUrl=${encodeURIComponent(RENDER_ADDRESS)}`;
 const CLAUDE_START = `https://claude.ai/new?q=${encodeURIComponent(START_PROMPT)}`;
@@ -89,9 +86,7 @@ const HERO_CLIENTS: HeroClient[] = [
     label: "ChatGPT",
     button: {
       label: "Connect Phantra",
-      href: CHATGPT_PLUGINS_URL,
-      copyAlso: RENDER_ADDRESS,
-      copiedHint: "Paste it in ChatGPT: Add → Add custom MCP server",
+      href: CHATGPT_PLUGIN_URL,
       logo: "openai",
       ...WHITE_TONE,
     },
@@ -106,9 +101,9 @@ const HERO_CLIENTS: HeroClient[] = [
         },
         {
           title: "Add Phantra and sign in",
-          body: `Open chatgpt.com/plugins, press Add and choose Add custom MCP server. Name it ${CONNECTOR_NAME}, paste this address: ${RENDER_ADDRESS}, and sign in with your Phantra account. The button below opens the page and copies the address for you. Custom MCP servers depend on your ChatGPT plan and workspace settings; if you don't see Add, your plan doesn't allow them yet.`,
+          body: `The button below opens Phantra in ChatGPT's plugin directory. Press Add, then sign in with your Phantra account and allow it. If your workspace can't add directory plugins, add it as a custom MCP server instead at chatgpt.com/plugins: name it ${CONNECTOR_NAME} and paste ${RENDER_ADDRESS}.`,
           link: { label: "OpenAI's own steps", href: CHATGPT_HELP_URL },
-          action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL, copyAlso: RENDER_ADDRESS, logo: "openai" },
+          action: { label: "Add Phantra to ChatGPT", href: CHATGPT_PLUGIN_URL, logo: "openai" },
         },
         {
           title: "Create with Phantra in ChatGPT",
@@ -338,7 +333,7 @@ const FAQS = [
   // address the ChatGPT directory submission names (2026-10-16).
   {
     q: "How do I add Phantra to ChatGPT?",
-    a: `Open chatgpt.com/plugins, press Add and choose Add custom MCP server. Name it ${CONNECTOR_NAME}, paste ${RENDER_ADDRESS}, and sign in with your Phantra account. Then start a chat and ask for an image or a video. Custom MCP servers depend on your ChatGPT plan and workspace settings; if you don't see Add, your plan doesn't allow them yet.`,
+    a: `Open Phantra in ChatGPT's plugin directory (${CHATGPT_PLUGIN_URL}), press Add, and sign in with your Phantra account. Then start a chat and ask for an image or a video. If your workspace can't add directory plugins, add a custom MCP server at chatgpt.com/plugins named ${CONNECTOR_NAME} with the address ${RENDER_ADDRESS}.`,
   },
   {
     q: "How do I add Phantra to Claude?",

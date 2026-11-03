@@ -116,6 +116,8 @@ def test_every_owned_table_grows_an_account_id(pg):
     mcp_feedback.init(pg)
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
+    from src import voice_clone
+    voice_clone.init(pg)
     with db.connect(pg) as conn:
         for table in db.OWNED_TABLES:
             assert "account_id" in db.columns(conn, table), f"{table} has no owner"
@@ -1053,6 +1055,8 @@ def _init_everything(path):
     mcp_feedback.init(path)
     mcp_preferences.init(path)
     mcp_recipes.init(path)
+    from src import voice_clone
+    voice_clone.init(path)
 
 
 AUTH_SCHEMA = {"users", "accounts", "account_members"}

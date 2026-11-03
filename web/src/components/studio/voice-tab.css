@@ -1,0 +1,446 @@
+/* The Voice section (voice-tab.tsx, /studio/voice): the model cards along
+   the top, and the open model's panel -- its form on the left, what it made
+   on the right. Prefixed vx-; the drop zone, buttons and Library picker are
+   the Effects tab's (effects-tab.css). Every colour is a studio token
+   (studio.css :root). No credit number is drawn by anything in this file. */
+/* the page column: the same width and gutter as the view's heading */
+.vx > :not(.vhead) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1680px;
+  margin-inline: auto;
+  padding-inline: 42px;
+}
+.vx-models {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.vx-model {
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: var(--r2);
+  border: 1px solid var(--edge);
+  background: var(--well);
+  color: var(--bone);
+  font-family: var(--body);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t), box-shadow var(--t);
+}
+.vx-model:hover {
+  border-color: var(--line-hi);
+}
+.vx-model[aria-selected="true"] {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  box-shadow: 0 0 0 2px var(--signal-soft);
+}
+.vx-model-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vx-model-head svg {
+  width: 18px;
+  height: 18px;
+  color: var(--signal);
+}
+.vx-model-head b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.vx-model-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone-2);
+}
+.vx-model-what {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bone);
+}
+.vx-model small {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--bone-3);
+}
+.vx-ghost {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.vx-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 18px;
+  align-items: start;
+}
+.vx-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.vx-form .ss {
+  width: 100%;
+}
+.vx-script {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  padding: 12px 14px;
+  border-radius: var(--r2);
+  border: 1px solid var(--edge);
+  background: var(--well);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.vx-script:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+.vx-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vx-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--bone-2);
+}
+.vx-field select,
+.vx-field input {
+  height: 34px;
+  min-width: 140px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: var(--slate);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+}
+.vx-field input {
+  min-width: 80px;
+  width: 80px;
+}
+.vx-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--bone-3);
+}
+.vx-go {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.vx-go small {
+  font-size: 12.5px;
+  color: var(--bone-3);
+}
+
+.vx-out {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--r2);
+  border: 1px solid var(--edge-lo);
+  background: var(--well);
+  min-width: 0;
+}
+.vx-out-head b {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.vx-out-head span,
+.vx-empty {
+  font-size: 12.5px;
+  color: var(--bone-3);
+  margin: 0;
+}
+.vx-reads {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vx-reads li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--edge-lo);
+  background: var(--slate);
+}
+.vx-reads li[data-status="failed"] small {
+  color: var(--danger-hi);
+}
+.vx-reads small {
+  font-size: 12px;
+  color: var(--bone-3);
+}
+.vx-read-words {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--bone);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.vx-read-play {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vx-read-play audio {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+}
+.vx-read-play small {
+  flex: 1;
+}
+.vx-dub-media {
+  width: 100%;
+  border-radius: 8px;
+  background: #000;
+}
+/* the library: languages as chips, the language's voices as a wrap of pills */
+.vx-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.vx-langs button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--bone-2);
+  font-family: var(--body);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.vx-langs button small {
+  margin-left: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--bone-3);
+}
+.vx-langs button[aria-selected="true"] {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--text);
+}
+.vx-voices {
+  list-style: none;
+  margin: 0;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 168px;
+  overflow-y: auto;
+  border-radius: var(--r2);
+  border: 1px solid var(--edge-lo);
+  background: var(--well);
+}
+.vx-voices button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--edge-lo);
+  background: var(--slate);
+  color: var(--bone);
+  font-family: var(--body);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.vx-voices button:hover {
+  border-color: var(--line-hi);
+}
+.vx-voices button[aria-checked="true"] {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 2px var(--signal-soft);
+  color: var(--text);
+}
+.vx-slider input[type="range"] {
+  width: 150px;
+  min-width: 0;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--signal);
+}
+
+/* dialogue: the cast, then the lines, each line marked by its speaker */
+.vx-cast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.vx-cast-one {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: var(--well);
+}
+.vx-cast-n {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone-2);
+}
+.vx-cast-one select,
+.vx-lines select,
+.vx-lines input {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: var(--slate);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+}
+.vx-x {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bone-3);
+  cursor: pointer;
+}
+.vx-x:hover {
+  color: var(--text);
+  background: var(--raise);
+}
+.vx-x svg {
+  width: 14px;
+  height: 14px;
+}
+.vx-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vx-lines li {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: center;
+  padding-left: 10px;
+  border-left: 3px solid var(--edge);
+}
+.vx-lines li[data-n="0"] { border-left-color: var(--signal); }
+.vx-lines li[data-n="1"] { border-left-color: var(--bone-2); }
+.vx-lines li[data-n="2"] { border-left-color: var(--line-hi); }
+.vx-lines li[data-n="3"] { border-left-color: var(--bone-3); }
+.vx-lines input {
+  width: 100%;
+}
+.vx-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--bone-3);
+}
+@media (max-width: 520px) {
+  .vx-lines li {
+    grid-template-columns: minmax(0, 1fr) 28px;
+  }
+  .vx-lines li select {
+    grid-column: 1 / -1;
+  }
+}
+.vx-consent {
+  padding: 14px 16px;
+  border-radius: var(--r2);
+  border: 1px solid color-mix(in srgb, var(--signal) 45%, transparent);
+  background: var(--signal-wash);
+  color: var(--bone);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.vx-consent b {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.vx-consent ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  list-style: decimal;
+  display: grid;
+  gap: 4px;
+}
+.vx-consent q {
+  display: block;
+  margin: 6px 0 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--text);
+  font-size: 14px;
+  quotes: "\201C" "\201D";
+}
+.vx-consent small {
+  color: var(--bone-2);
+  font-size: 12px;
+}
+.vx-field input.vx-name {
+  width: 260px;
+}
+@media (max-width: 860px) {
+  .vx-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .vx > :not(.vhead) {
+    padding-inline: 16px;
+  }
+}

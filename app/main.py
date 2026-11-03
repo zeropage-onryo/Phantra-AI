@@ -67,6 +67,7 @@ from src import (
     shootgen,
     spend,
     upload_links,
+    voice_clone,
     winners,
     workflows,
     youtube,
@@ -202,6 +203,7 @@ def init_tables() -> None:
     mcp_preferences.init()  # a workspace's connector defaults (newest row wins)
     mcp_recipes.init()      # a creator's own recipes, every save a version
     brand_kits.init()       # brand kits a project may pick (opt-in)
+    voice_clone.init()      # a person's own cloned voices, after the consent line
 
 
 @asynccontextmanager

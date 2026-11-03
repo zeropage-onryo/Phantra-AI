@@ -1,0 +1,68 @@
+/* A dub's card (dubbing-step.tsx): the step card (still-step.css) and the
+   effect card's controls (effect-step.css), with a clip picker and the
+   consent box. Prefixed db-; every colour is a studio token (studio.css :root). */
+.db-sec {
+  display: grid;
+  gap: 8px;
+}
+.db-k {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone-2);
+}
+.db-clips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.db-clips > button {
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: var(--rp);
+  border: 1px solid var(--edge-lo);
+  background: var(--slate);
+  color: var(--bone);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.db-clips > button.on {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 2px var(--signal-soft);
+  color: var(--text);
+}
+.db-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.db-row .fx-opt {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+/* effect-step.css puts a field's input in column 2 beside its label; here
+   the label sits above it */
+.db-row .fx-opt input,
+.db-row .fx-opt select {
+  grid-column: 1;
+}
+.db-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone);
+  cursor: pointer;
+}
+.db-consent input {
+  margin-top: 2px;
+  accent-color: var(--signal);
+}
+@media (max-width: 520px) {
+  .db-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

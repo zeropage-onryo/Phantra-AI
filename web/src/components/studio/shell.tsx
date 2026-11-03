@@ -1,10 +1,18 @@
 "use client";
 
-/* The signed-in shell (2026-09-11): the rail, the bar, the account
-   row — one component every studio page sits inside, so the product
-   has one navigation instead of a rail per screen.
+/* The signed-in shell (2026-09-11): the header and its navigation — one
+   component every studio page sits inside, so the product has one
+   navigation instead of one per screen.
 
-   The rail (2026-10-07, Mike's call): Projects first, as the home, then
+   THE NAV IS ON TOP (2026-10-26, Mike's call): the left rail is gone, with
+   its pin, its Search row and its account row. Its links are the header's
+   own row now, after the brand; the header's right-hand cluster (search,
+   the activity bell, credits, New session, the avatar menu) is unchanged.
+   The header's old three-tab strip (Projects / Create / Library / Timeline)
+   went with it: the nav carries every page. On a phone the header is two
+   rows and the nav scrolls sideways; there is no bottom bar any more.
+
+   The nav (2026-10-07, Mike's call): Projects first, as the home, then
    Create, Assets, Edit, Elements and Renders. Pipeline and Director are
    gone from it -- a concept is one scene and a project holds scenes, so
    the board of projects replaced the board of concepts, and the Director
@@ -18,10 +26,10 @@
    lists what is rendering and what finished, and there is no count to
    badge -- the activity tray's dot says when a job is live.
 
-   OFF THE RAIL (2026-10-20, Mike's call): Renders left the rail on every
+   OFF THE NAV (2026-10-20, Mike's call): Renders left the nav on every
    size. The page stays, reached by its address, the ⌘K palette and the
    links that need it (Finish a draft, the editor's empty state). Edit
-   leaves the phone's bottom bar only, for now: the editor has no phone
+   leaves the phone's nav only, for now: the editor has no phone
    layout. */
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -37,14 +45,13 @@ import {
 } from "react";
 import {
   AtSign,
-  ChevronsUpDown,
+  AudioLines,
   Coins,
   FolderKanban,
   House,
   Layers,
   LogOut,
   Palette,
-  PanelLeft,
   Plug,
   Scissors,
   Search,
@@ -67,7 +74,7 @@ import {
 import { OwlLockup } from "@/components/owl-lockup";
 import { CreditPill } from "@/components/studio/credit-pill";
 import { CommandPalette } from "@/components/studio/command-palette";
-import { PluginsRailItem } from "@/components/studio/plugins-flyout";
+import { PluginsNavItem } from "@/components/studio/plugins-flyout";
 import { ActivityTray } from "@/components/studio/activity-tray";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
@@ -77,7 +84,7 @@ import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "settings";
+export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "voice" | "renders" | "settings";
 
 type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
 const NAV: NavItem[] = [
@@ -87,21 +94,14 @@ const NAV: NavItem[] = [
   // only while the `effects_tab` capability is on; the page itself 404s
   // without it, so an entry with the flag off would point at nothing
   { id: "effects", label: "Effects", href: "/studio/effects", icon: Sparkles, cap: "effects_tab" },
+  // the Voice section (2026-10-26, docs/tasks/task-voice-tab.md): every voice
+  // model on one page, behind `voice_tab` the same way
+  { id: "voice", label: "Voice", href: "/studio/voice", icon: AudioLines, cap: "voice_tab" },
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
   // brand kits (2026-10-20): one per client, picked per project
   { id: "brand", label: "Brand", href: "/studio/brand", icon: Palette },
-];
-
-/* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
-   mock): Create is the box, Library the Assets wall, Timeline the editor.
-   The rail still carries every page; these are the three the mock names. */
-const TABS: { label: string; href: string; view: ViewId }[] = [
-  { label: "Projects", href: "/studio/projects", view: "projects" },
-  { label: "Create", href: "/studio", view: "studio" },
-  { label: "Library", href: "/studio/assets", view: "assets" },
-  { label: "Timeline", href: "/studio/cut", view: "cut" },
 ];
 
 const VIEW_BY_PATH: [string, ViewId][] = [
@@ -115,6 +115,7 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/elements", "elements"],
   ["/studio/brand", "brand"],
   ["/studio/effects", "effects"],
+  ["/studio/voice", "voice"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
   ["/studio/queue", "renders"], // the old address redirects there
@@ -170,30 +171,11 @@ const Ctx = createContext<ShellContext>({
 });
 export const useShell = () => useContext(Ctx);
 
-const PIN_KEY = "phantra.rail.pinned";
-const PIN_EVENT = "phantra:rail-pin";
-/* the pin lives in localStorage; read through an external-store
-   subscription so the server renders it collapsed and the client
-   snaps to the saved state without a setState-in-effect */
-const subscribePin = (cb: () => void) => {
-  window.addEventListener(PIN_EVENT, cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener(PIN_EVENT, cb);
-    window.removeEventListener("storage", cb);
-  };
-};
+/* external-store subscription with nothing to subscribe to: the server
+   render and the first client render agree, then the client's value wins */
 const subscribeNothing = () => () => {};
-const readPin = () => {
-  try {
-    return localStorage.getItem(PIN_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-
-/* The end of both account menus -- the rail's profile row and the header's
-   avatar -- as ONE component, so the two menus cannot drift apart. */
+/* The end of the account menu -- the header's avatar -- as ONE component,
+   so a second menu can never drift from it. */
 function MenuTail({ close }: { close: () => void }) {
   return (
     <>
@@ -227,17 +209,14 @@ export function StudioShell({ children }: { children: ReactNode }) {
   const stage = canvas || editor;
   const [me, setMe] = useState<Me | null>(null);
   const [signedOut, setSignedOut] = useState(false);
-  const pinned = useSyncExternalStore(subscribePin, readPin, () => false);
-  const [menu, setMenu] = useState(false);
-  // the header's avatar menu (accounts, sign out) -- its own flag, so the
-  // rail's account row and the avatar never open each other's
+  // the header's avatar menu (accounts, sign out)
   const [hmenu, setHmenu] = useState(false);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
   const [balanceRead, setBalanceRead] = useState<{ account: number; value: Balance | null } | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [bar, setBarNode] = useState<ReactNode>(null);
-  // the capability-gated rail entries (NavItem.cap): read once an account
+  // the capability-gated nav entries (NavItem.cap): read once an account
   // is known; an entry whose flag is off, unknown or unread is not drawn
   const [caps, setCaps] = useState<Record<string, boolean>>({});
   // per toast: its timer and its deferred half, outside React state so the
@@ -343,25 +322,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
     () => modKey(navigator.platform || navigator.userAgent),
     () => "⌘" as const,
   );
-
-  const togglePin = () => {
-    try {
-      localStorage.setItem(PIN_KEY, pinned ? "0" : "1");
-    } catch {
-      /* private window: the pin just forgets */
-    }
-    window.dispatchEvent(new Event(PIN_EVENT));
-  };
-
-  // the rail's account menu closes on a tap outside it, as the header's does
-  useEffect(() => {
-    if (!menu) return;
-    const off = (e: PointerEvent) => {
-      if (!(e.target as Element | null)?.closest?.(".racct-wrap")) setMenu(false);
-    };
-    document.addEventListener("pointerdown", off);
-    return () => document.removeEventListener("pointerdown", off);
-  }, [menu]);
 
   useEffect(() => {
     if (!hmenu) return;
@@ -474,7 +434,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // `workspace` this context hands out, so re-reading /api/me is what makes
   // every page re-ask -- no reload (BACKLOG #19).
   const pickAccount = (slug: string) => {
-    setMenu(false);
     setHmenu(false);
     if (slug === workspace) return;
     switchAccount(slug)
@@ -501,99 +460,12 @@ export function StudioShell({ children }: { children: ReactNode }) {
       >
         <div className="zps-field" aria-hidden />
 
-        <nav className={`rail${pinned ? " pinned" : ""}`} aria-label="Primary">
-          <div className="rhead">
-            <span className="rl rtitle">Studio</span>
-            <button
-              type="button"
-              className="rpin"
-              onClick={togglePin}
-              aria-pressed={pinned}
-              title={pinned ? "Let the rail collapse" : "Keep the rail open"}
-            >
-              <PanelLeft size={14} strokeWidth={1.5} />
-            </button>
-          </div>
-          <div className="rnav">
-            {NAV.filter((n) => !n.cap || caps[n.cap] === true).map(({ id, label, href, icon: Icon, external }) => {
-              const current = id === view;
-              const inner = (
-                <>
-                  <Icon strokeWidth={1.35} />
-                  <span className="rl">{label}</span>
-                </>
-              );
-              // data-nav names the entry, so a size can drop one (Edit on a phone)
-              return external ? (
-                <a key={id} href={`${API_URL}${href}`} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
-                  {inner}
-                </a>
-              ) : (
-                <Link key={id} href={href} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
-                  {inner}
-                </Link>
-              );
-            })}
-            <PluginsRailItem />
-          </div>
-          <div className="rfoot">
-            {/* the hint that had nothing behind it until 2026-10-08: it opens
-                the palette (command-palette.tsx), as ⌘K / Ctrl+K does */}
-            <button type="button" className="rl rkbd" onClick={() => openPalette()} title="Search and commands">
-              <span>Search</span>
-              <kbd>{mod === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
-            </button>
-            {/* the menu is the button's SIBLING, not its child (2026-10-20):
-                inside the button its items were buttons nested in a button */}
-            <span className="racct-wrap">
-              <button
-                type="button"
-                className="racct"
-                onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
-                aria-haspopup="menu"
-                aria-expanded={menu}
-                title={signedOut ? "Sign in" : `${who} · switch account`}
-              >
-                <span className="ravatar">
-                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "P"}
-                </span>
-                <span className="rl rwho">
-                  <span className="rname">{signedOut ? "Sign in" : who}</span>
-                  <span className="rrole">
-                    {signedOut
-                      ? "Google, Discord or email"
-                      : me?.account
-                        ? `${me.account.label} · ${me.account.role || "member"}`
-                        : "no account"}
-                  </span>
-                </span>
-                <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
-              </button>
-              {menu && me ? (
-                <span className="rmenu" role="menu">
-                  <span className="m">Accounts</span>
-                  {me.accounts.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      aria-current={a.slug === workspace ? "true" : undefined}
-                      onClick={() => pickAccount(a.slug)}
-                    >
-                      {a.label}
-                    </button>
-                  ))}
-                  <MenuTail close={() => setMenu(false)} />
-                </span>
-              ) : null}
-            </span>
-          </div>
-        </nav>
-
         <div className="shell">
-          {/* THE HEADER (2026-10-02, the composer mock): the brand with its
-              red dot, Create / Library / Timeline in the middle, and on the
-              right the balance, New session and the account's avatar. Every
-              piece is wired: the tabs are pages, New session archives the
+          {/* THE HEADER (2026-10-02, the composer mock; the nav moved up from
+              the left rail 2026-10-26): the brand with its red dot, the
+              studio's pages after it, and on the right the balance, New
+              session and the account's avatar. Every piece is wired: the
+              nav entries are pages, New session archives the
               open conversation (lib/assistant.ts requestNewSession, taken by
               AssistantThreadProvider), the avatar opens the account menu. */}
           <header className="bar hdr">
@@ -603,17 +475,27 @@ export function StudioShell({ children }: { children: ReactNode }) {
               <span className="hdot" aria-hidden />
               <OwlLockup intro className="hlockup" />
             </Link>
-            <nav className="htabs" aria-label="Studio">
-              {TABS.map((t) => (
-                <Link
-                  key={t.href}
-                  href={t.href}
-                  aria-current={view === t.view ? "page" : undefined}
-                  className={t.view === "cut" ? "htab-cut" : t.view === "assets" ? "htab-lib" : undefined}
-                >
-                  {t.label}
-                </Link>
-              ))}
+            <nav className="htabs" aria-label="Primary">
+              {NAV.filter((n) => !n.cap || caps[n.cap] === true).map(({ id, label, href, icon: Icon, external }) => {
+                const current = id === view;
+                const inner = (
+                  <>
+                    <Icon strokeWidth={1.5} />
+                    <span className="hl">{label}</span>
+                  </>
+                );
+                // data-nav names the entry, so a size can drop one (Edit on a phone)
+                return external ? (
+                  <a key={id} href={`${API_URL}${href}`} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
+                    {inner}
+                  </a>
+                ) : (
+                  <Link key={id} href={href} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
+                    {inner}
+                  </Link>
+                );
+              })}
+              <PluginsNavItem />
             </nav>
             {/* the right-hand cluster is one grid cell, so the tabs between
                 it and the brand can never be drawn underneath it */}
@@ -683,8 +565,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
           workspace={workspace}
           signedOut={signedOut}
           toast={toast}
-          pinned={pinned}
-          onTogglePin={togglePin}
           onSwitchAccount={pickAccount}
         />
 

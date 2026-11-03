@@ -170,247 +170,7 @@
   flex: 1;
 }
 
-/* ── RAIL ── 84px of icons; hover (or the pin) widens it to 236px and the
-   labels fade in OVER the content — the shell keeps its margin. */
-.rail {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 84px;
-  z-index: 60;
-  overflow: hidden;
-  background: rgb(10 10 12 / 0.52);
-  backdrop-filter: blur(24px) saturate(1.2);
-  border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  padding: 22px 12px 18px;
-  transition:
-    width 200ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    background-color 200ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    box-shadow 200ms;
-}
-.rail:hover,
-.rail.pinned {
-  width: 236px;
-  background: rgb(10 10 12 / 0.88);
-  box-shadow: 8px 0 40px -12px rgb(0 0 0 / 0.9);
-}
-.rail .rl {
-  opacity: 0;
-  white-space: nowrap;
-  transition: opacity 150ms;
-}
-.rail:hover .rl,
-.rail.pinned .rl {
-  opacity: 1;
-}
-.rhead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 26px;
-  height: 38px;
-}
-.rtitle {
-  font-size: 13px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
-.rpin {
-  margin-left: auto;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  border-radius: 9px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--dimmer);
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  transition:
-    opacity 150ms,
-    color var(--t),
-    border-color var(--t);
-}
-.rail:hover .rpin,
-.rail.pinned .rpin {
-  opacity: 1;
-}
-.rpin:hover,
-.rpin[aria-pressed="true"] {
-  color: var(--text);
-  border-color: var(--line-hi);
-}
-.rnav {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.rnav a,
-.rnav button {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  height: 44px;
-  padding: 0 21px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--dimmer);
-  font-size: 13.5px;
-  text-align: left;
-  width: 100%;
-  transition:
-    color var(--t),
-    background var(--t);
-}
-.rnav svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
-}
-.rnav a:hover,
-.rnav button:hover {
-  color: var(--dim);
-  background: rgb(255 255 255 / 0.04);
-}
-.rnav [aria-current] {
-  color: var(--text);
-  background: var(--signal-soft);
-}
-.rnav [aria-current]::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 18px;
-  border-radius: var(--rp);
-  background: var(--signal);
-  color: var(--on-signal);
-}
-.rbadge {
-  position: absolute;
-  top: 9px;
-  left: 37px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--rp);
-  background: var(--signal);
-  color: var(--on-signal);
-  font-family: var(--mono);
-  font-size: 8.5px;
-  line-height: 15px;
-}
-.rfoot {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-/* the rail's palette button: "Search ⌘K", shown with the other labels */
-.rail .rkbd {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 6px 8px;
-  padding: 4px 6px 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--rp);
-  background: none;
-  color: var(--dim);
-  font-size: 12px;
-  transition:
-    color var(--t),
-    border-color var(--t),
-    opacity 150ms;
-}
-.rail .rkbd:hover {
-  color: var(--text);
-  border-color: var(--line-hi);
-}
-.rkbd kbd {
-  font-family: var(--mono);
-  font-size: 9px;
-  padding: 3px 7px;
-  border-radius: var(--rp);
-  border: 1px solid var(--line);
-  color: var(--dimmer);
-}
-.racct-wrap {
-  position: relative;
-  display: block;
-}
-.racct {
-  position: relative;
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 6px 6px;
-  margin-top: 4px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: transparent;
-  text-align: left;
-  color: var(--text);
-}
-.ravatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 36px;
-  height: 36px;
-  margin-left: 6px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--slate);
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--dim);
-}
-.ravatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.rwho {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-.rname,
-.rrole {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.2;
-}
-.rname {
-  font-size: 13px;
-}
-.rrole {
-  font-size: 11px;
-  color: var(--dim);
-}
-.rchev {
-  width: 14px;
-  height: 14px;
-  flex: none;
-  color: var(--dimmer);
-}
+/* the account menu (the header's avatar opens it; .hmenu places it) */
 .rmenu {
   position: absolute;
   left: 8px;
@@ -467,7 +227,6 @@
 
 /* ── SHELL + BAR ── */
 .shell {
-  margin-left: 84px;
   min-height: 100vh;
   position: relative;
   z-index: 1;
@@ -483,8 +242,9 @@
   min-height: 0;
 }
 /* the header (2026-10-02, the composer mock): one 64px row with a hairline
-   under it, on every page -- the rail is the full navigation, this is the
-   brand, the three tabs the mock names, the balance, New session and you */
+   under it, on every page -- the brand, the studio's pages (the left rail's
+   links moved up here 2026-10-26), the balance, New session and you. It
+   sticks to the top, as the rail did to the left. */
 .bar {
   display: flex;
   align-items: center;
@@ -498,14 +258,14 @@
   background: rgb(11 11 11 / 0.82);
   backdrop-filter: blur(16px);
 }
-/* Three columns, 1fr auto 1fr (2026-10-03): the tabs sit in the true centre
-   while the brand and the right-hand cluster each fit their half, and when one
-   does not -- a narrow window, a long balance -- that column grows to its
-   content and the tabs move over. Centred with position: absolute they were
-   drawn underneath the balance pill from ~900 to ~1000px wide. */
+/* Three columns, auto 1fr auto: the brand, the nav (which takes what is
+   left and scrolls sideways when it does not fit) and the right-hand
+   cluster, which can never be drawn underneath the nav. */
 .hdr {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  position: sticky;
+  top: 0;
 }
 .hright {
   justify-self: end;
@@ -543,20 +303,64 @@
   box-shadow: 0 0 10px color-mix(in srgb, var(--signal) 55%, transparent);
 }
 .htabs {
+  justify-self: start;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: center;
-  gap: 26px;
+  gap: 2px;
+  margin-left: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.htabs a {
-  font-size: 14px;
+.htabs::-webkit-scrollbar {
+  display: none;
+}
+.htabs a,
+.htabs button {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
   color: var(--dim);
-  transition: color var(--t);
+  font-size: 13.5px;
+  white-space: nowrap;
+  transition:
+    color var(--t),
+    background var(--t);
 }
-.htabs a:hover {
+.htabs svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.htabs a:hover,
+.htabs button:hover,
+.htabs button[aria-expanded="true"] {
   color: var(--text);
+  background: rgb(255 255 255 / 0.04);
 }
 .htabs a[aria-current] {
   color: var(--text);
+  background: var(--signal-soft);
+}
+/* room runs out before 1180px with eight entries and the cluster: only the
+   open page keeps its word, the rest are icons (each has a title) */
+@media (max-width: 1180px) {
+  .htabs a:not([aria-current]) .hl,
+  .htabs button .hl {
+    display: none;
+  }
+  .htabs a,
+  .htabs button {
+    padding: 0 10px;
+  }
 }
 .hsearch {
   width: 36px;
@@ -685,9 +489,6 @@
    edge (the avatar half-cut at 800px, off-screen and a sideways-scrolling
    page on a phone, 2026-10-03) */
 @media (max-width: 900px) {
-  .htabs {
-    gap: 18px;
-  }
   .hbrand .hlockup {
     display: none;
   }
@@ -696,20 +497,11 @@
   }
 }
 @media (max-width: 640px) {
-  /* a 360px phone with a five-digit balance needs these 8px back */
-  .htabs {
-    gap: 14px;
-  }
   .hnew {
     display: none;
   }
   /* the search button and the activity bell (2026-10-08) are the phone's
-     only doors to the ⌘K palette and the tray, and they need the room
-     Library had: the bottom bar still carries Assets (Timeline goes at
-     720px, with the bar's Edit) */
-  .htabs .htab-lib {
-    display: none;
-  }
+     only doors to the ⌘K palette and the tray */
   .hsearch,
   .htray {
     width: 32px;
@@ -717,6 +509,35 @@
   }
   .zps .hright {
     gap: 6px;
+  }
+}
+/* a phone (2026-10-26): the header is two rows -- brand and cluster, then the
+   nav, which scrolls sideways. No editor on a phone, for now (2026-10-20,
+   Mike's call): it has no phone layout, so its entry goes. */
+@media (max-width: 720px) {
+  .bar.hdr {
+    height: auto;
+    padding: 8px 16px 6px;
+    row-gap: 4px;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand right"
+      "nav nav";
+  }
+  .bar.hdr .hbrand {
+    grid-area: brand;
+    min-height: 36px;
+  }
+  .bar.hdr .hright {
+    grid-area: right;
+  }
+  .bar.hdr .htabs {
+    grid-area: nav;
+    justify-self: stretch;
+    margin-left: -10px;
+  }
+  .htabs [data-nav="cut"] {
+    display: none;
   }
 }
 .brand {
@@ -2560,7 +2381,7 @@ textarea.zin {
 .ztoasts {
   position: fixed;
   top: 76px;
-  left: calc(50% + 42px);
+  left: 50%;
   transform: translateX(-50%);
   z-index: 130;
   display: flex;
@@ -2568,7 +2389,7 @@ textarea.zin {
   align-items: center;
   gap: 8px;
   width: max-content;
-  max-width: min(640px, calc(100vw - 84px - 48px));
+  max-width: min(640px, calc(100vw - 48px));
   pointer-events: none;
 }
 .ztoast {
@@ -2630,7 +2451,7 @@ textarea.zin {
 .ztoast .zx:hover {
   color: var(--text);
 }
-/* a phone: the rail is a bar along the bottom, so the stage is the width */
+/* a phone: the stage is the width */
 @media (max-width: 720px) {
   .ztoasts {
     left: 16px;
@@ -2642,10 +2463,10 @@ textarea.zin {
   }
 }
 
-/* the job rail, bottom-left */
+/* the job list, bottom-left */
 .jobs {
   position: fixed;
-  left: 100px;
+  left: 18px;
   bottom: 18px;
   z-index: 50;
   display: flex;
@@ -3203,9 +3024,8 @@ textarea.zin {
   display: none;
 }
 /* THE VIEWER (2026-10-19) -- components/studio/asset-viewer.css draws it.
-   The shell is its own stacking context (z 1) under the nav rail and the
-   phone's bottom bar (z 60): while the viewer is open the whole shell lifts
-   over them, so the viewer covers the screen and the Make element form
+   The shell is its own stacking context (z 1): while the viewer is open it
+   lifts (z 61) over the pinned panels, so the viewer covers the screen and the Make element form
    opened from it (z 120) still sits above it. The toasts stay on top
    (outside the shell, z 130). The creature hides: it would sit on the
    stage. */
@@ -3364,106 +3184,11 @@ select.zin {
 }
 
 
-/* ── PHONES ── the 84px rail eats a third of a 390px screen, so under
-   720px it becomes a bottom bar of icons and the shell takes the full
-   width. Labels, the pin and the ⌘K hint have no room and hide. */
+/* ── PHONES ── the nav is the header's second row (see above), so the shell
+   takes the full width and has no bottom bar to clear. */
 @media (max-width: 720px) {
-  .rail,
-  .rail:hover,
-  .rail.pinned {
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: 64px;
-    flex-direction: row;
-    align-items: center;
-    padding: 0 8px;
-    padding-bottom: env(safe-area-inset-bottom);
-    border-right: 0;
-    border-top: 1px solid var(--line);
-    background: rgb(10 10 12 / 0.92);
-    box-shadow: none;
-  }
-  .rail .rl,
-  .rhead,
-  .rkbd,
-  .rpin {
-    display: none;
-  }
-  .rnav {
-    flex: 1;
-    flex-direction: row;
-    justify-content: space-around;
-    gap: 0;
-  }
-  .rnav a,
-  .rnav button {
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    justify-content: center;
-  }
-  /* no editor on a phone, for now (2026-10-20, Mike's call): it has no
-     phone layout, so the bar's Edit and the header's Timeline both go */
-  .rnav [data-nav="cut"],
-  .htabs .htab-cut {
-    display: none;
-  }
-  .rnav [aria-current]::before {
-    left: 50%;
-    top: auto;
-    bottom: 2px;
-    transform: translateX(-50%);
-    width: 18px;
-    height: 3px;
-  }
-  .rbadge {
-    left: 26px;
-    top: 4px;
-  }
-  .rfoot {
-    margin: 0;
-    flex-direction: row;
-  }
-  .racct {
-    width: auto;
-    padding: 0;
-    margin: 0 4px;
-    border: 0;
-  }
-  .ravatar {
-    margin: 0;
-    width: 32px;
-    height: 32px;
-  }
-  /* the rail is a 64px bar here, and the menu opens ABOVE it: the rail's
-     desktop overflow: hidden clipped every pixel of it, so the avatar
-     looked dead on a phone (2026-10-20). The bar has no labels to clip. */
-  .rail,
-  .rail:hover,
-  .rail.pinned {
-    overflow: visible;
-  }
-  /* a small menu popping up from the avatar, its right edge on the
-     avatar's, clear of the bar */
-  .rail .rmenu {
-    left: auto;
-    right: -4px;
-    bottom: calc(100% + 22px);
-    min-width: 220px;
-  }
-  .rail .rmenu button,
-  .rail .rmenu a {
-    min-height: 40px;
-  }
   .shell {
-    margin-left: 0;
-    padding-bottom: 80px;
-  }
-  .bar {
-    padding: 0 16px;
+    padding-bottom: 16px;
   }
   .view {
     padding-bottom: 60px;
@@ -4333,9 +4058,9 @@ p.zkeys {
   margin-top: 18px;
 }
 
-/* ── PLUGINS ── the rail's Plugins row and its flyout. The flyout opens to
-   the right of the row, on the palette's surface. Under 720px the rail is a
-   bottom bar, so the flyout rises above it as a bottom sheet. */
+/* ── PLUGINS ── the nav's Plugins entry and its flyout. The flyout opens
+   under the button, on the palette's surface. Under 720px it rises from the
+   bottom as a sheet. */
 .pfbtn[aria-expanded="true"] {
   color: var(--text);
   background: rgb(255 255 255 / 0.04);
