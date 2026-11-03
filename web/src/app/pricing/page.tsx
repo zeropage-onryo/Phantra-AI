@@ -64,11 +64,20 @@ export default function PricingPage() {
                 with. Every plan renders every model.
               </p>
             </div>
-            <div className="mt-10 overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+            {/* a phone (QA 2026-11-02 P9): the table is wider than the
+                screen, so say where the plans are; the box takes focus so a
+                keyboard can scroll it, and the model column stays put */}
+            <p className="mt-8 text-[13px] text-[#afafaf] sm:hidden">Swipe the table to see Standard, Pro and Max →</p>
+            <div
+              className="mt-10 overflow-x-auto rounded-[6px] max-sm:mt-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+              tabIndex={0}
+              role="region"
+              aria-label="Clips a month on each model, by plan"
+            >
+              <table className="w-full min-w-[640px] border-collapse text-left text-sm max-sm:w-max max-sm:min-w-0">
                 <thead>
                   <tr className="border-b border-border text-[12px] uppercase tracking-[0.06em] text-[#82807d]">
-                    <th className="py-3 pr-4 font-medium">Model</th>
+                    <th className="sticky left-0 bg-background py-3 pr-4 font-medium">Model</th>
                     <th className="py-3 pr-4 font-medium">Credits / clip</th>
                     {PLANS.map((p) => (
                       <th key={p.key} className="py-3 pr-4 font-medium text-foreground">
@@ -80,9 +89,9 @@ export default function PricingPage() {
                 <tbody>
                   {MODELS.map((m) => (
                     <tr key={m.model} className="border-b border-border">
-                      <td className="py-3.5 pr-4">
+                      <td className="sticky left-0 bg-background py-3.5 pr-4">
                         <span className="font-medium text-foreground">{m.name}</span>
-                        <span className="ml-2 text-[12px] text-[#82807d]">{TIER_LABEL[m.tier]}</span>
+                        <span className="ml-2 text-[12px] text-[#82807d] max-sm:ml-0 max-sm:block">{TIER_LABEL[m.tier]}</span>
                       </td>
                       <td className="py-3.5 pr-4 text-[#c6c4c0]">
                         {num(m.credits)} / {m.seconds}s
