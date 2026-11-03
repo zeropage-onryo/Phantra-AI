@@ -45,7 +45,7 @@ export function AffiliateEstimator() {
             max={40}
             value={perMonth}
             onChange={(ev) => setPerMonth(Number(ev.target.value))}
-            className="mt-4 h-1.5 w-full cursor-pointer accent-[var(--mari,#FFC800)]"
+            className="mt-4 h-1.5 w-full cursor-pointer accent-[var(--mari,#F3F48B)]"
           />
 
           <p className="mt-6 text-[15px] text-[#afafaf]">Plan they pick</p>
@@ -58,7 +58,7 @@ export function AffiliateEstimator() {
                 aria-checked={p.key === plan.key}
                 onClick={() => setPlanKey(p.key)}
                 className={`rounded-lg border px-3.5 py-2 text-[15px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
-                  p.key === plan.key ? "border-[var(--mari,#FFC800)] bg-[var(--mari,#FFC800)] text-[#0b0a08]" : "border-border text-[#afafaf] hover:border-[#565553] hover:text-foreground"
+                  p.key === plan.key ? "border-[var(--mari,#F3F48B)] bg-[var(--mari,#F3F48B)] text-[#0b0a08]" : "border-border text-[#afafaf] hover:border-[#565553] hover:text-foreground"
                 }`}
               >
                 {p.name} ${p.monthly_usd}
@@ -67,7 +67,7 @@ export function AffiliateEstimator() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[var(--mari,#FFC800)] p-6 text-[#0b0a08]">
+        <div className="flex items-center justify-between gap-4 rounded-[14px] bg-[var(--mari,#F3F48B)] p-6 text-[#0b0a08]">
           <div>
             <p className="text-[16px] opacity-75">Estimated, first 12 months</p>
             <p className="serif mt-1 text-[clamp(2.25rem,5vw,3rem)] tabular-nums" aria-live="polite">
@@ -84,7 +84,7 @@ export function AffiliateEstimator() {
           {byMonth.map((v, i) => (
             <div key={i} className="flex h-full flex-1 flex-col justify-end" title={`Month ${i + 1}: ${money(v)}`}>
               <div
-                className="w-full rounded-t-[4px] bg-gradient-to-t from-[var(--mari,#FFC800)]/25 to-[var(--mari,#FFC800)]"
+                className="w-full rounded-t-[4px] bg-gradient-to-t from-[var(--mari,#F3F48B)]/25 to-[var(--mari,#F3F48B)]"
                 style={{ height: `${Math.max(3, (v / peak) * 100)}%` }}
               />
             </div>

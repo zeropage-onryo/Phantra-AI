@@ -12,7 +12,7 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
 |---|---|---|---|
 | Starter | 25% | first 6 months of a referral's payments | sign-up (instant) |
 | Pro | 30% | first 6 months | 10 paying referrals *(build's assumption)* |
-| Partner | 35% | first 12 months | 50 paying referrals |
+| Partner | 30% | first 12 months | 50 paying referrals **and your approval** (`grant-partner`) |
 
 - **Referred buyer:** 10% off their first *monthly* payment (a yearly plan already has 20% off).
 - **Joining (2026-11-02):** a channel URL and the terms box; the code and link exist the moment the form is sent. Set `AFFILIATE_AUTO_APPROVE=0` on Fly to put applications back in a queue for `approve`. The review moves to the money: look at a partner's channel and referrals (`report`) before you send their **first** payout.
@@ -29,7 +29,7 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
   $50 or more (`payouts`, send PayPal/bank, `mark-paid`). Credits still exist as a per-partner switch
   (`set-payout <slug> credits`): a `promo` lot on the partner's own account, 1 credit per cent,
   12-month expiry, which costs about 42¢ on the dollar (pricing.MARKUP 2.4). Cash costs the full face
-  amount, so the top tier is 35% of referred revenue, not ~14.6%.
+  amount, so the top tier is 30% of referred revenue, not ~14.6%.
 - **Attribution:** `?ref=<code>` link → `phantra_ref` cookie (60 days, domain `.phantra.ai`)
   → attributed at sign-up (`app/auth._provision`). Only a *new* account, only to an *approved*
   partner, first touch wins, never after the account has paid, never to yourself (same account
@@ -58,6 +58,7 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
    python -m src.affiliates reject <slug> --note "…"
    python -m src.affiliates suspend <slug>
    python -m src.affiliates set-payout <slug> cash # only after you trust them
+   python -m src.affiliates grant-partner <slug>   # Partner tier (30% x 12 months); they need 50 paying referrals too; --revoke undoes
    python -m src.affiliates release                # pays every commission whose hold ended
    python -m src.affiliates payouts                # cash owed (>= $50) — send it yourself
    python -m src.affiliates mark-paid <slug> <transfer-reference>

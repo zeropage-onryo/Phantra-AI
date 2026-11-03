@@ -23,7 +23,13 @@ THE TIERS (Mike, 2026-10-26). Rate and window are by tier:
 
     starter   25% for 6 months    everyone, on approval
     pro       30% for 6 months    10 paying referrals
-    partner   35% for 12 months   50 paying referrals
+    partner   30% for 12 months   50 paying referrals AND Mike's approval
+
+PARTNER IS BY APPROVAL (Mike, 2026-11-03: "change partner to 30% and only
+after approval"). The rate was 35%; at today's markups a yearly buyer on 35%
+for 12 months leaves a loss, 30% about break-even, so it is 30% and 50 paying
+referrals only makes a partner ELIGIBLE: `grant-partner` in the CLI switches
+it on. Until then a partner with 50 earns at Pro terms.
 
 A tier is read off the partner's count of PAYING referrals at the moment a
 referral makes its FIRST payment and is then LOCKED on that referral: a
@@ -107,6 +113,7 @@ class Tier:
     rate_bp: int          # basis points: 2500 = 25%
     window_months: int    # how many months of a referral's payments earn
     min_paying: int       # paying referrals needed to START earning at this tier
+    by_approval: bool = False   # ALSO needs Mike's grant (partner_approved)
 
     @property
     def percent(self) -> float:
@@ -116,7 +123,7 @@ class Tier:
 TIERS = (
     Tier("starter", "Starter", 2500, 6, 0),
     Tier("pro", "Pro", 3000, 6, 10),
-    Tier("partner", "Partner", 3500, 12, 50),
+    Tier("partner", "Partner", 3000, 12, 50, by_approval=True),
 )
 TIER_BY_KEY = {t.key: t for t in TIERS}
 
@@ -127,10 +134,13 @@ RESERVED_CODES = frozenset({
 })
 
 
-def tier_for_count(paying_referrals: int) -> Tier:
-    """The best tier a partner with this many paying referrals has earned."""
+def tier_for_count(paying_referrals: int, partner_approved: bool = False) -> Tier:
+    """The best tier a partner with this many paying referrals has earned. A
+    by-approval tier (Partner) is skipped unless Mike has granted it."""
     best = TIERS[0]
     for tier in TIERS:
+        if tier.by_approval and not partner_approved:
+            continue
         if paying_referrals >= tier.min_paying:
             best = tier
     return best
@@ -148,7 +158,8 @@ def public_terms() -> dict:
     return {
         "version": TERMS_VERSION,
         "tiers": [{"key": t.key, "label": t.label, "percent": t.percent,
-                   "months": t.window_months, "min_paying": t.min_paying}
+                   "months": t.window_months, "min_paying": t.min_paying,
+                   "by_approval": t.by_approval}
                   for t in TIERS],
         "hold_days": HOLD_DAYS,
         "cookie_days": COOKIE_DAYS,
@@ -192,6 +203,7 @@ CREATE TABLE IF NOT EXISTS affiliate_partners (
 );
 ALTER TABLE affiliate_partners ADD COLUMN IF NOT EXISTS full_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE affiliate_partners ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT '';
+ALTER TABLE affiliate_partners ADD COLUMN IF NOT EXISTS partner_approved BOOLEAN NOT NULL DEFAULT false;
 CREATE UNIQUE INDEX IF NOT EXISTS affiliate_partners_account_idx
     ON affiliate_partners (account_id);
 CREATE UNIQUE INDEX IF NOT EXISTS affiliate_partners_code_idx
@@ -465,6 +477,19 @@ def set_status(who: str, status: str, *, note: str = "", dsn: Optional[str] = No
         return dict(row)
 
 
+def grant_partner(who: str, granted: bool = True, *, dsn: Optional[str] = None) -> dict:
+    """Mike's switch for the Partner tier. Takes effect on referrals that
+    make their FIRST payment afterwards; tiers already locked stay as booked."""
+    ensure(dsn)
+    with db.connect(dsn) as conn:
+        partner = _resolve_partner(conn, who)
+        row = conn.execute(
+            "UPDATE affiliate_partners SET partner_approved = %s "
+            "WHERE id = %s AND account_id = %s RETURNING *",
+            (granted, partner["id"], partner["account_id"])).fetchone()
+        return dict(row)
+
+
 def set_payout_mode(who: str, mode: str, *, dsn: Optional[str] = None) -> dict:
     """Credits is the default; cash is Mike's per-partner switch, set once he
     trusts the partner. Takes effect on commissions released AFTER the
@@ -593,14 +618,14 @@ def on_invoice_paid(account_id: int, invoice: dict, *, months_covered: int = 1,
     basis = invoice_net_cents(invoice)
     with db.connect(dsn) as conn:
         ref = conn.execute(
-            "SELECT r.*, p.status AS partner_status FROM affiliate_referrals r "
+            "SELECT r.*, p.status AS partner_status, p.partner_approved FROM affiliate_referrals r "
             "JOIN affiliate_partners p ON p.id = r.partner_id AND p.account_id = r.account_id "
             "WHERE r.referred_account_id = %s", (account_id,)).fetchone()
         if ref is None:
             return {"action": "no_referral"}
         _partner_lock(conn, int(ref["partner_id"]))
         ref = conn.execute(
-            "SELECT r.*, p.status AS partner_status FROM affiliate_referrals r "
+            "SELECT r.*, p.status AS partner_status, p.partner_approved FROM affiliate_referrals r "
             "JOIN affiliate_partners p ON p.id = r.partner_id AND p.account_id = r.account_id "
             "WHERE r.referred_account_id = %s", (account_id,)).fetchone()
         if ref["partner_status"] != "approved":
@@ -611,7 +636,8 @@ def on_invoice_paid(account_id: int, invoice: dict, *, months_covered: int = 1,
         if basis <= 0:
             return {"action": "nothing_paid"}
         if ref["first_paid_at"] is None:
-            tier = tier_for_count(_paying_count(conn, ref["account_id"], ref["partner_id"]))
+            tier = tier_for_count(_paying_count(conn, ref["account_id"], ref["partner_id"]),
+                                  bool(ref["partner_approved"]))
             conn.execute(
                 "UPDATE affiliate_referrals SET first_paid_at = %s, tier_key = %s, rate_bp = %s, "
                 "window_months = %s WHERE id = %s AND account_id = %s",
@@ -803,7 +829,7 @@ def summary(account_id: int, *, dsn: Optional[str] = None) -> dict:
             "SELECT id, created_at, commission_cents, status, payout, rate_bp, hold_until "
             "FROM affiliate_commissions WHERE account_id = %s AND partner_id = %s "
             "ORDER BY id DESC LIMIT 12", (account_id, p["id"])).fetchall()]
-    tier = tier_for_count(paying)
+    tier = tier_for_count(paying, bool(p.get("partner_approved")))
     nxt = next_tier(tier)
     out.update({
         "status": p["status"],
@@ -815,7 +841,8 @@ def summary(account_id: int, *, dsn: Optional[str] = None) -> dict:
         "tier": {"key": tier.key, "label": tier.label, "percent": tier.percent,
                  "months": tier.window_months},
         "next_tier": ({"key": nxt.key, "label": nxt.label, "percent": nxt.percent,
-                       "months": nxt.window_months, "needs": max(0, nxt.min_paying - paying)}
+                       "months": nxt.window_months, "needs": max(0, nxt.min_paying - paying),
+                       "by_approval": nxt.by_approval}
                       if nxt else None),
         "earnings": {
             "held_cents": sums.get("held", (0, 0))[0],
@@ -886,6 +913,9 @@ def main(argv: Optional[list[str]] = None) -> None:
     po = sub.add_parser("set-payout", help="cash (default) or credits, per partner")
     po.add_argument("who")
     po.add_argument("mode", choices=PAYOUT_MODES)
+    gp = sub.add_parser("grant-partner", help="put a partner on the Partner tier (needs 50 paying referrals too)")
+    gp.add_argument("who")
+    gp.add_argument("--revoke", action="store_true")
     sub.add_parser("release", help="pay every commission whose 60-day hold has ended")
     sub.add_parser("payouts", help="cash owed per partner (at or over the minimum)")
     mp = sub.add_parser("mark-paid", help="record that you sent a partner their released cash")
@@ -913,6 +943,9 @@ def main(argv: Optional[list[str]] = None) -> None:
         elif args.cmd == "set-payout":
             p = set_payout_mode(args.who, args.mode)
             print(f"partner #{p['id']} now paid as {p['payout_mode']}")
+        elif args.cmd == "grant-partner":
+            p = grant_partner(args.who, not args.revoke)
+            print(f"partner #{p['id']} Partner tier {'granted' if p['partner_approved'] else 'revoked'}")
         elif args.cmd == "release":
             print(release_due())
         elif args.cmd == "payouts":

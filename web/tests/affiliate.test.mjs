@@ -8,9 +8,10 @@ const AFFILIATE_TERMS = JSON.parse(readFileSync(new URL('../src/content/affiliat
 test('the page prints the three tiers Mike set', () => {
   assert.deepEqual(
     AFFILIATE_TERMS.tiers.map((t) => [t.key, t.percent, t.months]),
-    [['starter', 25, 6], ['pro', 30, 6], ['partner', 35, 12]],
+    [['starter', 25, 6], ['pro', 30, 6], ['partner', 30, 12]],
   );
   assert.equal(AFFILIATE_TERMS.tiers[2].min_paying, 50);
+  assert.equal(AFFILIATE_TERMS.tiers[2].by_approval, true);
   assert.equal(AFFILIATE_TERMS.buyer_discount_percent, 10);
 });
 
