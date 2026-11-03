@@ -10,6 +10,8 @@
 
    Pure and import-free: tests/direct.test.mjs runs it as it is. */
 
+import type { CameraCatalogue, ModelCamera } from "./camera";
+
 export type SecondsAxis =
   | { kind: "choices"; values: number[]; default: number }
   | { kind: "range"; min: number; max: number; default: number }
@@ -34,8 +36,10 @@ export type VideoModel = {
   ref_tag: string | null;
   /** the resolutions it renders with references, null = all of them */
   ref_resolutions: string[] | null;
+  /** how the Camera move card reaches it (lib/camera.ts), absent on an older API */
+  camera?: ModelCamera;
 };
-export type VideoMenu = { ready: boolean; items: VideoModel[]; default: string; exempt: boolean };
+export type VideoMenu = { ready: boolean; items: VideoModel[]; default: string; exempt: boolean; camera?: CameraCatalogue };
 
 export type ImageModel = {
   id: string;

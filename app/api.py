@@ -7552,7 +7552,9 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
     optional start frame as `files` (an upload) or `asset_photos` (a picked
     picture). With `ref_mode=references` (2026-10-25) those pictures are
     instead ALL held as references on the model's reference endpoint
-    (fal.REF2V), named in the prompt by their tags. No photograph is
+    (fal.REF2V), named in the prompt by their tags. `camera_move`,
+    `lens_focal`, `lens_aperture` and `lens_look` (2026-11-03) are the
+    Camera move and Lens cards, placed by direct.dress_video. No photograph is
     required (Mike's call): this writes no scene, so the reference gate --
     which guards scenes -- has nothing to guard here."""
     from src import direct, fal
@@ -7572,6 +7574,14 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
     held = str(form.get("ref_mode") or "") == "references"
     pictures = [r[0] for r in image_refs] if held else []
     start = image_refs[0][0] if image_refs and not held else None
+    # the Camera move and Lens cards (2026-11-03, src/camera.py): words in
+    # the prompt, LTX 2.5's own camera setting, or a reference clip
+    try:
+        shot = direct.dress_video(prompt, model, form.get, start_frame=start is not None,
+                                  resolution=str(form.get("resolution") or "") or None)
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    prompt = shot["prompt"]
     try:
         q = direct.video_quote(account_id, model=model,
                                seconds=_form_int(form, "seconds"),
@@ -7596,7 +7606,9 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
             aspect_ratio=q["aspect"],
             # the person pressed the priced button on the Video page
             approved=True, account_id=account_id, source="direct", bank=True,
-            **({"references": pictures} if pictures else {}))
+            **({"references": pictures} if pictures else {}),
+            **({"reference_videos": shot["video_refs"]} if shot["video_refs"] else {}),
+            **({"camera_motion": shot["camera_motion"]} if shot["camera_motion"] else {}))
         if not res.get("ok"):
             raise RuntimeError(_render_failed(res.get("error"), "The clip"))
         asset = res.get("asset_id")

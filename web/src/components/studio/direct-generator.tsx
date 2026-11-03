@@ -78,6 +78,19 @@ import {
 } from "@/lib/studio-api";
 import "@/components/studio/direct-generator.css";
 import { ModelPins } from "@/components/studio/model-pins";
+import {
+  MODE_LABEL,
+  MODE_NOTE,
+  NO_CAMERA,
+  blockedBy,
+  cameraChips,
+  cameraFields,
+  cameraMode,
+  lensValue,
+  moveValue,
+  type CameraCatalogue,
+  type CameraPick,
+} from "@/lib/camera";
 import { SignupSheet, takePendingPrompt } from "@/components/studio/phone/signup-sheet";
 /* eslint-disable @next/next/no-img-element */
 
@@ -122,7 +135,7 @@ type Shown = {
   behind?: string | null;
 };
 
-type MenuName = "model" | "length" | "res" | "frame" | null | "dock-model" | "dock-shape";
+type MenuName = "model" | "length" | "res" | "frame" | null | "dock-model" | "dock-shape" | "camera" | "lens";
 
 const readStore = (key: string): string | null => {
   try {
@@ -194,6 +207,8 @@ function Generator({ kind }: { kind: Kind }) {
   const [iPick, setIPick] = useState<ImagePick | null>(null);
   const [pickNote, setPickNote] = useState("");
   const [menu, setMenu] = useState<MenuName>(null);
+  // the Camera move and Lens cards (2026-11-03, lib/camera.ts): words, LTX's own setting or a reference clip
+  const [cam, setCam] = useState<CameraPick>(NO_CAMERA);
 
   // a link may carry a prompt and (on Video) a start frame: read once, on arrival
   const [prompt, setPrompt] = useState(() => (params.get("prompt") ?? "").slice(0, 26000));
@@ -275,6 +290,28 @@ function Generator({ kind }: { kind: Kind }) {
   const resolutions = videoResolutions(vModel, refMode);
   const vRes =
     vPick && resolutions.length && !resolutions.includes(vPick.resolution) ? resolutions[resolutions.length - 1] : vPick?.resolution;
+  const camCat: CameraCatalogue | null = video ? (vMenu?.camera ?? null) : null;
+  const camChips = video ? cameraChips(camCat, vModel ?? null, cam, hasStart, vRes) : [];
+  const camFoot = (["exact", "clip", "guided"] as const).map((m) => `${MODE_LABEL[m]}: ${MODE_NOTE[m]}.`).join(" ");
+  /** One card pick; a pick that contradicts another clears the other, and says why. */
+  const pickCamera = (field: keyof CameraPick, id: string) => {
+    // a lens pick tapped again is cleared; a move is chosen from a list with None
+    const next: CameraPick = { ...cam, [field]: cam[field] === id && field !== "move" ? "" : id };
+    const said: string[] = [];
+    for (const c of camCat?.conflicts ?? []) {
+      const other = c.a === next[field] ? c.b : c.b === next[field] ? c.a : "";
+      if (!other) continue;
+      for (const k of ["move", "focal", "aperture", "look"] as (keyof CameraPick)[]) {
+        if (k !== field && next[k] === other) {
+          next[k] = "";
+          said.push(c.why);
+        }
+      }
+    }
+    setCam(next);
+    for (const why of said) toast(`${why} The other pick was cleared.`, "ok");
+  };
+
   const vSend = vPick && vRes ? { ...vPick, resolution: vRes } : vPick;
   const resNote =
     vModel && vPick && vRes !== vPick.resolution
@@ -453,6 +490,7 @@ function Generator({ kind }: { kind: Kind }) {
       form.set("resolution", vSend?.resolution ?? vPick.resolution);
       form.set("aspect", vPick.aspect);
       if (refMode === "references") form.set("ref_mode", "references");
+      for (const [k, v] of cameraFields(cam)) form.set(k, v);
     } else if (iPick) {
       form.set("model", iPick.model);
       form.set("aspect", iPick.aspect);
@@ -861,6 +899,23 @@ function Generator({ kind }: { kind: Kind }) {
             />
           </div>
           {notes}
+          {camChips.length ? (
+            <div className="dgv-camchips" aria-label="Added to the prompt">
+              {camChips.map((c) => (
+                <span key={c.key} className="dgv-camchip" title={c.text}>
+                  <b data-mode={c.badge}>{c.badge}</b>
+                  <span>{c.text}</span>
+                  <button
+                    type="button"
+                    aria-label={c.key === "move" ? "Remove the camera move" : "Remove the lens"}
+                    onClick={() => setCam((was) => (c.key === "move" ? { ...was, move: "" } : { ...was, focal: "", aperture: "", look: "" }))}
+                  >
+                    <X strokeWidth={2} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           {picturesNote}
           {refMode === "references" && tags.length ? (
             <p className="dg-hint">The clip is held to these pictures. Name them in the prompt; tap a tag to put it there.</p>
@@ -933,6 +988,43 @@ function Generator({ kind }: { kind: Kind }) {
                     shapes
                   />
                 )}
+                {camCat ? (
+                  <>
+                    <ChipMenu
+                      name="Camera move"
+                      open={menu === "camera"}
+                      onOpen={() => setMenu(menu === "camera" ? null : "camera")}
+                      onClose={() => setMenu(null)}
+                      value={moveValue(camCat, cam)}
+                      strong={!!cam.move}
+                      items={[
+                        { id: "", name: "None", note: "Nothing is added; describe the camera yourself", right: "" },
+                        ...camCat.moves.map((m) => {
+                          const how = cameraMode(vModel, m.id, hasStart, vRes);
+                          const why = blockedBy(camCat, { ...cam, move: "" }, m.id);
+                          return { id: m.id, name: m.label, note: why ? `${m.words} (clears the lens pick: ${why})` : m.words, right: how ? MODE_LABEL[how] : "" };
+                        }),
+                      ]}
+                      picked={cam.move}
+                      onPick={(id) => {
+                        pickCamera("move", id);
+                        setMenu(null);
+                      }}
+                      title={`Camera move on ${vModel.label}`}
+                      foot={camFoot}
+                      scroll
+                      wide
+                    />
+                    <LensMenu
+                      open={menu === "lens"}
+                      onOpen={() => setMenu(menu === "lens" ? null : "lens")}
+                      onClose={() => setMenu(null)}
+                      cat={camCat}
+                      pick={cam}
+                      onPick={pickCamera}
+                    />
+                  </>
+                ) : null}
                 {refs.length === 1 && vCap > 1 ? (
                   <span className="dgv-use" role="radiogroup" aria-label="Use the picture as">
                     <button type="button" role="radio" aria-checked={!oneAsRef} onClick={() => setOneAsRef(false)}>
@@ -1087,6 +1179,71 @@ function ChipMenu(props: {
       {props.open ? (
         <div className="dg-pop-up" data-wide={props.wide ? "1" : undefined}>
           <MenuList items={props.items} picked={props.picked} onPick={props.onPick} title={props.title} foot={props.foot} shapes={props.shapes} scroll={props.scroll} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** The Lens card: focal length, aperture and a look, each tapped on or off.
+ *  Words in the prompt on every model (no clip model has a lens setting). */
+function LensMenu(props: {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  cat: CameraCatalogue;
+  pick: CameraPick;
+  onPick: (field: keyof CameraPick, id: string) => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  useDismiss(box, props.open, props.onClose);
+  const groups: { field: keyof CameraPick; name: string; list: CameraCatalogue["focal"] }[] = [
+    { field: "focal", name: "Focal length", list: props.cat.focal },
+    { field: "aperture", name: "Aperture", list: props.cat.aperture },
+    { field: "look", name: "Look", list: props.cat.looks },
+  ];
+  const any = !!(props.pick.focal || props.pick.aperture || props.pick.look);
+  return (
+    <div className="dg-pop" ref={box}>
+      <button
+        type="button"
+        className="dgv-chip"
+        data-strong={any ? "1" : undefined}
+        aria-label="Lens"
+        aria-haspopup="dialog"
+        aria-expanded={props.open}
+        onClick={props.onOpen}
+      >
+        {lensValue(props.cat, props.pick)}
+        <ChevronDown strokeWidth={2} className="dg-chev" />
+      </button>
+      {props.open ? (
+        <div className="dg-pop-up" data-wide="1">
+          <div className="dg-menu dgv-lens" role="dialog" aria-label="Lens">
+            <span className="dg-menu-title">Lens</span>
+            {groups.map((g) => (
+              <div key={g.field} className="dgv-lens-group" role="group" aria-label={g.name}>
+                <span className="dgv-lens-name">{g.name}</span>
+                <div className="dgv-lens-row">
+                  {g.list.map((e) => {
+                    const why = blockedBy(props.cat, { ...props.pick, [g.field]: "" }, e.id);
+                    return (
+                      <button
+                        key={e.id}
+                        type="button"
+                        aria-pressed={props.pick[g.field] === e.id}
+                        title={why ? `${e.words}. Picking it clears: ${why}` : e.words}
+                        onClick={() => props.onPick(g.field, e.id)}
+                      >
+                        {e.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <span className="dg-menu-foot">Lens is described in words on every model: what it does to the picture, not just the number. Tap a pick again to clear it.</span>
+          </div>
         </div>
       ) : null}
     </div>

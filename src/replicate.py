@@ -85,7 +85,12 @@ def submit_url(replicate_model: str) -> str:
 
 
 def to_input(body: dict) -> dict:
-    """fal's body for a Seedance row -> Replicate's `input`."""
+    """fal's body for a Seedance row -> Replicate's `input`. A video
+    reference is REFUSED, not dropped: its price here is not the one quoted,
+    and dropping it would render a different clip (fal.generate_video
+    refuses first; this is the second lock)."""
+    if (body or {}).get("video_urls"):
+        raise ValueError("video references render on fal only")
     out: dict = {}
     for key, value in (body or {}).items():
         name = FIELDS.get(key)
