@@ -68,6 +68,11 @@ GRANT_KEY = "oauth_consent_grant"       # {"id", "token", "csrf"} for one decisi
 # that, never anything that could break out of a URL path segment.
 _ID = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+# A desktop app's own redirect scheme (RFC 8252 7.1), and the schemes no
+# app address may use: they run code, read files or stay in the browser.
+_APP_SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*$")
+_NEVER_SCHEMES = {"javascript", "vbscript", "data", "file", "blob", "about",
+                  "filesystem", "view-source", "chrome", "ftp", "ws", "wss"}
 # How long a consent waits on a sign-in. Past this the pending id is
 # forgotten, so a person who walked away is not shown "Connect an app" on
 # their next visit. Supabase's own authorization request lasts about TEN
@@ -204,12 +209,31 @@ def _gone(status: int, body: Any) -> bool:
 
 def _safe_redirect(url: Any) -> Optional[str]:
     """Supabase's redirect_url, followed only when it is an absolute
-    http(s) URL -- the authorization server validated the client's
-    redirect URI, this just refuses to 303 to a javascript: or a path."""
+    http(s) URL or a desktop app's own address (`cursor://...`) -- the
+    authorization server validated the client's redirect URI, this just
+    refuses a javascript:, a data: or a path. Measured 2026-11-03: Cursor
+    registers `cursor://anysphere.cursor-mcp/oauth/callback`, and an
+    http-only rule left it on "Needs authentication" after every Allow."""
     if not isinstance(url, str):
         return None
     parts = urlsplit(url)
-    return url if parts.scheme in ("https", "http") and parts.netloc else None
+    if not parts.netloc:
+        return None
+    if parts.scheme in ("https", "http"):
+        return url
+    if _APP_SCHEME.match(parts.scheme) and parts.scheme not in _NEVER_SCHEMES:
+        return url
+    return None
+
+
+def _back_to(request: Request, target: str, client_name: str = "") -> Any:
+    """Send the person back to the app. A web address is a 303, as it
+    always was; a desktop app's address is a page that opens it, with a
+    link, because a browser may hold back opening another program until
+    the person clicks."""
+    if urlsplit(target).scheme in ("https", "http"):
+        return RedirectResponse(target, status_code=303)
+    return _page(request, back=target, client_name=client_name or "the app")
 
 
 def _host(uri: Any) -> str:
@@ -265,7 +289,7 @@ def consent_page(request: Request, authorization_id: str = ""):
         request.session.pop(GRANT_KEY, None)
         target = _safe_redirect(body.get("redirect_url"))
         if target:
-            return RedirectResponse(target, status_code=303)
+            return _back_to(request, target)
         return _problem(request, "The authorization server gave no way back to the app.", 502)
     shown = describe(body)
     # what the person is about to approve, kept beside the grant so the
@@ -328,4 +352,4 @@ def consent_decision(request: Request, authorization_id: str = Form(""),
         return _problem(request, "The authorization server gave no way back to the app.", 502)
     if action == "approve":
         _remember(grant)
-    return RedirectResponse(target, status_code=303)
+    return _back_to(request, target, str(grant.get("client_name") or ""))

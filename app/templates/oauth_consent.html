@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>{% if problem %}Connection problem{% else %}Allow {{ client_name }}?{% endif %}</title>
+<title>{% if problem %}Connection problem{% elif back %}Back to {{ client_name }}{% else %}Allow {{ client_name }}?{% endif %}</title>
+{% if back %}<meta http-equiv="refresh" content="0;url={{ back }}">{% endif %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -47,6 +48,9 @@ button{font:inherit;font-weight:600;border-radius:12px;padding:12px 14px;cursor:
   border:1px solid var(--line-hi);background:transparent;color:var(--text)}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a.back{display:block;text-align:center;font-weight:600;border-radius:12px;padding:12px 14px;
+  background:var(--accent);color:#fff;text-decoration:none}
+a.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .foot{color:var(--dim);font-size:13px;margin-top:18px}
 </style>
 </head>
@@ -55,6 +59,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   {% if problem %}
   <h1>We couldn't finish connecting</h1>
   <p class="sub">{{ problem }}</p>
+  {% elif back %}
+  <h1>Opening {{ client_name }}</h1>
+  <p class="sub">Your browser may ask to open it. If nothing happens, use the button.</p>
+  <a class="back" href="{{ back }}">Return to {{ client_name }}</a>
+  <p class="foot">You can close this tab once {{ client_name }} says it is connected.</p>
   {% else %}
   <h1>Allow {{ client_name }} to use Phantra?</h1>
   <p class="sub">{% if email %}Signed in as <b>{{ email }}</b>. {% endif %}You will be sent back to
