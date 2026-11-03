@@ -5356,7 +5356,7 @@ p.zkeys {
 }
 /* the last menu on the bar (Plugins) is portalled; the one before it sits
    at the right of the nav, so it hangs from its trigger's right edge */
-.hnav-wrap[data-group="edit"] .hnav-menu {
+.hnav > .hnav-wrap:last-of-type .hnav-menu {
   left: auto;
   right: 0;
   transform: none;

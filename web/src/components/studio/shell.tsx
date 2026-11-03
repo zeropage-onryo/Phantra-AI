@@ -83,6 +83,7 @@ import { requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 import { halloweenOn } from "@/lib/effects-wall";
+import { EDITOR_IN_UI } from "@/lib/editor-flag";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
@@ -125,10 +126,12 @@ type NavGroup = { id: string; label: string; icon: typeof House; items: ViewId[]
 const GROUPS: NavGroup[] = [
   { id: "projects", label: "Projects", icon: FolderKanban, items: ["projects", "calendar"] },
   { id: "create", label: "Create", icon: House, items: ["studio", "image", "video", "ads", "effects", "voice"] },
-  { id: "library", label: "Library", icon: Layers, items: ["assets", "elements", "brand"] },
-  { id: "edit", label: "Edit", icon: Scissors, items: ["cut", "renders"] },
+  // Renders sits with the work it made while the editor is off the UI
+  // (lib/editor-flag.ts); with it back on, Edit holds both again
+  { id: "library", label: "Library", icon: Layers, items: EDITOR_IN_UI ? ["assets", "elements", "brand"] : ["assets", "elements", "brand", "renders"] },
+  ...(EDITOR_IN_UI ? [{ id: "edit", label: "Edit", icon: Scissors, items: ["cut", "renders"] as ViewId[] }] : []),
 ];
-/* Renders is off the old rail (2026-10-20) but has a home in Edit's menu */
+/* Renders is off the old rail (2026-10-20) but has a home in the menus */
 const EXTRA: NavItem[] = [{ id: "renders", label: "Renders", href: "/studio/renders", icon: Film }];
 /* a line under each page's name in its menu */
 const BLURB: Partial<Record<ViewId, string>> = {
