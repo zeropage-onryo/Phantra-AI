@@ -9,8 +9,8 @@
    - a bottom bar of five labelled tabs: Home · Assets · a big Create
      button · Effects · Profile;
    - a full-screen menu holding everything that left the bar (Projects,
-     the Image and Video generators, Elements, Brand kits, Calendar,
-     Plugins, Settings).
+     the Image and Video generators, Voice where the rail shows it, Ad
+     Studio, Elements, Brand kits, Calendar, Plugins, Settings).
 
    The credit pill, search, the activity tray and New session are not on a
    phone's top bar: credits live on the Profile tab (/studio/me). None of
@@ -20,6 +20,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import {
   AtSign,
+  AudioLines,
   CalendarDays,
   Clapperboard,
   FolderKanban,
@@ -151,7 +152,7 @@ export function PhoneTabs({ caps, unseen = 0 }: { caps: Capabilities; unseen?: n
 }
 
 /** Everything that left the bar, as one full-screen sheet. */
-export function PhoneMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function PhoneMenu({ open, onClose, caps }: { open: boolean; onClose: () => void; caps: Capabilities }) {
   // every link in it closes it on the way (onClick), so there is no
   // route watcher here
   useEffect(() => {
@@ -186,6 +187,8 @@ export function PhoneMenu({ open, onClose }: { open: boolean; onClose: () => voi
         {row("/studio/projects", "Projects", FolderKanban)}
         {row("/studio/video", "Video", Clapperboard)}
         {row("/studio/image", "Image", ImageIcon)}
+        {/* the rail's own flag (QA 2026-11-02 T15: Voice had no way in on a phone) */}
+        {caps.voice_tab === true ? row("/studio/voice", "Voice", AudioLines) : null}
         {row("/studio/ads", "Ad Studio", Megaphone)}
         {row("/studio/elements", "Elements", AtSign)}
         {row("/studio/brand", "Brand kits", Palette)}

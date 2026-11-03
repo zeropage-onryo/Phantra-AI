@@ -761,7 +761,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
           {stage ? <div className="stage">{children}</div> : children}
         </div>
         <PhoneTabs caps={caps} unseen={unseen} />
-        <PhoneMenu open={pmenu} onClose={closePmenu} />
+        <PhoneMenu open={pmenu} onClose={closePmenu} caps={caps} />
 
         <CommandPalette
           me={me}

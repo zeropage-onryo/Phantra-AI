@@ -241,7 +241,7 @@ function MediaTab() {
         <p className="cx-note">
           {bin.length
             ? "Nothing of that kind in the bin."
-            : "Your renders from Assets land here, beside anything you upload. Render a scene in the Queue, or drop a file above."}
+            : "Your renders from Assets land here, beside anything you upload. Render a scene from its Render card, or drop a file above."}
         </p>
       )}
     </div>

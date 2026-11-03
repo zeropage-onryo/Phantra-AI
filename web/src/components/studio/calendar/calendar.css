@@ -167,6 +167,11 @@
   gap: 6px;
   cursor: pointer;
 }
+/* `.zps button { color: inherit }` outranks the bare class, which left the
+   label white on yellow (QA 2026-11-02 T14, the T5 trap): scoped, it wins */
+.zps .cal-primary {
+  color: var(--on-signal);
+}
 .cal-primary.sm {
   padding: 5px 9px;
   font-size: 11px;

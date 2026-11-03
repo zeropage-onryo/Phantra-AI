@@ -160,7 +160,7 @@ export function AddElement({
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Look, wardrobe, quirks — becomes a searchable chunk on the RAG assets shelf"
+              placeholder="Look, wardrobe, quirks — the writer reads these whenever this element is in a scene"
               aria-label="Notes"
             />
           </div>
@@ -230,7 +230,7 @@ export function AddElement({
         </div>
         <div className="zdfoot">
           <span className="m">
-            saves the {kind} + teaches the RAG assets shelf{willDraw ? ` + draws the sheet${sheetPrice ? ` (${sheetPrice})` : ""}` : ""}
+            saves the {kind}{willDraw ? " and draws its reference sheet" : ""}
           </span>
           <span className="spacer" />
           <button type="button" className="zbtn" onClick={onClose}>

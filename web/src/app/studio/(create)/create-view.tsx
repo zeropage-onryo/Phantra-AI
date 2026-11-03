@@ -304,6 +304,7 @@ import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/sce
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
 import { VesperPeek } from "@/components/studio/vesper-peek";
+import { landedFrom } from "@/lib/vesper-voice";
 import { takeTalk } from "@/lib/creature";
 
 /* an upload on its way to the bin: drawn from its object URL until the
@@ -3460,6 +3461,15 @@ function Composer() {
     },
   };
   const liveRun = running.current && busy;
+  // the newest still or clip that landed in this thread, for Vesper's cheer
+  // (a turn that only wrote a scene lands nothing: QA 2026-11-02 T12)
+  const landedNow = useMemo(() => {
+    for (let i = thread.length - 1; i >= 0; i--) {
+      const hit = landedFrom(thread[i].made);
+      if (hit) return hit;
+    }
+    return null;
+  }, [thread]);
   const sendLabel = "Send";
   // what THIS send can spend without another click (lib/continue.ts):
   // nothing, unless a still is drawn on the send
@@ -3754,7 +3764,8 @@ function Composer() {
               making={!!liveRun}
               typing={!!idea.trim()}
               failed={!!last?.failed || last?.made?.status === "failed"}
-              kind={output}
+              landedKey={landedNow?.key ?? null}
+              landedKind={landedNow?.kind ?? output}
               onFill={(text) => {
                 setIdea(text);
                 setTimeout(() => {

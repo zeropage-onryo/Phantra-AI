@@ -53,6 +53,7 @@ import {
   fontFaces,
   captionSample,
   fontStack,
+  inkOn,
   isFontRole,
   isSvg,
   LINK_PHOTOS_MAX,
@@ -900,7 +901,7 @@ export default function BrandKitPage() {
               <span className={LABEL}>Palette</span>
               <div className="flex h-10 overflow-hidden rounded-md">
                 {spec.palette.length ? spec.palette.map((s, i) => (
-                  <span key={i} className="flex flex-1 items-end p-1 text-[9px]" style={{ background: normaliseHex(s.hex) ?? "#000", color: "#0008" }}>
+                  <span key={i} className="flex flex-1 items-end p-1 text-[9px]" style={{ background: normaliseHex(s.hex) ?? "#000", color: inkOn(normaliseHex(s.hex) ?? "#000") }}>
                     {s.role}
                   </span>
                 )) : <span className={HINT}>No colours yet.</span>}

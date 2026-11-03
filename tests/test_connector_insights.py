@@ -65,6 +65,10 @@ def test_with_nothing_made_what_works_says_so_and_calls_nothing(world):
     out = mcp_server.what_works(dsn=world["dsn"], account_id=world["a"])
     assert not out["enough_data"] and out["outputs"]["made"] == 0
     assert any("too little to say" in line for line in out["lines"])
+    # read on Ad Studio by the person, so said in their words (QA
+    # 2026-11-02 T17: "(this fills in from 5)")
+    assert not any("fills in" in line for line in out["lines"])
+    assert any(f"once {mcp_server.INSIGHT_MIN_OUTPUTS} are made" in line for line in out["lines"])
     assert any("nothing posted" in line for line in out["lines"])
     assert out["presets"] == [] and out["posted"] == []
     _no_dollars(out)

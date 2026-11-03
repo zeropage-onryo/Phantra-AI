@@ -409,7 +409,7 @@ input.cx-title {
   inset: 0;
   display: grid;
   place-items: center;
-  color: var(--dimmer);
+  color: var(--dim);
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.14em;

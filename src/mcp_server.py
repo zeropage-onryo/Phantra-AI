@@ -3608,9 +3608,9 @@ def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -
     enough = made >= INSIGHT_MIN_OUTPUTS
     lines: list[str] = []
     if not enough:
-        lines.append(f"too little to say yet: {made} output{'s' if made != 1 else ''} made "
-                     f"(this fills in from {INSIGHT_MIN_OUTPUTS}); keep, download, cut, star "
-                     "or post what you like and it starts to mean something")
+        lines.append(f"too little to say yet: {made} output{'s' if made != 1 else ''} made, "
+                     f"and this starts once {INSIGHT_MIN_OUTPUTS} are made; keep, download, cut, "
+                     "star or post what you like and it starts to mean something")
     else:
         lines.append(f"you kept {kept} of {made} outputs ({kept / made:.0%})")
         for m in models[:3]:

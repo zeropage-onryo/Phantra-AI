@@ -2039,7 +2039,11 @@ button.tag:hover {
 .elcover {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* never wider than the page (QA 2026-11-02 T6): in the view's column a
+     grid with auto margins sizes to its content, and auto-fit then laid
+     two 320px tracks side by side, 752px wide on a 390px phone */
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   align-items: center;
   gap: 48px;
   padding: 0 clamp(32px, 6vw, 96px) 60px;
@@ -3070,6 +3074,19 @@ textarea.zin {
 .qinfo {
   min-width: 0;
 }
+/* the Showcase's row (renders page, house account): picture, words, status,
+   actions -- stacked on a phone below (QA 2026-11-02 T7) */
+.qrow.showrow {
+  grid-template-columns: 128px minmax(0, 1fr) 96px minmax(0, max-content);
+  align-items: flex-start;
+}
+.showacts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
 .qn {
   font-size: 13.5px;
   white-space: nowrap;
@@ -3742,6 +3759,18 @@ select.zin {
   }
 }
 
+
+/* the Showcase's row on a phone: one column, the actions a wrapping row */
+@media (max-width: 720px) {
+  .qrow.showrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .qrow.showrow .showacts {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
 
 /* the Queue's lane and job list on a phone: same 16px gutters as the heads */
 @media (max-width: 720px) {
@@ -5073,6 +5102,14 @@ p.zkeys {
 }
 .zplug-get-btn:hover {
   background: var(--signal-deep);
+}
+/* `.zps a { color: inherit }` outranks the bare class: white on yellow
+   (QA 2026-11-02 T14). Scoped, the label is black, and Off stays grey */
+.zps .zplug-get-btn {
+  color: var(--on-signal);
+}
+.zps .zplug-get-btn.off {
+  color: var(--bone-3);
 }
 .zplug-get-btn.off {
   background: var(--raise);

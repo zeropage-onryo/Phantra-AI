@@ -42,10 +42,33 @@ export function greeting(who: string | null | undefined, recent: Recent): Line {
   return { id: "hi", text: `${hi} — what are we making today?` };
 }
 
+/** What one send's result has landed, if anything: a still drawn, or a
+    clip on the scene (whole, a shot, the final cut, an effect's). A scene
+    that was only WRITTEN has landed nothing -- he used to say "That one
+    came out" for it (QA 2026-11-02 T12). The key changes once per landing,
+    so the peek speaks once. */
+type Landable = {
+  id: string;
+  output: string;
+  status: string;
+  image?: string | null;
+  sceneClip?: string | null;
+  clip?: string | null;
+  finalCut?: { url?: string | null } | null;
+  parts?: { media_url?: string | null }[] | null;
+};
+export function landedFrom(made: Landable | null | undefined): { key: string; kind: "image" | "video" } | null {
+  if (!made || made.status !== "done") return null;
+  const clip = made.sceneClip || made.clip || made.finalCut?.url || made.parts?.some((p) => p.media_url);
+  if (clip) return { key: `${made.id}:clip`, kind: "video" };
+  if (made.output === "image" && made.image) return { key: `${made.id}:image`, kind: "image" };
+  return null;
+}
+
 /** a make just landed in the box */
 export function landed(kind: "image" | "video"): Line {
   return kind === "video"
-    ? { id: "landed-v", text: "That one came out. Another take, or join it into a cut?" }
+    ? { id: "landed-v", text: "That clip came out. Another take, or join it into a cut?" }
     : { id: "landed-i", text: "Fresh still. Want me to animate it?", fill: "Animate my last still" };
 }
 

@@ -84,7 +84,7 @@
   font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--dimmer);
+  color: var(--dim);
 }
 .dg .dg-lab em {
   font-style: normal;
@@ -100,7 +100,7 @@
 .dg .dg-count {
   font-family: var(--mono);
   font-size: 10.5px;
-  color: var(--dimmer);
+  color: var(--dim);
   white-space: nowrap;
 }
 .dg .dg-hint {
@@ -111,6 +111,9 @@
 }
 .dg .dg-hint a {
   color: var(--signal);
+  /* told from its sentence by more than colour (QA 2026-11-02 T14) */
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .dg .dg-note {
   margin: 0;
@@ -260,7 +263,7 @@
   font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--dimmer);
+  color: var(--dim);
 }
 .dg .dg-menu-rows {
   display: flex;
@@ -775,7 +778,7 @@
 }
 .dg .dg-empty small {
   font-size: 11.5px;
-  color: var(--dimmer);
+  color: var(--dim);
 }
 .dg .dg-starters {
   display: flex;

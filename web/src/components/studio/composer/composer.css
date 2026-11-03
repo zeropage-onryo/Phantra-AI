@@ -147,6 +147,25 @@
   position: relative;
   bottom: auto;
 }
+/* Vesper peeks 48px over the box's top edge (.zc-vesper below). Docked
+   under a conversation that space is kept clear, so he never sits on the
+   last card's buttons or the project row (QA 2026-11-02 T12: he covered
+   "Open the canvas", the project chip, a plan card's last line) */
+.zc.zc-active .zc-dock:not(:has(.zc-project)) > .zc-box {
+  margin-top: 52px;
+}
+.zc.zc-active .zc-dock:has(.zc-project) > .zc-box {
+  margin-top: 40px;
+}
+@media (max-width: 720px) {
+  .zc.zc-active .zc-dock:not(:has(.zc-project)) > .zc-box {
+    margin-top: 38px;
+  }
+  /* his bubble wraps to two lines at phone width */
+  .zc.zc-active .zc-dock:has(.zc-project) > .zc-box {
+    margin-top: 50px;
+  }
+}
 @media (max-width: 720px) {
   .zc.zc-active .zc-dock:has(.zc-project) {
     position: relative;
@@ -397,6 +416,12 @@
   align-items: center;
   gap: 2px;
   margin-left: 4px;
+  /* the options wrap inside their own group, so Send keeps its place at
+     the right of the first row however many a project and a kit add (QA
+     2026-11-02 T13: it dropped to a row of its own, on the left) */
+  flex: 1 1 0;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 .zc .zc-opt {
   height: 32px;
