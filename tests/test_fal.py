@@ -690,9 +690,12 @@ def test_a_start_frame_that_cannot_be_sent_is_refused_not_rendered_without(
 
 
 def test_references_reach_the_reference_endpoint_and_the_row(
-        tmp_db, approved, keys, fake_download):
+        tmp_db, approved, keys, fake_download, monkeypatch):
     import json
 
+    # fal's own reference endpoint; at 720p Seedance 2.5 renders on Replicate
+    # since 2026-11-02 (tests/test_replicate.py), so that host is switched off
+    monkeypatch.setenv(fal.REPLICATE_ENV, "0")
     http = FakeHttp()
     result = fal.generate_from_prompt(
         "@Image1 holds the phone from @Image2", model="seedance2.5",

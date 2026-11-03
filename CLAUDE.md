@@ -367,6 +367,12 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
 - **fal is the only video renderer** (`src/fal.py`, `providers.VIDEO_PROVIDERS = {"fal": fal}`):
   Kling, Veo, Seedance, LTX, Wan from one dated table (`fal.VIDEO_MODELS`: id, legal durations
   and resolutions, price per second per resolution, each re-checked against the model's schema).
+  **One row may have a second HOST** (2026-11-02, `src/replicate.py`,
+  `docs/tasks/task-replicate-seedance.md`): Seedance 2.5 at 480p / 720p renders on Replicate at
+  ByteDance's own rate, half fal's. `fal.host_for(model, resolution)` decides, `price_per_second`
+  prices that host, and the live loop, cancel and recovery are fal's own (`_submit_and_wait`
+  with `replicate.queue_http` as its transport; the sweep picks it for a `replicate:` model_id).
+  No `REPLICATE_API_TOKEN` is a refusal before any hold; `PHANTRA_REPLICATE=0` moves it back.
   A length is fitted UP to the model's enum; an illegal choice is REFUSED, never clamped. A row
   is logged under the model that rendered it, never "fal".
 - **The Render card** (`render-card.tsx`) is the only place a clip is paid for:
