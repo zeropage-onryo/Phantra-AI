@@ -16,6 +16,7 @@ hand-filled showcase manifest, both shipped with a deploy.
 2. **The "New" badge and a public What's new page ship in this build.**
 3. **Sitewide trending is a later step** (counts only, a minimum before anything shows, never
    another account's renders or prompts). Trending entries stay hand-picked until then.
+   Built 2026-11-02 on Mike's "totals across all accounts" (step 5 below).
 4. **One render per announcement, on the house account (`phantra`)**, shown to every user. Users
    never pay for or see a price on a showcase; they pay only for their own render after a click.
 5. **Approve each render**, no standing budget. Keep / Redo before anything goes live.
@@ -311,3 +312,43 @@ None are live today, so `DEALS` ships empty.
 
 Not in step 4, still to build: the editor / plugin / connector / model-page readers, the
 `whats-new` PR label, the `/ship` reminder.
+
+### Step 5 (2026-11-02, branch `claude/create-new-popular`): studio-wide Trending
+
+Mike, 2026-11-02, asked whether the Create page picks up new features and shows what is new and
+popular, and chose "totals across all accounts" for popular.
+
+- `src/popular.py`: one bounded read of `generations` across every account (landed rows only,
+  `output_path` set, last 7 days, newest 50,000), each mapped to a catalogue key off its attempt
+  log: an effect or free look (`params.effect`), else a fal model (`provider == "fal"`, `model`
+  in `fal.VIDEO_MODELS` / `IMAGE_MODELS`). The house account's showcase renders
+  (`source == "showcase"`) never count. **The floor:** a key trends only once 3 different
+  accounts used it and it landed 5 times; most-shared first, then uses; top 8; a key no longer
+  offered drops out. **What leaves:** `{id, source, key, label, runs}`, the total only. The
+  account count is used for the floor and dropped; no prompt, render, picture or account id
+  leaves the module. Cached in the process for 10 minutes; never raises.
+- Tenancy: the read selects `account_id` (to count accounts for the floor), so the SQL audit
+  passes it; the comment beside it names its siblings (`generative.used_today(everyone=True)`,
+  `spend.spent_today_everyone`). No new table, no new route.
+- `whats_new.feed` returns `trending` beside `items`, and each live item carries
+  `trending_runs` when its key is in it.
+- `lib/front-page.ts` `applyTrending`: a tile whose key is trending (a feed tile by id; a
+  `news.json` tile by its look, model, effect or an id that is the key) becomes TRENDING with
+  "N uses this week" in place of its date. A tile still New (a feed tile's `new`, a file model
+  dated inside 21 days) keeps its NEW tag and gets the line. Once anything is really trending,
+  the hand-picked `type: "trending"` entries in `news.json` step aside; until then they stay,
+  so the Trending chip is never empty. Order: New feed tiles, then Trending by uses, then the
+  rest unchanged. `usesLabel`: "42 uses this week", "1.3k uses this week", never a price.
+- What it cannot light up yet: an effect or look that has no tile at all. The effects and looks
+  that existed before step 1 were seeded `skipped`, and `news.json` has tiles for only some of
+  them, so a popular effect with neither shows nowhere until Mike keeps a showcase for it (the
+  Showcase list's Restore, then Pick or Render).
+- Checked in a browser against `next dev` with every `/api` route mocked (nothing could spend):
+  `crash_zoom` at 42 uses led the wall as TRENDING, Kling 4.0 at 17 kept NEW MODEL with "17 uses
+  this week", the Trending chip showed the real one only, no page errors, no sideways scroll at
+  390px, no non-GET request. Seen while checking, not changed: at 1440 the wall starts under the
+  expanded rail (x=84 against a 236px rail), so the first column's tile is cut, on main too.
+- Tests: `tests/test_popular.py` (10: both floors, a total never who, key mapping, showcase
+  excluded, failed and old rows excluded, offered-only, cache, the feed's field);
+  `web/tests/front-page.test.mjs` (6 more). `tests/test_whats_new.py` and
+  `tests/test_tenancy.py` pass unchanged.

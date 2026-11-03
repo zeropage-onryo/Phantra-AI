@@ -25,7 +25,7 @@
    tests/front-page.test.mjs runs this file as it is. No price is drawn
    anywhere here except a deal's own words, and nothing here sends. */
 import type { ShowcaseItem } from "./showcase";
-import type { FeedItem } from "./whats-new";
+import type { FeedItem, TrendingKey } from "./whats-new";
 
 export type NewsType = "model" | "effect" | "trending" | "update" | "soon" | "deal";
 export type NewsSize = "big" | "wide" | "tall" | "medium" | "small" | "slim";
@@ -63,6 +63,10 @@ export type NewsItem = {
   textOnly?: boolean;
   /** Coming soon's "This month", never a made-up date */
   eta?: string | null;
+  /** a feed tile still inside its New window (whats_new.NEW_DAYS) */
+  fresh?: boolean;
+  /** trending studio-wide: this key's uses this week across every account */
+  runs?: number;
 };
 
 /** The tag on a tile, by type. Words only; the colour is the CSS's (front.css). */
@@ -209,9 +213,64 @@ export function feedNews(feed: FeedItem[]): { news: NewsItem[]; media: Record<st
       unread: !!f.unread,
       textOnly,
       eta: f.source === "soon" ? f.eta : null,
+      fresh: !!f.new,
+      ...(f.trending_runs ? { runs: f.trending_runs } : {}),
     });
   }
   return { news, media };
+}
+
+/* ── trending, studio-wide (2026-11-02, src/popular.py) ── */
+const NEW_DAYS = 21;
+
+/** The trending key a hand-made file entry points at, if any: its look, its
+ *  model, an effect by name, or an id that IS the key ("crash_zoom"). */
+function fileKey(item: NewsItem, keys: Map<string, TrendingKey>): TrendingKey | undefined {
+  const a = item.action as Record<string, unknown>;
+  const tries = [
+    typeof a.look === "string" ? `look:${a.look}` : "",
+    typeof a.model === "string" ? `model:${a.model}` : "",
+    typeof a.effect === "string" ? `effect:${a.effect}` : "",
+  ].filter(Boolean);
+  for (const t of tries) if (keys.has(t)) return keys.get(t);
+  for (const k of keys.values()) if (k.key === item.id) return k;
+  return undefined;
+}
+
+/** The wall with the studio's real Trending in it. A tile whose key the
+ *  whole studio is using (`trending`, from GET /api/whats-new) becomes a
+ *  TRENDING tile with its week's total -- unless it is still New, which wins
+ *  the tag. Once anything is really trending, the hand-picked Trending
+ *  entries in news.json step aside; until then they stay, so the chip is
+ *  never empty. Order: New feed tiles, then Trending by uses, then the rest
+ *  as they were. */
+export function applyTrending(news: NewsItem[], trending: TrendingKey[] | null | undefined, now: Date): NewsItem[] {
+  const keys = new Map((trending ?? []).filter((k) => k.runs > 0).map((k) => [k.id, k]));
+  const stillNew = (n: NewsItem) => {
+    if (n.feedId) return !!n.fresh;
+    if (n.type !== "model" || !n.date) return false;
+    const [y, m, d] = n.date.split("-").map(Number);
+    return (now.getTime() - Date.UTC(y, m - 1, d)) / 86_400_000 <= NEW_DAYS;
+  };
+  const marked = news.map((n) => {
+    const runs = n.feedId ? n.runs : fileKey(n, keys)?.runs;
+    if (!runs) return n.feedId ? n : { ...n, runs: undefined };
+    if (stillNew(n) || n.type === "soon" || n.type === "deal") return { ...n, runs };
+    return { ...n, runs, type: "trending" as NewsType, tag: undefined };
+  });
+  const real = marked.some((n) => n.runs && n.type === "trending");
+  const kept = real ? marked.filter((n) => !(n.type === "trending" && !n.runs)) : marked;
+  const first = kept.filter((n) => n.feedId && n.fresh);
+  const hot = kept.filter((n) => !(n.feedId && n.fresh) && n.type === "trending" && n.runs).sort((a, b) => (b.runs ?? 0) - (a.runs ?? 0));
+  const rest = kept.filter((n) => !first.includes(n) && !hot.includes(n));
+  return [...first, ...hot, ...rest];
+}
+
+/** "42 uses this week", "1.2k uses this week": the studio's total, never who. */
+export function usesLabel(runs: number | undefined): string {
+  if (!runs || runs < 1) return "";
+  const n = runs >= 1000 ? `${(runs / 1000).toFixed(runs >= 10_000 ? 0 : 1).replace(/\.0$/, "")}k` : String(runs);
+  return `${n} ${runs === 1 ? "use" : "uses"} this week`;
 }
 
 /** The wall's entries: the feed's (New first, as the server sent them), then

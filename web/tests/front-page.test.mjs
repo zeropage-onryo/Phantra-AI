@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  FILTERS, TAG, countLabel, feedAction, feedNews, hasWork, isFinalCut, liveNews, mergeNews, peekItems, plays,
-  readNews, readNewsItem, splitAccent, trayStages, wallTiles, whenLabel,
+  FILTERS, TAG, applyTrending, countLabel, feedAction, feedNews, hasWork, isFinalCut, liveNews, mergeNews, peekItems, plays,
+  readNews, readNewsItem, splitAccent, trayStages, usesLabel, wallTiles, whenLabel,
 } from '../src/lib/front-page.ts';
 
 /* The Create home as a front page (2026-10-22, docs/tasks/task-create-front-page.md). */
@@ -192,4 +192,64 @@ test('the feed leads the wall and wins over the file entry it names', () => {
 test('a feed tile carries no price', () => {
   const { news } = feedNews([feedItem()]);
   assert.doesNotMatch(JSON.stringify(news), /credit|\$\s?\d/i);
+});
+
+/* ── studio-wide Trending (2026-11-02, src/popular.py) ── */
+
+const NOW = new Date(Date.UTC(2026, 10, 2, 12));
+const fileItem = (over) => ({ id: 'x', type: 'update', title: 'X', accent: '', line: '', date: null, size: 'medium',
+  media: 'look.noir', action: { fill: 'x' }, requires: null, peek: false, ...over });
+const feedTile = (over) => feedNews([{ id: 'effect:bt', source: 'effect', tag: 'NEW EFFECT', title: 'Bullet time',
+  line: 'x', accent: '', size: 'tall', action: { effect: 'bt' }, media: { kind: 'video', url: 'https://m/x.mp4', poster: null },
+  eta: null, ends: null, new: false, unread: false, notify: null, you_asked: false, live_at: '2026-09-01T00:00:00Z', ...over }]).news[0];
+
+test('a hand-made tile pointing at a trending look becomes TRENDING with its total', () => {
+  const look = fileItem({ id: 'crash_zoom', type: 'effect', action: { look: 'crash_zoom' } });
+  const other = fileItem({ id: 'other' });
+  const out = applyTrending([other, look], [{ id: 'look:crash_zoom', source: 'look', key: 'crash_zoom', label: 'Crash', runs: 42 }], NOW);
+  assert.equal(out[0].id, 'crash_zoom', 'trending leads the old news');
+  assert.equal(out[0].type, 'trending');
+  assert.equal(out[0].runs, 42);
+  assert.equal(out[1].runs, undefined);
+});
+
+test('a feed tile that is trending but not New is tagged TRENDING; a New one keeps NEW', () => {
+  const old = applyTrending([feedTile({ trending_runs: 9 })], [], NOW)[0];
+  assert.equal(old.type, 'trending');
+  assert.equal(old.tag, undefined, 'the TRENDING tag, not the feed\'s NEW EFFECT');
+  assert.equal(old.runs, 9);
+  const fresh = applyTrending([feedTile({ trending_runs: 9, new: true })], [], NOW)[0];
+  assert.equal(fresh.type, 'effect');
+  assert.equal(fresh.runs, 9);
+});
+
+test('a recent model in the file stays NEW MODEL even when trending', () => {
+  const m = fileItem({ id: 'kling4', type: 'model', date: '2026-10-22', action: { fill: 'x', model: 'kling4' } });
+  const [out] = applyTrending([m], [{ id: 'model:kling4', source: 'model', key: 'kling4', label: 'Kling', runs: 30 }], NOW);
+  assert.equal(out.type, 'model');
+  assert.equal(out.runs, 30);
+});
+
+test('hand-picked Trending steps aside only once something is really trending', () => {
+  const picked = fileItem({ id: 'picked', type: 'trending' });
+  const look = fileItem({ id: 'noir', type: 'effect', action: { look: 'noir' } });
+  // nothing past the floor yet: the hand-pick stays, the chip is never empty
+  assert.deepEqual(applyTrending([picked, look], [], NOW).map((n) => n.id), ['picked', 'noir']);
+  const real = applyTrending([picked, look], [{ id: 'look:noir', source: 'look', key: 'noir', label: 'Noir', runs: 7 }], NOW);
+  assert.deepEqual(real.map((n) => n.id), ['noir']);
+});
+
+test('the file\'s own Trending entries are not dropped when the feed says nothing', () => {
+  const news = readNews(file);
+  assert.deepEqual(applyTrending(news, undefined, NOW).map((n) => n.id), news.map((n) => n.id));
+});
+
+test('the uses line is a total, never a price', () => {
+  assert.equal(usesLabel(1), '1 use this week');
+  assert.equal(usesLabel(42), '42 uses this week');
+  assert.equal(usesLabel(1250), '1.3k uses this week');
+  assert.equal(usesLabel(2000), '2k uses this week');
+  assert.equal(usesLabel(15000), '15k uses this week');
+  assert.equal(usesLabel(0), '');
+  assert.doesNotMatch(usesLabel(42), /credit|\$/);
 });
