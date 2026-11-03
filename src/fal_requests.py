@@ -55,7 +55,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from . import db, ledger
+from . import db, ledger, replicate
 
 # The key the adapter puts in its generations params so the sweep can find
 # the row a request already produced -- ledger_ref's twin, present whether
@@ -393,7 +393,12 @@ def _recover_one(row: dict, *, http, dsn: Optional[str]) -> dict:
         return fal._finish_recovered(row, Path(existing["output_path"]),
                                      generation_id=known_id, dsn=dsn)
 
-    call = http or (lambda u, p=None: fal._request(u, p, account_id=account_id))
+    # a Replicate job (2026-11-02, src/replicate.py) is read through its own
+    # transport, which answers in fal's shapes -- every step below is shared
+    if http is None and replicate.is_ours(row.get("model_id")):
+        call = replicate.queue_http()
+    else:
+        call = http or (lambda u, p=None: fal._request(u, p, account_id=account_id))
     try:
         state = call(row["status_url"])
         failed = fal._error_in(state)

@@ -1,5 +1,5 @@
 {
-  "pricing_version": "2026-11-02-fal-v5",
+  "pricing_version": "2026-11-02-fal-v6",
   "credit_cents": 1,
   "markup": "2.4",
   "markup_by_model": {
@@ -162,7 +162,7 @@
       "tier": "creator",
       "max_seconds": null,
       "seconds": 5,
-      "credits": 332,
+      "credits": 162,
       "frame": "720p"
     },
     {

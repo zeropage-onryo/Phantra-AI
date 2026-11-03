@@ -88,7 +88,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import cancellation, fal_requests, generative, ledger, render_names
+from . import cancellation, fal_requests, generative, ledger, render_names, replicate
 from . import charge as charging
 from .shot import Shot
 
@@ -346,6 +346,15 @@ VIDEO_MODELS: dict[str, dict] = {
         "resolutions": ("480p", "720p", "1080p"),
         "default_resolution": "720p",
         "prices": {"480p": 0.2205, "720p": 0.4730, "1080p": 1.164},
+        # A SECOND HOST (2026-11-02, src/replicate.py): Replicate resells
+        # ByteDance at ByteDance's own rate, half of fal's, with no 1080p.
+        # host_for() sends a 480p / 720p render there; price_per_second
+        # prices whichever host renders. Read off replicate.com/bytedance/
+        # seedance-2.5 (no video input) and its schema that day.
+        "hosts": {"replicate": {"model": "bytedance/seedance-2.5",
+                                "prices": {"480p": 0.1028, "720p": 0.2312},
+                                "checked": "2026-11-02",
+                                "source": "https://replicate.com/bytedance/seedance-2.5"}},
         "platform": "seedance",
         "checked": "2026-10-06",
         "source": "https://fal.ai/models/bytedance/seedance-2.5/image-to-video",
@@ -1232,6 +1241,25 @@ def spend_approved(approved: Optional[bool] = None, quote=None) -> bool:
     return (os.environ.get(SPEND_ENV) or "").strip() == "1"
 
 
+# A second host is on unless PHANTRA_REPLICATE=0 (2026-11-02). Read where it
+# is asked, never at import, so a test can flip it.
+REPLICATE_ENV = "PHANTRA_REPLICATE"
+
+
+def host_for(model: str = DEFAULT_MODEL, resolution: Optional[str] = None) -> str:
+    """Which host renders this model at this resolution: "replicate" when the
+    row carries a Replicate rate for that tier and the switch is on, else
+    "fal". Deterministic and key-free, so the card, the quote, the hold and
+    the site's table all price the same host; the render refuses rather than
+    fall back if the host's key is missing (generate_video)."""
+    spec = VIDEO_MODELS.get(model) or {}
+    rep = (spec.get("hosts") or {}).get("replicate")
+    if not rep or (os.environ.get(REPLICATE_ENV) or "1").strip() == "0":
+        return "fal"
+    tier = resolution or spec.get("default_resolution")
+    return "replicate" if tier in rep.get("prices", {}) else "fal"
+
+
 def price_per_second(model: str = DEFAULT_MODEL,
                      resolution: Optional[str] = None) -> float:
     """USD per second of output at this resolution. A model that takes a
@@ -1242,6 +1270,8 @@ def price_per_second(model: str = DEFAULT_MODEL,
     spec = model_spec(model)
     prices = spec["prices"]
     tier = resolution or spec["default_resolution"]
+    if host_for(model, resolution) == "replicate":
+        return spec["hosts"]["replicate"]["prices"][tier]
     if tier in prices:
         return prices[tier]
     if "resolution" not in spec["params"]:
@@ -1488,7 +1518,8 @@ def _cancelled_at_fal(why: str) -> "cancellation.Cancelled":
 def _submit_and_wait(model_id: str, body: dict, *, http=None,
                      timeout_s: Optional[int] = None,
                      account_id: Optional[int] = None,
-                     tracker: Optional[fal_requests.Tracker] = None) -> tuple[dict, set]:
+                     tracker: Optional[fal_requests.Tracker] = None,
+                     submit_url: Optional[str] = None) -> tuple[dict, set]:
     """Submit -> poll to COMPLETED -> fetch the result. Returns (result
     payload, queue URLs to skip). Raises on an error payload or the
     deadline.
@@ -1533,7 +1564,9 @@ def _submit_and_wait(model_id: str, body: dict, *, http=None,
     # one actually in force.
     timeout_s = TIMEOUT_SECONDS if timeout_s is None else timeout_s
     http = http or (lambda u, p=None: _request(u, p, account_id=account_id))
-    submitted = http(f"{HOST}/{model_id}", body)
+    # `submit_url` (2026-11-02): a second host's own address, with `http`
+    # its transport in fal's shapes (src/replicate.py)
+    submitted = http(submit_url or f"{HOST}/{model_id}", body)
     status_url = submitted.get("status_url")
     response_url = submitted.get("response_url")
     if not status_url or not response_url:
@@ -1634,6 +1667,13 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
     # would refuse too, but only after the hold.
     if not has_key(account_id):
         raise RuntimeError("FAL_KEY not set (create one at fal.ai/dashboard/keys)")
+    # The host that renders (2026-11-02): priced as that host, so it must be
+    # that host. No Replicate token is a refusal BEFORE any hold, never a
+    # quiet fall back to fal at twice the cost of the price shown.
+    host = host_for(model, resolution)
+    if host == "replicate" and not replicate.has_token():
+        raise RuntimeError("REPLICATE_API_TOKEN not set: this render is priced on Replicate "
+                           "(set PHANTRA_REPLICATE=0 to render and price it on fal)")
     # Name-swap first, THEN build the body: what we check has to be what
     # we send.
     prompt = safe_prompt(prompt, db_path, account_id)
@@ -1643,6 +1683,12 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
                                 negative_prompt=negative_prompt,
                                 reference_urls=reference_urls)
     out_path = Path(out_path)
+    submit_url = None
+    if host == "replicate":
+        rep_model = VIDEO_MODELS[model]["hosts"]["replicate"]["model"]
+        submit_url = replicate.submit_url(rep_model)
+        model_id = replicate.model_id(rep_model)
+        http = http or replicate.queue_http()
     own = charge is None
     if own:
         charge = charging.Charge(
@@ -1663,7 +1709,8 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
     charge.submitted()     # the last line before the provider call
     try:
         result, skip = _submit_and_wait(model_id, body, http=http,
-                                        account_id=account_id, tracker=tracker)
+                                        account_id=account_id, tracker=tracker,
+                                        submit_url=submit_url)
         url = _output_url(result, skip)
         if not url:
             raise RuntimeError(
