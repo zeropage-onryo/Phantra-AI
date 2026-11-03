@@ -13,13 +13,10 @@ and DaVinci Resolve panels.
 
 ## The add-on: `phantra-blender-plugin` (beside this repo)
 
-Repo: `../phantra-blender-plugin` (committed on `main`, 0.1.0). **The GitHub repo is not
-created yet**: this session's `gh repo create` was refused twice by the auto-mode classifier.
-Mike runs, from that folder:
-
-```bash
-gh repo create zeropage-onryo/phantra-blender-plugin --private --source . --remote origin --push --description "Phantra for Blender: make AI images and video and bring your Phantra Library into the project and onto the Video Sequencer."
-```
+Repo: [`zeropage-onryo/phantra-blender-plugin`](https://github.com/zeropage-onryo/phantra-blender-plugin)
+(private, proprietary license, created on Mike's word on 2026-11-03 after the session's own
+`gh repo create` was refused by the auto-mode classifier; cloned at `../phantra-blender-plugin`;
+CI runs the unit tests on Python 3.11).
 
 A Blender **4.2+** add-on, installable from one zip (`scripts/build-release.sh` ->
 `dist/phantra-blender-plugin-0.1.0.zip`, reproducible, sha256 printed). The zip holds one folder
