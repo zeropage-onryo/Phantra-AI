@@ -21,7 +21,7 @@ export type AffiliateSummary = {
   paying_referrals?: number;
   signups?: number;
   tier?: Tier;
-  next_tier?: (Tier & { needs: number }) | null;
+  next_tier?: (Tier & { needs: number; by_approval?: boolean }) | null;
   earnings?: { held_cents: number; payable_cash_cents: number; paid_cents: number };
   recent?: { id: number; date: string; cents: number; status: string; payout: string | null; percent: number; pays_on: string }[];
 };

@@ -21,7 +21,7 @@ export function ApplyButton({ children = "Apply now", className = "" }: { childr
 type View = { phase: "loading" } | { phase: "sign-in" } | { phase: "error"; message: string } | { phase: "ok"; summary: AffiliateSummary };
 
 const field =
-  "w-full rounded-[10px] bg-secondary px-4 py-3 text-[16px] text-foreground placeholder:text-[#6f6f6f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mari,#FFC800)]";
+  "w-full rounded-[10px] bg-secondary px-4 py-3 text-[16px] text-foreground placeholder:text-[#6f6f6f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mari,#F3F48B)]";
 const label = "mb-2 block text-[15px] text-foreground";
 const body = "text-[16px] leading-relaxed text-[#afafaf]";
 
@@ -144,8 +144,8 @@ export function AffiliateModal() {
           </dl>
           {s.next_tier && s.next_tier.needs > 0 && (
             <p className="mt-4 text-[15px] leading-relaxed text-[#afafaf]">
-              {s.next_tier.needs} more paying referral{s.next_tier.needs === 1 ? "" : "s"} unlocks {s.next_tier.label}: {s.next_tier.percent}% for{" "}
-              {s.next_tier.months} months.
+              {s.next_tier.needs} more paying referral{s.next_tier.needs === 1 ? "" : "s"} {s.next_tier.by_approval ? "makes you eligible for" : "unlocks"}{" "}
+              {s.next_tier.label}: {s.next_tier.percent}% for {s.next_tier.months} months{s.next_tier.by_approval ? ", once we approve it" : ""}.
             </p>
           )}
         </div>
@@ -211,7 +211,7 @@ export function AffiliateModal() {
         <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-border p-4 text-[15px] text-foreground">
           <input
             type="checkbox"
-            className="mt-1 size-4 accent-[var(--mari,#FFC800)]"
+            className="mt-1 size-4 accent-[var(--mari,#F3F48B)]"
             checked={form.accept_terms}
             onChange={(e) => setForm({ ...form, accept_terms: e.target.checked })}
           />

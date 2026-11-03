@@ -6,21 +6,24 @@
       "label": "Starter",
       "percent": 25.0,
       "months": 6,
-      "min_paying": 0
+      "min_paying": 0,
+      "by_approval": false
     },
     {
       "key": "pro",
       "label": "Pro",
       "percent": 30.0,
       "months": 6,
-      "min_paying": 10
+      "min_paying": 10,
+      "by_approval": false
     },
     {
       "key": "partner",
       "label": "Partner",
-      "percent": 35.0,
+      "percent": 30.0,
       "months": 12,
-      "min_paying": 50
+      "min_paying": 50,
+      "by_approval": true
     }
   ],
   "hold_days": 60,
