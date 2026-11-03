@@ -39,7 +39,6 @@ import {
   Loader2,
   LogOut,
   MessageSquarePlus,
-  PanelLeft,
   Plus,
   RectangleHorizontal,
   RectangleVertical,
@@ -51,6 +50,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/lib/api";
 import { createProject as createCut } from "@/lib/cut/api";
+import { EDITOR_IN_UI } from "@/lib/editor-flag";
 import { handleOf, kindLabel } from "@/lib/elements";
 import { requestNewSession } from "@/lib/assistant";
 import { PALETTE_EVENT, isPaletteKey, marks, rankCommands, step } from "@/lib/palette";
@@ -82,16 +82,12 @@ export function CommandPalette({
   workspace,
   signedOut,
   toast,
-  pinned,
-  onTogglePin,
   onSwitchAccount,
 }: {
   me: Me | null;
   workspace: string;
   signedOut: boolean;
   toast: (text: string, kind?: "ok" | "err") => void;
-  pinned: boolean;
-  onTogglePin: () => void;
   onSwitchAccount: (slug: string) => void;
 }) {
   const router = useRouter();
@@ -202,7 +198,7 @@ export function CommandPalette({
         page("Projects", "/studio/projects", FolderKanban, "home board workspace"),
         page("Create", "/studio", House, "composer write scene image video guide"),
         page("Assets", "/studio/assets", Layers, "library wall renders images clips"),
-        page("Edit", "/studio/cut", Scissors, "timeline editor cuts"),
+        ...(EDITOR_IN_UI ? [page("Edit", "/studio/cut", Scissors, "timeline editor cuts")] : []),
         page("Elements", "/studio/elements", AtSign, "characters props products places cast"),
         page("Renders", "/studio/renders", ListVideo, "rendering jobs running finished clips queue"),
         page("Calendar", "/studio/calendar", CalendarDays, "schedule posts publish social week month feed queue"),
@@ -240,9 +236,9 @@ export function CommandPalette({
           verb: "Create",
           run: () => go("/studio/elements?new=1"),
         },
-        newCut("9:16", RectangleVertical),
-        newCut("16:9", RectangleHorizontal),
-        newCut("1:1", Square),
+        ...(EDITOR_IN_UI
+          ? [newCut("9:16", RectangleVertical), newCut("16:9", RectangleHorizontal), newCut("1:1", Square)]
+          : []),
         {
           key: "act:new-session",
           title: "New session",
@@ -268,17 +264,6 @@ export function CommandPalette({
           },
         })),
         {
-          key: "act:pin",
-          title: pinned ? "Let the rail collapse" : "Keep the rail open",
-          icon: PanelLeft,
-          keywords: "sidebar navigation pin",
-          verb: pinned ? "Collapse" : "Pin",
-          run: () => {
-            close();
-            onTogglePin();
-          },
-        },
-        {
           key: "act:credits",
           title: "Buy credits",
           icon: CreditCard,
@@ -299,7 +284,7 @@ export function CommandPalette({
         },
       ],
     };
-  }, [me?.accounts, workspace, pinned, go, close, router, toast, onSwitchAccount, onTogglePin]);
+  }, [me?.accounts, workspace, go, close, router, toast, onSwitchAccount]);
 
   // what is drawn: the server's groups for THIS query, plus the commands
   const groups = useMemo<Group[]>(() => {
@@ -374,7 +359,7 @@ export function CommandPalette({
       verb: "Open",
       run: () => go(`/studio/cut/${encodeURIComponent(c.id)}`),
     }));
-    if (cuts.length) out.push({ label: "Cuts", rows: cuts });
+    if (cuts.length && EDITOR_IN_UI) out.push({ label: "Cuts", rows: cuts });
     return out;
   }, [found, q, commands, go]);
 

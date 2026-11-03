@@ -57,7 +57,7 @@ What a signed-in person has:
   proposes edits; export to MP4, audio, a still or OpenTimelineIO.
 - **The connector**: an MCP server at `https://api.phantra.ai/mcp` (the ChatGPT listing, in
   ChatGPT's plugin directory since OpenAI approved it on 2026-11-02, where every Connect to
-  ChatGPT button points: `web/src/lib/connect-chatgpt.ts`; it renders) and `/mcp/claude` (the Claude listing; it writes and prices, renders happen in the
+  ChatGPT button points: `CHATGPT_PLUGIN_URL` in `web/src/lib/connect-claude.ts`; it renders) and `/mcp/claude` (the Claude listing; it writes and prices, renders happen in the
   studio), plus the stdio studio server Claude Desktop launches.
 - **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
   one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.

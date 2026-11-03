@@ -3,9 +3,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { CHATGPT_PLUGIN_URL } from "@/lib/connect-claude";
 import Link from "next/link";
-import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
-import { CHATGPT_INSTALL_URL } from "@/lib/connect-chatgpt";
+import { ArrowUpRight, ChevronDown, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
 
 /** `logo` is the company's own icon, saved from its live site into
  *  web/public/brand/plugins/ (2026-10-16). */
@@ -20,8 +20,7 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "MCP",
     items: [
-      // the Phantra AI listing in ChatGPT's plugin directory (2026-11-02)
-      { name: "ChatGPT", href: CHATGPT_INSTALL_URL, logo: "/brand/plugins/chatgpt.svg" },
+      { name: "ChatGPT", href: CHATGPT_PLUGIN_URL, logo: "/brand/plugins/chatgpt.svg" },
       { name: "Claude", href: "https://claude.ai/customize/connectors", logo: "/brand/plugins/claude.svg" },
       { name: "Grok Bot", logo: "/brand/plugins/grok.svg" },
       { name: "Muse", icon: Music2 },
@@ -43,7 +42,7 @@ export const PLUGIN_GROUPS: Group[] = [
 /** The Plugins row for the studio rail. The flyout is portalled to the body
  *  because the rail clips its children, and it opens to the right of the row.
  *  Under 720px it becomes a bottom sheet over a tap-to-close backdrop. */
-export function PluginsRailItem() {
+export function PluginsRailItem({ top = false }: { top?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -54,7 +53,9 @@ export function PluginsRailItem() {
     // Placed once on open, while the pointer is still in the widened rail.
     const place = () => {
       const r = btn.current?.getBoundingClientRect();
-      if (r) setPos({ top: r.top, left: r.right + 8 });
+      // in the header's nav (2026-11-02) it drops below the button instead,
+      // its right edge kept on screen
+      if (r) setPos(top ? { top: r.bottom + 8, left: Math.min(r.left, window.innerWidth - 288 - 16) } : { top: r.top, left: r.right + 8 });
     };
     place();
     const onDown = (e: MouseEvent) => {
@@ -75,7 +76,7 @@ export function PluginsRailItem() {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, top]);
 
   // The row sits low in the rail, so a flyout opened at its top ran off a
   // laptop-height window and hid the last rows. Once drawn, lift it to fit.
@@ -91,14 +92,15 @@ export function PluginsRailItem() {
       <button
         ref={btn}
         type="button"
-        className="pfbtn"
+        className={top ? "pfbtn hnav-btn" : "pfbtn"}
         aria-haspopup="menu"
         aria-expanded={open}
         title="Plugins"
         onClick={() => setOpen((v) => !v)}
       >
-        <Puzzle strokeWidth={1.35} />
-        <span className="rl">Plugins</span>
+        <Puzzle strokeWidth={top ? 1.5 : 1.35} />
+        <span className={top ? "hnav-l" : "rl"}>Plugins</span>
+        {top ? <ChevronDown className="hnav-chev" strokeWidth={1.8} /> : null}
       </button>
       {open && pos && typeof document !== "undefined"
         ? createPortal(

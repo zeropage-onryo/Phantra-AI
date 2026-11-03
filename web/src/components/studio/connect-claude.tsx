@@ -14,6 +14,7 @@
 import { useEffect, useId, useState } from "react";
 import { Check, CircleCheck, Copy, ExternalLink, X } from "lucide-react";
 import {
+  CHATGPT_PLUGIN_URL,
   CLAUDE_CONNECTORS_URL,
   CONNECTOR_NAME,
   DESKTOP_COMMAND,
@@ -22,7 +23,6 @@ import {
   connectPlan,
   connectedLine,
 } from "@/lib/connect-claude";
-import { CHATGPT_INSTALL_URL } from "@/lib/connect-chatgpt";
 import { getMcpConnection, type McpConnection, type Me } from "@/lib/studio-api";
 
 type Toast = (text: string, kind?: "ok" | "err") => void;
@@ -130,7 +130,7 @@ export function ConnectMcpBody({ me, toast }: { me: Me | null; toast: Toast }) {
             plan.url,
           )}
           {/* ChatGPT adds Phantra from its plugin directory (listed 2026-11-02) */}
-          <a className="zbtn pri ccgo" href={CHATGPT_INSTALL_URL} target="_blank" rel="noopener noreferrer">
+          <a className="zbtn pri ccgo" href={CHATGPT_PLUGIN_URL} target="_blank" rel="noopener noreferrer">
             Add {CONNECTOR_NAME} in ChatGPT <ExternalLink strokeWidth={1.8} />
           </a>
 
@@ -148,7 +148,7 @@ export function ConnectMcpBody({ me, toast }: { me: Me | null; toast: Toast }) {
               Customize → Connectors
             </a>
             ; in ChatGPT: the{" "}
-            <a href={CHATGPT_INSTALL_URL} target="_blank" rel="noopener noreferrer">
+            <a href={CHATGPT_PLUGIN_URL} target="_blank" rel="noopener noreferrer">
               Phantra AI plugin
             </a>
             , then Manage). Nothing here deletes a connection.
