@@ -65,6 +65,7 @@ from . import accounts, db, imagesearch, outcomes, preprod, refbin
 # the effects table, for the legal sets the render listing's effect tools
 # publish in their schemas (2026-10-20); it imports nothing from here
 from . import effects as effect_table
+from .failures import Refusal
 
 # A list call returns cards, not whole rows: a scene prompt is ~1200
 # characters and a project holds dozens.
@@ -1206,6 +1207,23 @@ class Refused(Exception):
     """
 
 
+def refusal_code(exc) -> str:
+    """The code a tool's error result carries (QA 2026-11-02 K9): a
+    `Refusal`'s own, `not_available` for a `Refused` (stop asking), and
+    `invalid_request` for any other caller error. A crash is
+    `server_error`, set where the SDK tells one from a refusal."""
+    if isinstance(exc, Refused):
+        return "not_available"
+    return getattr(exc, "code", None) or "invalid_request"
+
+
+_ERROR_CODE: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "phantra_mcp_error_code", default=None)
+"""The failed call's code, from `call_tool` (where the exception is) to
+`_handle_call_tool` (where the SDK has already made it a result). One task
+runs both, awaited in line, so the value set in one is read in the other."""
+
+
 # --- shaping ---------------------------------------------------------------
 
 def _status_of(concept: dict) -> str:
@@ -1551,7 +1569,7 @@ def open_in_studio(prompt: str, kind: str = "image", aspect: str = "",
             raise ValueError(f"{ref!r}: `source` is a render's gen:<id> from `library`")
         row = render_assets.get(int(rest), dsn, account_id=_account(account_id, dsn))
         if not row or row.get("deleted_at"):
-            raise ValueError(f"no render {rest} on this account -- ids come from `library`")
+            raise Refusal("not_found", f"no render {rest} on this account -- ids come from `library`")
         params["on"] = ref
         out["source"] = ref
     base = (os.environ.get(STUDIO_URL_ENV) or "").strip().rstrip("/") or DEFAULT_STUDIO_URL
@@ -1607,7 +1625,7 @@ def read_scene(scene_id: int, dsn: Optional[str] = None,
     account_id = _account(account_id, dsn)
     concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if concept is None:
-        raise ValueError(f"no scene {scene_id}")
+        raise Refusal("not_found", f"no scene {scene_id}")
     out = _scene_view(concept, account_id)
     shot = (concept.get("shots") or [None])[0]
     if shot and (shot.get("prompt") or "").strip() and preprod.reference_gate(concept):
@@ -1663,7 +1681,7 @@ def write_scene(prompt: str, seconds: Optional[int] = None, refs=None, title: st
     if scene_id is not None:
         existing = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
         if existing is None:
-            raise ValueError(f"no scene {scene_id}")
+            raise Refusal("not_found", f"no scene {scene_id}")
     project = _project_arg(project_id)
     if project is not None:
         _project_or_refuse(project, dsn, account_id)
@@ -1898,17 +1916,18 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
     account_id = _account(account_id, dsn)
     concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if concept is None:
-        raise ValueError(f"no scene {scene_id}")
+        raise Refusal("not_found", f"no scene {scene_id}")
     if concept.get("archived"):
         # a removed scene was priced and handed an approve link (QA 2026-11-02 K4)
-        raise ValueError(f"scene {scene_id} was removed, so it is not priced -- the person "
+        raise Refusal("scene_removed", f"scene {scene_id} was removed, so it is not priced -- the person "
                          "restores it in the studio first, or `write_scene` writes a new one")
     shot = (concept.get("shots") or [None])[0]
     if not shot or not (shot.get("prompt") or "").strip():
-        raise ValueError(f"scene {scene_id} has no scene prompt yet -- `write_scene` first")
+        raise Refusal("needs_prompt", f"scene {scene_id} has no scene prompt yet -- `write_scene` first")
     ungrounded = preprod.reference_gate(concept)
     if ungrounded:
-        raise ValueError(
+        raise Refusal(
+            "needs_reference",
             f"{ungrounded} -- scene {scene_id} is a draft and cannot be priced or "
             "rendered yet. Add a photo with `add_element` (or the person uploads "
             f"one in the studio), then `write_scene` with scene_id={scene_id}, the "
@@ -1933,9 +1952,9 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
         if e.reason == "nothing_to_render":
             clip = None
         else:
-            raise ValueError(str(e)) from e
+            raise Refusal(e.reason, str(e)) from e
     except ValueError as e:
-        raise ValueError(f"bad renderer choice: {e}") from e
+        raise Refusal("bad_renderer", f"bad renderer choice: {e}") from e
     said = _length_note(shot, clip)
     if said:
         clip["length_note"] = said
@@ -2083,7 +2102,7 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
         if kind == "gen" and rest.isdigit():
             row = render_assets.get(int(rest), dsn, account_id=account_id)
             if not row or row.get("deleted_at"):
-                raise ValueError(f"no render {rest} on this account -- ids come from "
+                raise Refusal("not_found", f"no render {rest} on this account -- ids come from "
                                  f"{_ids_from(listed)}")
             if row.get("media_kind") != "image":
                 raise ValueError(f"{ref} is a {row.get('media_kind')}; a reference "
@@ -2095,7 +2114,7 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
             from .cut import store as cut_store
             row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
             if not row:
-                raise ValueError(f"no upload {rest} on this account -- ids come from "
+                raise Refusal("not_found", f"no upload {rest} on this account -- ids come from "
                                  "`library`" if listed else
                                  f"no import {rest} on this account -- `import_file` "
                                  "returns the id")
@@ -2105,7 +2124,7 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
         elif kind == "candidate" and rest:
             cand = imagesearch.get(rest, dsn=dsn)
             if cand is None or not cand.get("image_url"):
-                raise ValueError(f"no candidate {rest!r} -- ids come from `images_for`")
+                raise Refusal("not_found", f"no candidate {rest!r} -- ids come from `images_for`")
             raw = cand["image_url"]
         else:
             if allowed is None:
@@ -2355,7 +2374,7 @@ def cancel_studio_job(job_id: int, *, job_status, cancel,
     render tools) is reported as such, never pretended at."""
     snap = job_status(int(job_id), account_id=account_id)
     if snap is None:
-        raise ValueError(f"no job {job_id} -- jobs live in memory and a restart "
+        raise Refusal("not_found", f"no job {job_id} -- jobs live in memory and a restart "
                          "clears them")
     base = {"job_id": snap["id"], "label": snap.get("label")}
     if snap["status"] in FINISHED:
@@ -2765,7 +2784,7 @@ def _own_picture(handle: str, dsn, account_id) -> bytes:
     if kind == "gen":
         row = render_assets.get(int(rest), dsn, account_id=account_id)
         if not row or row.get("deleted_at"):
-            raise ValueError(f"no render {rest} on this account")
+            raise Refusal("not_found", f"no render {rest} on this account")
         what = row.get("media_kind")
     else:
         row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
@@ -3167,11 +3186,11 @@ def _library_item(ref: str, dsn, account_id) -> tuple[dict, str]:
     if what == "asset":
         row = cut_store.get_media(id_, account_id=account_id, dsn=dsn)
         if not row:
-            raise ValueError(f"no upload {id_} on this account -- `library` lists them")
+            raise Refusal("not_found", f"no upload {id_} on this account -- `library` lists them")
         return row, str(row.get("kind") or "")
     row = render_assets.get(id_, dsn, account_id=account_id)
     if not row or row.get("deleted_at"):
-        raise ValueError(f"no render {id_} on this account -- `library` lists them")
+        raise Refusal("not_found", f"no render {id_} on this account -- `library` lists them")
     return row, str(row.get("media_kind") or "")
 
 
@@ -3350,7 +3369,7 @@ def duplicate_scene(scene_id: int, prompt: Optional[str] = None, refs=None,
     account_id = _account(account_id, dsn)
     source = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if source is None:
-        raise ValueError(f"no scene {scene_id}")
+        raise Refusal("not_found", f"no scene {scene_id}")
     shot0 = (source.get("shots") or [{}])[0] or {}
     text = (prompt or "").strip() or (shot0.get("prompt") or "").strip()
     if not text:
@@ -3503,7 +3522,7 @@ def read_recipe(name: str, *, dsn: Optional[str] = None,
                 "version": int(row["version"]), "project_id": row.get("project_id"),
                 "saved_at": str(row.get("created_at") or ""), "body": row["body"],
                 "note": RECIPE_NOTE}
-    raise ValueError(f"no recipe {name!r} -- `recipes` lists them")
+    raise Refusal("not_found", f"no recipe {name!r} -- `recipes` lists them")
 
 
 def save_recipe(name: str, body: str, project_id: Optional[int] = None, *,
@@ -4169,7 +4188,7 @@ def _clip_row(ref: str, dsn, account_id, listed: bool = False) -> dict:
     if kind == "asset" and rest.isdigit():
         row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
         if not row:
-            raise ValueError(f"no upload {rest} on this account -- ids come from `library`"
+            raise Refusal("not_found", f"no upload {rest} on this account -- ids come from `library`"
                              if listed else
                              f"no import {rest} on this account -- `import_file` returns the id")
         if row.get("kind") != "video":
@@ -4181,7 +4200,7 @@ def _clip_row(ref: str, dsn, account_id, listed: bool = False) -> dict:
                          f"you {'uploaded' if listed else 'imported'}. URLs are never taken")
     row = render_assets.get(int(rest), dsn, account_id=account_id)
     if not row or row.get("deleted_at"):
-        raise ValueError(f"no render {rest} on this account -- ids come from "
+        raise Refusal("not_found", f"no render {rest} on this account -- ids come from "
                          f"{_ids_from(listed)}")
     if row.get("media_kind") != "video":
         raise ValueError(f"{ref} is a {row.get('media_kind')}; this effect takes a clip")
@@ -4781,7 +4800,7 @@ def _project_or_refuse(project_id, dsn, account_id) -> dict:
         raise ValueError(f"project_id must be a number from `projects`, got {project_id!r}")
     found = projects.get(pid, dsn, account_id=account_id)
     if not found:
-        raise ValueError(f"no project {pid} -- ids come from `projects`")
+        raise Refusal("not_found", f"no project {pid} -- ids come from `projects`")
     return found
 
 
@@ -5347,7 +5366,7 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     caller.
     """
     from mcp.server.mcpserver import MCPServer
-    from mcp.server.mcpserver.exceptions import ToolError
+    from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
     from mcp.types import Icon, ToolAnnotations
 
     def _t(fn, *args, **kwargs):
@@ -5365,7 +5384,47 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         try:
             return fn(*args, **kwargs)
         except (ValueError, Refused) as exc:
-            raise ToolError(listed_text(str(exc)) if listing else str(exc)) from exc
+            err = ToolError(listed_text(str(exc)) if listing else str(exc))
+            err.code = refusal_code(exc)
+            raise err from exc
+
+    def _code_of(exc) -> str:
+        """The code of a ToolError the SDK raised: a crash is
+        `server_error`; a refusal's code is on the ToolError a tool raised,
+        which the SDK keeps as the cause."""
+        from pydantic import ValidationError
+        if isinstance(exc, UnexpectedToolError):
+            return "server_error"
+        cause = exc.__cause__
+        if isinstance(cause, ValidationError):
+            return "invalid_arguments"
+        if cause is None and str(exc).startswith("Unknown tool"):
+            return "unknown_tool"
+        return getattr(cause, "code", None) or getattr(exc, "code", None) or "invalid_request"
+
+    class _CodedServer(MCPServer):
+        """The SDK's server, with a code on every error result (QA 2026-11-02
+        K9, change 17): `structuredContent = {"error": {"code", "message"}}`
+        beside the same sentence, so a client can tell `needs_reference`
+        from `not_found` from an outage. A direct `call_tool` still raises,
+        as it always did; the code rides on the protocol's result only."""
+
+        async def call_tool(self, name, arguments, context=None):
+            try:
+                return await super().call_tool(name, arguments, context)
+            except ToolError as exc:
+                _ERROR_CODE.set(_code_of(exc))
+                raise
+
+        async def _handle_call_tool(self, ctx, params):
+            _ERROR_CODE.set(None)
+            result = await super()._handle_call_tool(ctx, params)
+            code = _ERROR_CODE.get()
+            if getattr(result, "is_error", False) and getattr(result, "structured_content", None) is None:
+                text = next((c.text for c in result.content if getattr(c, "type", "") == "text"), "")
+                result = result.model_copy(update={"structured_content": {
+                    "error": {"code": code or "server_error", "message": text}}})
+            return result
 
     # --- what a stranger reads (2026-10-07, the directory listing) ------
     #
@@ -5449,7 +5508,7 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     from . import mcp_widget
     card = mcp_widget.build() if listing == "render" else None
     extensions = ([probe[0]] if probe else []) + ([card[0]] if card else [])
-    server = MCPServer(name, version=SERVER_VERSION,
+    server = _CodedServer(name, version=SERVER_VERSION,
                        title="Phantra",
                        description=(CLAUDE_SERVER_DESCRIPTION if listing == "claude"
                                     else SERVER_DESCRIPTION),
@@ -5921,12 +5980,17 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                 if listing and e.code == "not_found":
                     # app/api's word is the studio's old one ("concept")
                     message = f"no scene {scene_id}"
+                # the connector's own word for the gate, as `write_scene` says it
+                code = "needs_reference" if e.code == "no_reference" else e.code
                 if listing:
-                    said = listed_text(f"{e.code}: {message}{hint}")
+                    said = listed_text(f"{code}: {message}{hint}")
                     if e.code == "out_of_credits" and CREDITS_ADDED_IN_STUDIO not in said:
                         said = f"{said.rstrip('.')}. {CREDITS_ADDED_IN_STUDIO}"
-                    raise ToolError(said) from e
-                raise ToolError(f"{e.code}: {message}{hint}") from e
+                else:
+                    said = f"{code}: {message}{hint}"
+                err = ToolError(said)
+                err.code = code
+                raise err from e
             out = dict(out)
             if out.get("already_used"):
                 # a return, never an error: a model that sees a tool error
@@ -5957,12 +6021,14 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
             if snap is None:
                 # only a listed server has `scene`: the studio surface is told
                 # what it always was, not to read a tool it does not have
-                raise ToolError(
+                err = ToolError(
                     f"no job {job_id} -- jobs live in memory and a restart "
                     "clears them; "
                     + ("a render still lands on its scene, so read `scene` "
                        "before starting anything again" if listing else
                        "start the work again if it was yours"))
+                err.code = "not_found"
+                raise err
             if listing == "render":
                 snap = _with_download(snap, _account(account_id, dsn))
             return snap

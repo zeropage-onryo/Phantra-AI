@@ -35,6 +35,8 @@ import math
 from pathlib import Path
 from typing import Optional
 
+from .failures import Refusal
+
 CHECKED = "2026-10-20"
 
 # --- OmniHuman v2: photo + audio -> clip -----------------------------------
@@ -310,8 +312,9 @@ def voice_row(ref: str, *, account_id: Optional[int], dsn=None) -> dict:
 
 def check_consent(consent) -> None:
     if consent is not True:
-        raise ValueError("`consent` must be true: ask the person to confirm the face in the "
-                         "photo is theirs, or that its owner agreed to it being animated")
+        raise Refusal("needs_consent",
+                      "`consent` must be true: ask the person to confirm the face in the "
+                      "photo is theirs, or that its owner agreed to it being animated")
 
 
 def talk_request(photo: str, audio: str, *, size: tuple, prompt: str = "",

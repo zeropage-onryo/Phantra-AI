@@ -87,3 +87,17 @@ def plain(raw, what: str = "The still") -> str:
             said = cause.format(service=service, model=model)
             return f"{what} was not made: {said}. {NOT_CHARGED}"
     return f"{what} was not made: {service} reported an error. {NOT_CHARGED}"
+
+
+class Refusal(ValueError):
+    """A caller error with a code a client can branch on (QA 2026-11-02 K9).
+
+    Still a ValueError with the same sentence, so every `except ValueError`
+    and every message a test matches is unchanged; the connector puts
+    `code` on the tool's error result (`mcp_server.refusal_code`), so a
+    client tells `needs_reference` from `not_found` from an outage without
+    reading the words."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code

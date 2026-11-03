@@ -39,6 +39,8 @@ import math
 import subprocess
 from typing import Optional
 
+from .failures import Refusal
+
 CHECKED = "2026-10-26"
 
 DUB = {
@@ -120,9 +122,10 @@ def check_speakers(speakers) -> Optional[int]:
 
 def check_consent(consent) -> None:
     if consent is not True:
-        raise ValueError("`consent` must be true: ask the person to confirm the voices on the "
-                         "clip are theirs, or that whoever they belong to agreed to it being "
-                         "dubbed -- the dub re-speaks them in their own voices")
+        raise Refusal("needs_consent",
+                      "`consent` must be true: ask the person to confirm the voices on the "
+                      "clip are theirs, or that whoever they belong to agreed to it being "
+                      "dubbed -- the dub re-speaks them in their own voices")
 
 
 def check_clip(probe: dict, has_sound: Optional[bool]) -> float:
