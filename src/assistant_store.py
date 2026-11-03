@@ -20,11 +20,17 @@ OWNED tables, one owner each:
   scene is CREATED the conversation goes away -- what it produced lives
   on the concept and, after a render, on the asset with its prompt (the
   Assets wall shows it there). The pill's button clears it the same way.
-  Nothing is ever archived: `clear_project` DELETES the row, and `init`
-  drops any row the earlier archive-on-new behaviour (2026-09-29 to
-  2026-10-02) left behind. `archived_at` stays on the live table but is
-  never set. The Studio composer's own Guide thread lived only in the
-  page's React state until today, so clicking to another tab lost the
+  Since 2026-11-03 (Mike's pick "C2" on the Sessions & Memory canvas) a
+  conversation is KEPT when a new session starts: the open row is the one
+  with `archived_at` NULL (one per account, the partial unique index) and
+  every earlier chat is a parked row beside it, listed in the chat
+  sheet's history drawer and reopened from there (`list_chats`,
+  `open_chat`). A chat a Create turn ran inside a project carries that
+  `project_id` and is kept for good, filed under the project; any other
+  chat is deleted CHAT_KEEP_DAYS after it was last used (`expire_chats`).
+  A chat with nothing said in it is never parked, it is deleted. The
+  Studio composer's own Guide thread lived only in the page's React
+  state until 2026-10-02, so clicking to another tab lost the
   conversation and every frame the hunt had drawn; now the composer and
   the pill are two views on this one row.
 - `reference_verdicts`: the person's click on a contact sheet beside what
@@ -42,7 +48,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from . import db
@@ -58,6 +64,11 @@ MAX_AVATAR_CHARS = 16          # one emoji can be a long ZWJ sequence
 MAX_DRAFT_TEXT = 10_000        # the composer's own textarea maxLength
 MAX_DRAFT_REFS = 40            # picked photos / uploads, each a URL
 DRAFT_MODES = ("guide", "create")
+# A chat outside any project is kept this long after it was last used
+# (2026-11-03, Mike); a project's chats are kept until the project goes.
+CHAT_KEEP_DAYS = 14
+# How many chats the history drawer lists, newest first.
+CHAT_LIST_MAX = 100
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS assistants (
@@ -108,12 +119,15 @@ def init(dsn: Optional[str] = None) -> None:
         # additive, for the live table made before the draft existed
         conn.execute("ALTER TABLE assistant_projects "
                      "ADD COLUMN IF NOT EXISTS draft_json TEXT NOT NULL DEFAULT '{}'")
-        # conversations are never archived (2026-10-02): rows the earlier
-        # archive-on-new left behind are dropped, once, here
-        conn.execute("DELETE FROM assistant_projects WHERE archived_at IS NOT NULL")
+        # which project a chat belongs to (2026-11-03): set by a Create
+        # turn that ran inside one; NULL is a chat on its own
+        conn.execute("ALTER TABLE assistant_projects "
+                     "ADD COLUMN IF NOT EXISTS project_id BIGINT")
         for table in TABLES:
             db.own_table(conn, table)
         conn.execute(INDEXES)
+    # chats past their keep date go at every start, as well as on every list
+    expire_chats(dsn=dsn)
 
 
 def _now() -> str:
@@ -241,7 +255,7 @@ def _project(row) -> dict:
     return out
 
 
-_PROJECT_COLS = "id, title, stage, turns_json, draft_json, created_at, updated_at"
+_PROJECT_COLS = "id, title, stage, turns_json, draft_json, created_at, updated_at, project_id"
 
 
 def open_project(*, account_id: int, dsn: Optional[str] = None) -> Optional[dict]:
@@ -289,13 +303,210 @@ def save_project(turns, stage, *, account_id: int, title: str = "",
     return _project(row)
 
 
-def clear_project(*, account_id: int, dsn: Optional[str] = None) -> None:
-    """Delete the account's conversation, if any. The next save starts a
-    fresh one. Nothing is archived: what a conversation produced is on
-    the concept it created, and the talk itself is working memory."""
+def _said_anything(turns_json: str) -> bool:
+    try:
+        turns = json.loads(turns_json or "[]")
+    except ValueError:
+        return False
+    return any(isinstance(t, dict) and t.get("role") == "user"
+               and str(t.get("content") or "").strip() for t in turns)
+
+
+def _park_open(conn, account_id: int) -> None:
+    """Put the open chat aside: kept (archived_at set) when the person said
+    anything in it, deleted when they did not."""
+    row = conn.execute(
+        "SELECT id, turns_json FROM assistant_projects "
+        "WHERE account_id = %s AND archived_at IS NULL", (account_id,)).fetchone()
+    if row is None:
+        return
+    if _said_anything(row["turns_json"]):
+        conn.execute("UPDATE assistant_projects SET archived_at = %s "
+                     "WHERE id = %s AND account_id = %s", (_now(), row["id"], account_id))
+    else:
+        conn.execute("DELETE FROM assistant_projects WHERE id = %s AND account_id = %s",
+                     (row["id"], account_id))
+
+
+def clear_project(*, account_id: int, forget: bool = False,
+                  dsn: Optional[str] = None) -> None:
+    """Start a new session: the open chat is put aside, kept in the history
+    drawer (2026-11-03), and the next save starts a fresh one. `forget`
+    deletes it instead -- what `save_as_project` uses, because that
+    conversation has just been filed into the project's own history."""
     with db.connect(dsn) as conn:
-        conn.execute("DELETE FROM assistant_projects WHERE account_id = %s",
-                     (account_id,))
+        if forget:
+            conn.execute("DELETE FROM assistant_projects "
+                         "WHERE account_id = %s AND archived_at IS NULL", (account_id,))
+        else:
+            _park_open(conn, account_id)
+
+
+# --- the history drawer (2026-11-03) -------------------------------------------
+
+def _cutoff() -> str:
+    """The updated_at a project-less chat must be newer than to be kept.
+    updated_at is an ISO text in UTC written by _now(), so it orders as text."""
+    return (datetime.now(timezone.utc) - timedelta(days=CHAT_KEEP_DAYS)).isoformat()
+
+
+# A chat is on its own when it names no project, or names one that is gone
+# (a deleted project, or one that is not this account's). A database with no
+# projects table yet (a bare test schema) has only chats on their own.
+_NO_PROJECT = ("(c.project_id IS NULL OR NOT EXISTS (SELECT 1 FROM projects p "
+               "WHERE p.id = c.project_id AND p.account_id IS NOT DISTINCT FROM c.account_id))")
+
+
+def _no_project(conn) -> str:
+    has = conn.execute("SELECT to_regclass('projects') IS NOT NULL "
+                       "AND to_regclass('project_messages') IS NOT NULL AS ok").fetchone()["ok"]
+    return _NO_PROJECT if has else "TRUE"
+
+
+def expire_chats(*, account_id: Optional[int] = None, dsn: Optional[str] = None) -> int:
+    """Delete every chat outside a project last used more than
+    CHAT_KEEP_DAYS ago -- the account's, or everyone's on a start. Returns
+    how many went. Never raises: a failed sweep is tried again next time."""
+    try:
+        with db.connect(dsn) as conn:
+            # one account's, or (account_id None, the start's sweep) everyone's
+            return int(conn.execute(
+                "DELETE FROM assistant_projects c WHERE c.updated_at < %s "
+                "AND c.account_id = COALESCE(%s, c.account_id) AND " + _no_project(conn),
+                (_cutoff(), account_id)).rowcount or 0)
+    except Exception as exc:                       # pragma: no cover - never fails a page
+        import sys
+        print(f"  chats not expired: {exc}", file=sys.stderr)
+        return 0
+
+
+def _days_left(updated_at: str) -> Optional[int]:
+    try:
+        last = datetime.fromisoformat(str(updated_at))
+    except ValueError:
+        return None
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    left = last + timedelta(days=CHAT_KEEP_DAYS) - datetime.now(timezone.utc)
+    return max(0, -(-int(left.total_seconds()) // 86400))      # whole days, rounded up
+
+
+def list_chats(*, account_id: int, dsn: Optional[str] = None) -> dict[str, Any]:
+    """The history drawer: every kept chat, newest first, and the projects
+    that have any talk in them.
+
+    - `chats`: {id, title, project_id (None when on its own), updated_at,
+      open, turns, days_left} -- `days_left` only for a chat outside a
+      project, the whole days until it is deleted; the drawer shows it in
+      the last week only.
+    - `projects`: {id, title, updated_at, messages} for each live project
+      with chats or with history on its own workspace (`project_messages`),
+      newest first; `messages` counts the workspace's turns.
+    """
+    expire_chats(account_id=account_id, dsn=dsn)
+    with db.connect(dsn) as conn:
+        alone = _no_project(conn)
+        rows = conn.execute(
+            "SELECT c.id, c.title, c.turns_json, c.updated_at, c.archived_at, "
+            f"CASE WHEN {alone} THEN NULL ELSE c.project_id END AS project_id "
+            "FROM assistant_projects c WHERE c.account_id = %s "
+            "ORDER BY c.updated_at DESC LIMIT %s",
+            (account_id, CHAT_LIST_MAX)).fetchall()
+        projects = [] if alone == "TRUE" else conn.execute(
+            "SELECT p.id, p.title, p.updated_at, "
+            "(SELECT COUNT(*) FROM project_messages m WHERE m.project_id = p.id "
+            " AND m.account_id IS NOT DISTINCT FROM p.account_id) AS messages "
+            "FROM projects p WHERE p.account_id = %s AND p.archived_at IS NULL "
+            "AND (EXISTS (SELECT 1 FROM project_messages m WHERE m.project_id = p.id "
+            "             AND m.account_id IS NOT DISTINCT FROM p.account_id) "
+            "     OR p.id IN (SELECT project_id FROM assistant_projects "
+            "                 WHERE account_id = %s AND project_id IS NOT NULL)) "
+            "ORDER BY p.updated_at DESC LIMIT %s",
+            (account_id, account_id, CHAT_LIST_MAX)).fetchall()
+    chats = []
+    for r in rows:
+        try:
+            turns = json.loads(r["turns_json"] or "[]")
+        except ValueError:
+            turns = []
+        said = [t for t in turns if isinstance(t, dict) and t.get("role") == "user"
+                and str(t.get("content") or "").strip()]
+        is_open = r["archived_at"] is None
+        if is_open and not said:
+            continue                      # an empty open chat is not history yet
+        pid = int(r["project_id"]) if r["project_id"] is not None else None
+        chats.append({"id": int(r["id"]),
+                      "title": r["title"] or "Untitled chat",
+                      "project_id": pid,
+                      "updated_at": r["updated_at"],
+                      "open": is_open,
+                      "turns": len(turns),
+                      "days_left": None if pid else _days_left(r["updated_at"])})
+    return {"chats": chats,
+            "projects": [{"id": int(p["id"]), "title": p["title"],
+                          "updated_at": p["updated_at"].isoformat()
+                          if isinstance(p["updated_at"], datetime) else p["updated_at"],
+                          "messages": int(p["messages"])} for p in projects],
+            "keep_days": CHAT_KEEP_DAYS}
+
+
+def open_chat(chat_id: int, *, account_id: int, dsn: Optional[str] = None) -> Optional[dict]:
+    """Make a kept chat the open one: the chat open now is put aside (kept
+    if anything was said in it) and the chosen one comes back, its keep
+    date restarted. None when there is no such chat for this account."""
+    with db.connect(dsn) as conn:
+        row = conn.execute(
+            "SELECT id, archived_at FROM assistant_projects WHERE id = %s AND account_id = %s",
+            (chat_id, account_id)).fetchone()
+        if row is None:
+            return None
+        if row["archived_at"] is not None:
+            _park_open(conn, account_id)
+        conn.execute(
+            "UPDATE assistant_projects SET archived_at = NULL, updated_at = %s "
+            "WHERE id = %s AND account_id = %s", (_now(), chat_id, account_id))
+        got = conn.execute(
+            f"SELECT {_PROJECT_COLS} FROM assistant_projects WHERE id = %s AND account_id = %s",
+            (chat_id, account_id)).fetchone()
+    return _project(got) if got else None
+
+
+def delete_chat(chat_id: int, *, account_id: int, dsn: Optional[str] = None) -> bool:
+    """Delete one kept chat for good (the drawer's ×). True if it went."""
+    with db.connect(dsn) as conn:
+        n = conn.execute("DELETE FROM assistant_projects WHERE id = %s AND account_id = %s",
+                         (chat_id, account_id)).rowcount
+    return bool(n)
+
+
+def tag_project(project_id: int, *, account_id: int, dsn: Optional[str] = None) -> None:
+    """A Create turn ran inside this project: the open chat is the
+    project's from now on, kept for as long as the project is. Opens an
+    empty chat to carry the tag when none is open yet (the page saves the
+    turn into it right after). Only one of the account's own projects is
+    taken. Never raises: filing is bookkeeping on top of a turn."""
+    try:
+        with db.connect(dsn) as conn:
+            if _no_project(conn) == "TRUE":
+                return
+            owned = conn.execute(
+                "SELECT 1 FROM projects WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
+                (project_id, account_id)).fetchone()
+            if not owned:
+                return
+            n = conn.execute(
+                "UPDATE assistant_projects SET project_id = %s "
+                "WHERE account_id = %s AND archived_at IS NULL",
+                (project_id, account_id)).rowcount
+            if not n:
+                now = _now()
+                conn.execute(
+                    "INSERT INTO assistant_projects (account_id, project_id, created_at, updated_at) "
+                    "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                    (account_id, project_id, now, now))
+    except Exception as exc:                       # pragma: no cover - never fails a turn
+        import sys
+        print(f"  chat not filed under project {project_id}: {exc}", file=sys.stderr)
 
 
 # --- keep / reject against the checker -------------------------------------

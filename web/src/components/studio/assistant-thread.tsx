@@ -26,9 +26,11 @@
    is held to the same pictures (2026-10-22, scene 441 -> 442: the rewrite
    lost all three stills), until the person takes them off or starts a new
    session; the pill's button clears it the same way
-   (`clearProject`). Nothing is ever archived -- the server DELETES the row.
-   What the talk produced lives on the concept and, once rendered, on the
-   asset with its prompt. Nothing here calls a model or spends.
+   (`clearProject`). Since 2026-11-03 New session KEEPS the chat: the server
+   parks it in the history drawer (chat-history.tsx), where `openChat`
+   brings it back. What the talk produced lives on the concept and, once
+   rendered, on the asset with its prompt. Nothing here calls a model or
+   spends.
 
    INSIDE A PROJECT IT IS THE PROJECT'S (2026-10-07, Mike's call). On a
    project's workspace (/studio/projects/<id>) the thread this provider
@@ -54,6 +56,7 @@ import { usePathname } from "next/navigation";
 import { useShell } from "@/components/studio/shell";
 import { projectMessages, type GuideReply, type ProjectMessage } from "@/lib/studio-api";
 import { numbered } from "@/lib/result-numbers";
+import { ChatHistory } from "@/components/studio/chat-history";
 import {
   EMPTY_DRAFT,
   NEW_SESSION_EVENT,
@@ -63,6 +66,7 @@ import {
   isStage,
   putProject,
   clearProject as clearProjectOnServer,
+  openChatOnServer,
   type ComposerDraft,
   type Stage,
   type Turn,
@@ -81,8 +85,11 @@ export type AssistantThread = {
   setStage: (s: Stage | "") => void;
   draft: ComposerDraft;
   setDraft: (update: DraftUpdate) => void;
-  /** delete the conversation on the server and start empty */
-  clearProject: () => Promise<void>;
+  /** start a new session: the chat is kept in the history drawer
+   *  (`forget` deletes it instead) and the thread starts empty */
+  clearProject: (forget?: boolean) => Promise<void>;
+  /** bring a kept chat back as the open one (the history drawer) */
+  openChat: (id: number) => Promise<void>;
   /** the scene was created: the conversation is done, only its card remains */
   finishProject: (written: ComposerDraft["written"]) => void;
   /** set on a project's workspace: `turns` are that project's saved history */
@@ -102,6 +109,7 @@ const Ctx = createContext<AssistantThread>({
   draft: EMPTY_DRAFT,
   setDraft: () => {},
   clearProject: async () => {},
+  openChat: async () => {},
   finishProject: () => {},
   projectId: null,
   hasOlder: false,
@@ -295,8 +303,8 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
     setDraftState((d) => (typeof update === "function" ? update(d) : { ...d, ...update }));
   }, []);
 
-  const clearProject = useCallback(async () => {
-    await clearProjectOnServer();
+  const clearProject = useCallback(async (forget = false) => {
+    await clearProjectOnServer(forget === true);
     setTurns([]);
     setStage("");
     setDraftState(EMPTY_DRAFT);
@@ -307,6 +315,18 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
       /* nothing kept here to clear */
     }
   }, [account, setTurns]);
+  // the history drawer: the server swaps the chosen chat in (the open one
+  // is kept) and its thread, step and box replace what is on screen
+  const openChat = useCallback(async (id: number) => {
+    const { project } = await openChatOnServer(id);
+    const serverTurns = (project.turns as Turn[]) || [];
+    const serverStage = isStage(project.stage) ? project.stage : "";
+    const serverDraft = asDraft(project.draft);
+    setTurns(serverTurns);
+    setStage(serverStage);
+    setDraftState(serverDraft);
+    saved.current = snapshot(serverTurns, serverStage, serverDraft);
+  }, [setTurns]);
   // Create wrote the scene: everything the conversation was for is on the
   // concept now. The Guide talk, the brief, the box and its references go;
   // what stays is the card pointing at it -- and the composer's own send
@@ -357,12 +377,19 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
       draft,
       setDraft,
       clearProject,
+      openChat,
       finishProject,
       projectId,
       hasOlder: !!scoped?.hasOlder,
       loadOlder,
     }),
-    [account, loadedFor, turns, setTurns, stage, draft, setDraft, clearProject, finishProject, projectId, scoped, setProjectTurns, setProjectStage, loadOlder],
+    [account, loadedFor, turns, setTurns, stage, draft, setDraft, clearProject, openChat, finishProject, projectId, scoped, setProjectTurns, setProjectStage, loadOlder],
   );
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      {/* the history drawer (2026-11-03): under this provider, so it can bring a kept chat back */}
+      <ChatHistory />
+    </Ctx.Provider>
+  );
 }

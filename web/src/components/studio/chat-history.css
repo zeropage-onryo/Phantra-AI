@@ -1,0 +1,240 @@
+/* The history drawer (2026-11-03, Mike's "C2"): a panel from the left edge,
+   folders per project, then the chats on their own. Colours are the
+   studio's tokens (studio.css :root). */
+.ch-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+.ch-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgb(4 4 5 / 0.45);
+  cursor: default;
+}
+.ch-drawer {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 12px;
+  width: min(320px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--well);
+  border: 1px solid var(--edge);
+  border-radius: var(--r1);
+  box-shadow: 0 30px 80px -20px rgb(0 0 0 / 0.7);
+  overflow: hidden;
+  animation: ch-in 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes ch-in {
+  from {
+    transform: translateX(-12px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ch-drawer {
+    animation: none;
+  }
+}
+.ch-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.ch-head b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ch-head .spacer {
+  flex: 1;
+}
+.ch-new,
+.ch-x {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--rp);
+  cursor: pointer;
+}
+.ch-new {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.ch-new svg {
+  color: var(--on-signal);
+}
+.ch-new:hover {
+  background: var(--signal-deep);
+}
+.ch-x {
+  background: none;
+  color: var(--bone);
+}
+.ch-x:hover {
+  background: var(--raise);
+  color: var(--text);
+}
+.ch-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 6px 14px;
+}
+.ch-label {
+  margin: 0;
+  padding: 14px 10px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.ch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ch-fold {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.ch-fold svg {
+  color: var(--dim);
+  flex: none;
+}
+.ch-fold:hover {
+  background: var(--panel);
+}
+.ch-fold-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ch-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--dim);
+}
+.ch-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+.ch-row:hover,
+.ch-row.is-open {
+  background: var(--raise);
+}
+.ch-pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ch-row.nested .ch-pick {
+  padding-left: 31px;
+}
+.ch-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--bone);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ch-row.is-open .ch-title,
+.ch-row:hover .ch-title {
+  color: var(--text);
+}
+.ch-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+.ch-now {
+  color: var(--signal);
+}
+.ch-left {
+  color: var(--warn);
+}
+.ch-del {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+  opacity: 0;
+}
+.ch-row:hover .ch-del,
+.ch-del:focus-visible {
+  opacity: 1;
+}
+.ch-del:hover {
+  color: var(--danger-hi);
+  background: var(--danger-soft);
+}
+@media (hover: none) {
+  .ch-del {
+    opacity: 1;
+  }
+}
+.ch-empty {
+  margin: 0;
+  padding: 16px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bone-2);
+}
+.ch-retry {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--signal);
+  font: inherit;
+  cursor: pointer;
+}

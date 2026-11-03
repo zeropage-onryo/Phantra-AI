@@ -45,6 +45,7 @@ import {
   Coins,
   FolderKanban,
   Handshake,
+  History,
   House,
   ImageIcon,
   Layers,
@@ -79,7 +80,7 @@ import { PhoneMenu, PhoneTabs, PhoneTop } from "@/components/studio/phone/phone-
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
-import { requestNewSession } from "@/lib/assistant";
+import { requestHistory, requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 import { halloweenOn } from "@/lib/effects-wall";
@@ -738,6 +739,17 @@ export function StudioShell({ children }: { children: ReactNode }) {
               ) : null}
               {!signedOut && me?.account ? <ActivityTray toast={toast} /> : null}
               <CreditPill balance={balance} onError={(text) => toast(text, "err")} />
+              {!signedOut && me?.account ? (
+                <button
+                  type="button"
+                  className="hsearch"
+                  onClick={() => requestHistory()}
+                  aria-label="Chat history"
+                  title="Chat history"
+                >
+                  <History size={15} strokeWidth={1.7} />
+                </button>
+              ) : null}
               {!signedOut && me?.account ? (
                 <button
                   type="button"
