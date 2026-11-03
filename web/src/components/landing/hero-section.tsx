@@ -1,21 +1,22 @@
 import { ChatGptNewsBar } from "@/components/landing/chatgpt-news-bar";
-import { HeroStudio } from "@/components/landing/hero-studio";
+import { HeroRail } from "@/components/landing/hero-rail";
 
-// The hero (2026-11-02, Mike's pick of "17d" on the Phantra Homepage canvas,
-// built on the page it replaced, which was the L5 "Split Reel" of
-// 2026-10-11): the lemon news bar saying Phantra is now an approved ChatGPT
-// app, then the headline, Vesper's box, the ChatGPT line and nine quick
-// starts on the left, and the picked start's picture large on the right. A
-// quick start opens the side drawer ("Popup 2"). Every other section of the
-// homepage is unchanged. The old hero's pieces (hero-nimbus, hero-reel,
-// ascii-ripple) are left in the tree, unused, in case Mike wants one back.
+// The hero (2026-11-02, Mike's pick of "B3 · Clip rail" on the Phantra Hero
+// canvas, built on the 17d hero it replaces): the lemon news bar saying
+// Phantra is now an approved ChatGPT app, then the picked start's clip edge
+// to edge behind the headline, Vesper's box and the ChatGPT line, with the
+// nine quick starts as a rail of playing clips along the bottom.
+//
+// The section is exactly one screen tall (header 60px + the bar + the hero
+// = 100svh), so nothing sits under the fold on any monitor; a very short
+// window gets a floor so the box and the rail never collide. The 17d pieces
+// (hero-studio) and the older ones (hero-nimbus, hero-reel, ascii-ripple)
+// stay in the tree, unused, in case Mike wants one back.
 export function HeroSection() {
   return (
-    <section id="studio" className="relative overflow-hidden pt-[60px]">
+    <section id="studio" className="relative flex h-svh min-h-[600px] flex-col overflow-hidden pt-[60px]">
       <ChatGptNewsBar />
-      <div className="relative px-4 pb-12 pt-10 sm:px-6 lg:flex lg:min-h-[max(720px,calc(100svh-120px))] lg:items-center lg:px-10 lg:pb-16 lg:pt-8 xl:px-20">
-        <HeroStudio />
-      </div>
+      <HeroRail />
     </section>
   );
 }
