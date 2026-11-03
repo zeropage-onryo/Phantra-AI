@@ -22,7 +22,6 @@ import argparse
 import re
 import sys
 import threading
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from . import db
