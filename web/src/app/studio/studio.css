@@ -715,6 +715,46 @@
   object-fit: cover;
   display: block;
 }
+/* signed out (2026-11-03, QA P14): Log in and Sign up where the avatar
+   would be. Sign up is the one yellow fill, black on it. */
+/* under .hright: `.zps button { color: inherit; font: inherit }` beats a
+   bare class (the D8 trap) */
+.hright .hlogin,
+.hright .hsignup {
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+  font-size: 13px;
+  white-space: nowrap;
+  transition:
+    border-color var(--t),
+    filter var(--t);
+}
+.hright .hlogin {
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+}
+.hright .hlogin:hover {
+  border-color: rgb(255 255 255 / 0.35);
+}
+.hright .hsignup {
+  padding: 0 16px;
+  border: 0;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+.hright .hsignup:hover {
+  filter: brightness(1.08);
+}
+.hright .hlogin:focus-visible,
+.hright .hsignup:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
 .rmenu.hmenu {
   left: auto;
   right: 0;
@@ -5553,4 +5593,63 @@ p.zkeys {
 .hnav-link[data-neon] svg {
   color: #ffd2a8;
   filter: drop-shadow(0 0 3px #ff7a1a) drop-shadow(0 0 8px #ff7a1a);
+}
+
+/* The sign-up wall (signed-out-wall.tsx, 2026-11-03): a page that needs an
+   account, signed out. An invitation, not an error: no red anywhere. */
+.zwall {
+  min-height: calc(100dvh - 64px);
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+}
+.zwall-card {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.zwall-card h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(32px, 6vw, 48px);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zwall-card p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zwall-card .zwall-ask {
+  margin-top: 8px;
+  color: var(--text);
+}
+.zwall-doors {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+.zwall-doors .zbtn {
+  height: 42px;
+  min-width: 120px;
+  font-size: 14px;
+  color: var(--text);
+}
+.zwall-doors .zbtn.pri {
+  color: var(--on-signal);
+}
+.zwall-card .zwall-try {
+  font-size: 13px;
+}
+.zwall-try a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

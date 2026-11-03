@@ -10,7 +10,11 @@
    The prompt is held in this browser (localStorage, an hour) and put back
    in the box when the person lands in the studio signed in
    (takePendingPrompt). It is never sent on its own: the person presses
-   Send again, which is the only thing that ever spends. */
+   Send again, which is the only thing that ever spends.
+
+   `back` (2026-11-03): the page the sheet was opened on. Image and Video
+   open it too, so sign-up returns there and the prompt is kept for that
+   page only; Create's sheet keeps the old default. */
 import { useEffect } from "react";
 import { ShellPortal } from "./portal";
 import { Check, Gift } from "lucide-react";
@@ -22,22 +26,24 @@ import { COMPOSE_HREF } from "./phone-chrome";
 const KEY = "phantra.pending.prompt";
 const HOLD_MS = 60 * 60 * 1000;
 
-export function keepPendingPrompt(text: string) {
+export function keepPendingPrompt(text: string, where: string = COMPOSE_HREF) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ text, at: Date.now() }));
+    localStorage.setItem(KEY, JSON.stringify({ text, at: Date.now(), where }));
   } catch {
     /* a private window: the box simply starts empty */
   }
 }
 
-/** The prompt a signed-out send kept, once; null when there is none or it
- *  is over an hour old. */
-export function takePendingPrompt(): string | null {
+/** The prompt a signed-out send on `where` kept, once; null when there is
+ *  none, it was kept on another page, or it is over an hour old. */
+export function takePendingPrompt(where: string = COMPOSE_HREF): string | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
+    const v = JSON.parse(raw) as { text?: unknown; at?: unknown; where?: unknown };
+    // a prompt kept before `where` existed belongs to Create
+    if ((v.where ?? COMPOSE_HREF) !== where) return null;
     localStorage.removeItem(KEY);
-    const v = JSON.parse(raw) as { text?: unknown; at?: unknown };
     if (typeof v.text !== "string" || !v.text.trim() || typeof v.at !== "number") return null;
     return Date.now() - v.at < HOLD_MS ? v.text : null;
   } catch {
@@ -45,16 +51,16 @@ export function takePendingPrompt(): string | null {
   }
 }
 
-export function SignupSheet({ prompt, onClose }: { prompt: string | null; onClose: () => void }) {
+export function SignupSheet({ prompt, onClose, back = COMPOSE_HREF }: { prompt: string | null; onClose: () => void; back?: string }) {
   useEffect(() => {
     if (prompt === null) return;
-    if (prompt.trim()) keepPendingPrompt(prompt);
+    if (prompt.trim()) keepPendingPrompt(prompt, back);
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [prompt, onClose]);
+  }, [prompt, onClose, back]);
   if (prompt === null) return null;
-  const go = (provider?: "google" | "discord") => goToSignIn("signup", COMPOSE_HREF, provider);
+  const go = (provider?: "google" | "discord") => goToSignIn("signup", back, provider);
   return (
     <ShellPortal>
       <div className="ph-sheet-wrap ph-signup">
@@ -93,7 +99,7 @@ export function SignupSheet({ prompt, onClose }: { prompt: string | null; onClos
           </button>
           <p className="ph-signup-foot">
             Have an account?{" "}
-            <button type="button" onClick={() => goToSignIn(undefined, COMPOSE_HREF)}>
+            <button type="button" onClick={() => goToSignIn(undefined, back)}>
               Log in
             </button>
           </p>
