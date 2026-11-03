@@ -128,16 +128,22 @@ const NAV: NavItem[] = [
 type NavGroup =
   | { id: string; label: string; icon: typeof House; items: ViewId[]; link?: never }
   | { id: string; link: ViewId };
+/* (2026-11-02, later still, Mike's call) every page is a plain link on the
+   bar; Plugins is the one dropdown. Library (Assets) and Renders are off the
+   bar: their pages stay, reached by address, ⌘K and the links that need them.
+   Calendar sits beside Ad Studio after the divider (drawn there, below). The
+   menu shape stays in the type for an entry that ever needs one again. */
 const GROUPS: NavGroup[] = [
-  { id: "projects", label: "Projects", icon: FolderKanban, items: ["projects", "calendar"] },
-  { id: "create", label: "Create", icon: House, items: ["studio", "effects"] },
+  { id: "projects", link: "projects" },
+  { id: "studio", link: "studio" },
+  { id: "effects", link: "effects" },
   { id: "image", link: "image" },
   { id: "video", link: "video" },
   { id: "voice", link: "voice" },
-  // Renders sits with the work it made while the editor is off the UI
-  // (lib/editor-flag.ts); with it back on, Edit holds both again
-  { id: "library", label: "Library", icon: Layers, items: EDITOR_IN_UI ? ["assets", "elements", "brand"] : ["assets", "elements", "brand", "renders"] },
-  ...(EDITOR_IN_UI ? [{ id: "edit", label: "Edit", icon: Scissors, items: ["cut", "renders"] as ViewId[] }] : []),
+  { id: "elements", link: "elements" },
+  { id: "brand", link: "brand" },
+  // the editor comes back as a plain link when lib/editor-flag.ts says so
+  ...(EDITOR_IN_UI ? [{ id: "cut", link: "cut" as ViewId }] : []),
 ];
 /* Renders is off the old rail (2026-10-20) but has a home in the menus */
 const EXTRA: NavItem[] = [{ id: "renders", label: "Renders", href: "/studio/renders", icon: Film }];
@@ -231,10 +237,22 @@ export const useShell = () => useContext(Ctx);
 
 const subscribeNothing = () => () => {};
 /* one page on the top bar as a plain link (no menu): its rail icon and name */
-function NavLinkItem({ id, view, caps }: { id: ViewId; view: ViewId; caps: Record<string, boolean> }) {
+function NavLinkItem({
+  id,
+  view,
+  caps,
+  unseen = 0,
+}: {
+  id: ViewId;
+  view: ViewId;
+  caps: Record<string, boolean>;
+  unseen?: number;
+}) {
   const n = NAV.find((x) => x.id === id);
   if (!n || (n.cap && caps[n.cap] !== true)) return null;
   const Icon = n.icon;
+  // the Halloween neon on Effects (lib/effects-wall.ts) and What's new's dot on Create
+  const neon = id === "effects" && halloweenOn();
   return (
     <Link
       href={n.href}
@@ -243,9 +261,11 @@ function NavLinkItem({ id, view, caps }: { id: ViewId; view: ViewId; caps: Recor
       title={n.label}
       aria-current={id === view ? "page" : undefined}
       data-here={id === view ? "1" : undefined}
+      data-neon={neon ? "1" : undefined}
     >
       <Icon strokeWidth={1.5} />
       <span className="hnav-l">{n.label}</span>
+      {id === "studio" && unseen > 0 ? <span className="nbadge dot" aria-label={`${unseen} new`} /> : null}
     </Link>
   );
 }
@@ -613,7 +633,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
             </Link>
             <nav className="hnav" aria-label="Primary">
               {GROUPS.map((g) => {
-                if (g.link) return <NavLinkItem key={g.id} id={g.link} view={view} caps={caps} />;
+                if (g.link) return <NavLinkItem key={g.id} id={g.link} view={view} caps={caps} unseen={unseen} />;
                 const items = g.items
                   .map((id) => NAV.find((n) => n.id === id) ?? EXTRA.find((n) => n.id === id))
                   .filter((n): n is NavItem => !!n && (!n.cap || caps[n.cap] === true));
@@ -689,6 +709,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
               <PluginsRailItem top />
               <span className="hnav-sep" aria-hidden />
               <NavLinkItem id="ads" view={view} caps={caps} />
+              <NavLinkItem id="calendar" view={view} caps={caps} />
             </nav>
             {/* the right-hand cluster is one grid cell, so the tabs between
                 it and the brand can never be drawn underneath it */}
