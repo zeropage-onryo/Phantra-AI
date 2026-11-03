@@ -26,17 +26,25 @@ def _fx(name):
 
 # -- the pure count --------------------------------------------------------------
 
-def test_a_key_trends_only_past_both_floors():
-    # three accounts, five runs: on the wall
-    rows = _rows([(1, _fx(EFFECT))] * 3 + [(2, _fx(EFFECT)), (3, _fx(EFFECT))])
-    assert [i["id"] for i in popular.count(rows)] == [f"effect:{EFFECT}"]
-    # one account's spree is never trending, however many runs
-    assert popular.count(_rows([(1, _fx(EFFECT))] * 50)) == []
-    # two accounts are not enough either
-    assert popular.count(_rows([(1, _fx(EFFECT))] * 10 + [(2, _fx(EFFECT))] * 10)) == []
-    # three accounts but four runs: under the run floor
-    assert popular.count(_rows([(1, _fx(EFFECT)), (2, _fx(EFFECT)), (3, _fx(EFFECT)),
-                                (3, _fx(EFFECT))])) == []
+def test_the_most_used_things_with_no_floor():
+    # Mike, 2026-11-03: "its for most popular used things" -- one use by one
+    # account is on the list, ranked by total uses
+    assert [i["id"] for i in popular.count(_rows([(1, _fx(EFFECT))]))] == [f"effect:{EFFECT}"]
+    rows = _rows([(1, _fx(EFFECT))] * 50 + [(2, {"provider": "fal", "model": MODEL})] * 3)
+    assert [(i["id"], i["runs"]) for i in popular.count(rows)] == [
+        (f"effect:{EFFECT}", 50), (f"model:{MODEL}", 3)]
+
+
+def test_a_floor_can_still_be_asked_for():
+    rows = _rows([(1, _fx(EFFECT))] * 50)
+    assert popular.count(rows, min_accounts=3) == []
+    assert popular.count(rows, min_runs=51) == []
+
+
+def test_only_the_top_few_are_handed_over():
+    keys = [n for n, r in popular._catalogue()[0].items()][: popular.TOP + 3]
+    rows = _rows([(1, _fx(k)) for i, k in enumerate(keys) for _ in range(i + 1)])
+    assert len(popular.count(rows)) == popular.TOP
 
 
 def test_what_leaves_is_a_total_never_who():
@@ -61,11 +69,13 @@ def test_effects_looks_and_models_map_to_their_catalogue_keys():
     assert popular.key_of(None, cat) is None
 
 
-def test_more_studios_beat_one_studios_spree():
-    wide = [(a, {"provider": "fal", "model": MODEL}) for a in (1, 2, 3, 4, 5, 6)]
-    deep = [(a, _fx(EFFECT)) for a in (1, 2, 3)] * 10
-    out = popular.count(_rows(wide + deep))
-    assert [i["id"] for i in out] == [f"model:{MODEL}", f"effect:{EFFECT}"]
+def test_more_uses_rank_first_and_a_tie_goes_to_the_wider_one():
+    deep = [(a, _fx(EFFECT)) for a in (1, 2, 3)] * 10                    # 30 uses, 3 accounts
+    wide = [(a, {"provider": "fal", "model": MODEL}) for a in range(1, 7)]  # 6 uses, 6 accounts
+    assert [i["id"] for i in popular.count(_rows(wide + deep))] == [f"effect:{EFFECT}", f"model:{MODEL}"]
+    # same uses: the one more accounts used comes first
+    one = [(1, _fx(EFFECT))] * 6
+    assert [i["id"] for i in popular.count(_rows(one + wide))] == [f"model:{MODEL}", f"effect:{EFFECT}"]
 
 
 def test_a_malformed_row_is_skipped_not_fatal():
