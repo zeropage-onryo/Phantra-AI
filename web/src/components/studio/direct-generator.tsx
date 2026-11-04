@@ -24,7 +24,7 @@
      prompt, the model / length / resolution / frame menus and Generate.
    The one button that spends is yellow and carries its price; a white
    button confirms without spending (Add, from the picture picker). */
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode, type RefObject } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Check, ChevronDown, Clapperboard, Download, LayoutGrid, RotateCcw, Upload, Wand2, X } from "lucide-react";
@@ -108,6 +108,20 @@ const toMaster = (url: string | null | undefined) => (e: { currentTarget: HTMLIm
 type Kind = "image" | "video";
 /** where each page lives: a signed-out Generate comes back here after sign-up */
 const PAGE: Record<Kind, string> = { image: "/studio/image", video: "/studio/video" };
+
+/* above a phone the page is the card panel (2026-11-03, Mike's pick: board 11
+   and 12 of the Image & Video canvas, Krea's shape); a phone keeps its docked
+   box. Decided in script so each gets its own tree; the server draws the wide
+   one and a phone swaps on hydration. */
+const WIDE = "(min-width: 721px)";
+function subscribeWide(change: () => void) {
+  const q = window.matchMedia(WIDE);
+  q.addEventListener("change", change);
+  return () => q.removeEventListener("change", change);
+}
+function useWide(): boolean {
+  return useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
+}
 
 /** one picture this make is sent with: a file dropped or chosen here, or a
  *  render / element photo (sent by its address, as the composer sends a pick) */
@@ -209,6 +223,9 @@ function Generator({ kind }: { kind: Kind }) {
   const [iPick, setIPick] = useState<ImagePick | null>(null);
   const [pickNote, setPickNote] = useState("");
   const [menu, setMenu] = useState<MenuName>(null);
+  const wide = useWide();
+  // the wide page's two views: the stage and its starters, or everything made
+  const [tab, setTab] = useState<"home" | "gens">("home");
   // the Camera move and Lens cards (2026-11-03, lib/camera.ts): words, LTX's own setting or a reference clip
   const [cam, setCam] = useState<CameraPick>(NO_CAMERA);
 
@@ -524,6 +541,7 @@ function Generator({ kind }: { kind: Kind }) {
       ...list,
     ]);
     setShownId(id);
+    setTab("home");
     try {
       const started = await runDirect(kind, form);
       announceBalanceChange();
@@ -684,6 +702,300 @@ function Generator({ kind }: { kind: Kind }) {
       {fileInput}
     </div>
   );
+
+  const camChipRow = camChips.length ? (
+    <div className="dgv-camchips" aria-label="Added to the prompt">
+      {camChips.map((c) => (
+        <span key={c.key} className="dgv-camchip" title={c.text}>
+          <b data-mode={c.badge}>{c.badge}</b>
+          <span>{c.text}</span>
+          <button
+            type="button"
+            aria-label={c.key === "move" ? "Remove the camera move" : "Remove the lens"}
+            onClick={() => setCam((was) => (c.key === "move" ? { ...was, move: "" } : { ...was, focal: "", aperture: "", look: "" }))}
+          >
+            <X strokeWidth={2} />
+          </button>
+        </span>
+      ))}
+    </div>
+  ) : null;
+  const goButton = (cls: string) => (
+    <button type="submit" className={cls} {...keepBoxFocus} disabled={signedOut ? !prompt.trim() : !canSend} data-busy={!signedOut && (pricing || sending) ? "1" : undefined}>
+      {sending ? <span className="dg-spin sm" aria-hidden /> : <Wand2 strokeWidth={1.8} />}
+      {goLabel}
+    </button>
+  );
+  const cameraMenus =
+    camCat && vModel ? (
+      <>
+        <ChipMenu
+          name="Camera move"
+          label="Camera move"
+          open={menu === "camera"}
+          onOpen={() => setMenu(menu === "camera" ? null : "camera")}
+          onClose={() => setMenu(null)}
+          value={cam.move ? moveValue(camCat, cam) : "None"}
+          strong={!!cam.move}
+          items={[
+            { id: "", name: "None", note: "Nothing is added; describe the camera yourself", right: "" },
+            ...camCat.moves.map((m) => {
+              const how = cameraMode(vModel, m.id, hasStart, vRes);
+              const why = blockedBy(camCat, { ...cam, move: "" }, m.id);
+              return { id: m.id, name: m.label, note: why ? `${m.words} (clears the lens pick: ${why})` : m.words, right: how ? MODE_LABEL[how] : "" };
+            }),
+          ]}
+          picked={cam.move}
+          onPick={(id) => {
+            pickCamera("move", id);
+            setMenu(null);
+          }}
+          title={`Camera move on ${vModel.label}`}
+          foot={camFoot}
+          scroll
+          wide
+        />
+        <LensMenu
+          label="Lens"
+          open={menu === "lens"}
+          onOpen={() => setMenu(menu === "lens" ? null : "lens")}
+          onClose={() => setMenu(null)}
+          cat={camCat}
+          pick={cam}
+          onPick={pickCamera}
+        />
+      </>
+    ) : null;
+
+  /* ── wider than a phone: the card panel (boards 11 and 12) ── */
+  if (wide) {
+    const shapes = video ? (vModel?.aspects ?? []) : iMenu ? (iModel?.aspects?.length ? iModel.aspects : iMenu.aspects) : [];
+    const pickShape = (a: string) => (video ? setVideo({ aspect: a }) : setImage({ aspect: a }));
+    const shape = video ? vPick?.aspect : iPick?.aspect;
+    const fill = (t: string) => {
+      setPrompt(t);
+      promptEl.current?.focus();
+    };
+    return (
+      <section className={`view dg dgk ${cardFonts}`} data-kind={kind} data-over={over ? "1" : undefined} {...drop}>
+        <main className="dgk-main">
+          <div className="dgk-tabs" role="tablist" aria-label="View">
+            <button type="button" role="tab" aria-selected={tab === "home"} onClick={() => setTab("home")}>
+              Home
+            </button>
+            <button type="button" role="tab" aria-selected={tab === "gens"} onClick={() => setTab("gens")}>
+              Generations{made.length ? <i>{made.length}</i> : null}
+            </button>
+          </div>
+          {tab === "home" ? (
+            <div className="dgk-home">
+              <Stage shown={shown} video={video} onStarter={fill} onReuse={reuse} onCancel={cancel} noStarters />
+              {video && camCat ? (
+                <section className="dgk-row" aria-label="Camera moves">
+                  <h2>Camera moves</h2>
+                  <div className="dgk-tiles">
+                    {camCat.moves.map((m) => {
+                      const how = cameraMode(vModel ?? null, m.id, hasStart, vRes);
+                      return (
+                        <button key={m.id} type="button" className="dgk-move" aria-pressed={cam.move === m.id} title={m.words} onClick={() => pickCamera("move", cam.move === m.id ? "" : m.id)}>
+                          <span className="dgk-mini" data-move={m.id} aria-hidden>
+                            <span className="dgk-w">
+                              <span className="dgk-floor" />
+                              <span className="dgk-b1" />
+                              <span className="dgk-b2" />
+                              <span className="dgk-subj" />
+                            </span>
+                          </span>
+                          <span className="dgk-move-name">
+                            <b>{m.label}</b>
+                            {how ? <em data-mode={how}>{MODE_LABEL[how]}</em> : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
+              <section className="dgk-row" aria-label="Starters">
+                <h2>Start from</h2>
+                <div className="dgk-tiles" data-text="1">
+                  {STARTERS[kind].map((t, i) => (
+                    <button key={t} type="button" className="dgk-starter" data-tone={i % 6} onClick={() => fill(t)}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </div>
+          ) : (
+            <div className="dgk-gens">
+              <History
+                made={made}
+                recent={recent}
+                shownId={shownId}
+                onShow={(id) => {
+                  setShownId(id);
+                  setTab("home");
+                }}
+                video={video}
+                grid
+              />
+            </div>
+          )}
+        </main>
+
+        <form
+          className="dgk-panel"
+          onSubmit={(e) => {
+            e.preventDefault();
+            go();
+          }}
+        >
+          <div className="dgk-mode" role="tablist" aria-label="Make">
+            <Link role="tab" aria-selected={!video} href={directHref("image")}>
+              Image
+            </Link>
+            <Link role="tab" aria-selected={video} href={directHref("video")}>
+              Video
+            </Link>
+          </div>
+
+          <div className="dgk-card">
+            <span className="dgk-lab">Model</span>
+            <ModelPins
+              kind={kind}
+              open={menu === "model"}
+              onOpen={() => setMenu(menu === "model" ? null : "model")}
+              onClose={() => setMenu(null)}
+              items={modelItems}
+              picked={(video ? vPick?.model : iPick?.model) ?? ""}
+              onPick={(id) => {
+                chooseModel(id);
+                setMenu(null);
+              }}
+              title={`${items.length} ${kind} models`}
+              foot={video ? "Switching keeps your prompt. A length or frame the new model does not take moves to its own, and a line says so." : "Switching keeps your prompt and your pictures."}
+              disabled={!items.length}
+            />
+          </div>
+
+          <div className="dgk-card">
+            <span className="dgk-lab-row">
+              <span className="dgk-lab">{video ? "Pictures" : "References"}</span>
+              <span className="dg-count">{video ? (vCap > 1 ? `up to ${vCap}` : "one start frame") : iModel ? refsCountLine(iModel.max_refs, refs.length) : ""}</span>
+            </span>
+            {tray("lg")}
+            {picturesNote}
+            {refMode === "references" && tags.length ? <p className="dg-hint">Name them in the prompt; tap a tag to put it there.</p> : null}
+            {video && refs.length === 1 && vCap > 1 ? (
+              <span className="dgv-use" role="radiogroup" aria-label="Use the picture as">
+                <button type="button" role="radio" aria-checked={!oneAsRef} onClick={() => setOneAsRef(false)}>
+                  Start frame
+                </button>
+                <button type="button" role="radio" aria-checked={oneAsRef} onClick={() => setOneAsRef(true)}>
+                  Reference
+                </button>
+              </span>
+            ) : null}
+          </div>
+
+          <label className="dgk-card dgk-promptcard">
+            <span className="dgk-lab-row">
+              <span className="dgk-lab">Prompt</span>
+              <span className="dg-count">
+                {prompt.length.toLocaleString("en-US")} / {(video ? (vModel?.prompt_max ?? 4000) : 4000).toLocaleString("en-US")}
+              </span>
+            </span>
+            <textarea
+              ref={promptEl}
+              className="dgk-prompt"
+              value={prompt}
+              maxLength={video ? (vModel?.prompt_max ?? 4000) : 4000}
+              rows={5}
+              placeholder={video ? "Describe the clip: what moves, the light, the sound…" : "Describe the image: the subject, the light, the look…"}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void generate();
+                }
+              }}
+            />
+            {camChipRow}
+          </label>
+
+          <div className="dgk-grid">
+            {video && vModel && vPick ? (
+              <>
+                <ChipMenu
+                  name="Length"
+                  label="Duration"
+                  open={menu === "length"}
+                  onOpen={() => setMenu(menu === "length" ? null : "length")}
+                  onClose={() => setMenu(null)}
+                  value={`${vPick.seconds}s`}
+                  items={lengths.map((sec) => ({ id: String(sec), name: `${sec}s`, note: "", right: "" }))}
+                  picked={String(vPick.seconds)}
+                  onPick={(sec) => setVideo({ seconds: Number(sec) })}
+                  title={`Length · ${lengths.length > 1 ? `${lengths[0]} to ${lengths[lengths.length - 1]} s` : `${lengths[0] ?? ""} s`}`}
+                  foot="Every change is priced again before Generate shows a number."
+                  disabled={lengths.length < 2}
+                  scroll
+                />
+                <ChipMenu
+                  name="Resolution"
+                  label="Resolution"
+                  open={menu === "res"}
+                  onOpen={() => setMenu(menu === "res" ? null : "res")}
+                  onClose={() => setMenu(null)}
+                  value={vRes}
+                  items={resolutions.map((r) => ({ id: r, name: r, note: "", right: "" }))}
+                  picked={vRes ?? ""}
+                  onPick={(r) => setVideo({ resolution: r })}
+                  title="Resolution"
+                  disabled={resolutions.length < 2}
+                />
+              </>
+            ) : null}
+            {hasStart ? (
+              <span className="dgk-follow">
+                <small>Aspect ratio</small>Follows the picture
+              </span>
+            ) : shape ? (
+              <ChipMenu
+                name="Frame"
+                label="Aspect ratio"
+                open={menu === "frame"}
+                onOpen={() => setMenu(menu === "frame" ? null : "frame")}
+                onClose={() => setMenu(null)}
+                value={
+                  <>
+                    <Frame aspect={shape} /> {shape}
+                  </>
+                }
+                items={shapes.map((a) => ({ id: a, name: a, note: "", right: "", icon: <Frame aspect={a} /> }))}
+                picked={shape}
+                onPick={pickShape}
+                title="Aspect ratio"
+                disabled={shapes.length < 2}
+                shapes
+              />
+            ) : null}
+            {video ? cameraMenus : null}
+          </div>
+
+          <span className="dg-grow" />
+          {notes}
+          {goButton("dg-go dgk-go")}
+          <p className="dg-hint">
+            ⌘↵ generates. Rather talk it through? <Link href="/studio">Create</Link> plans it with you.
+          </p>
+        </form>
+        {picker}
+        <SignupSheet prompt={signup} onClose={closeSignup} back={PAGE[kind]} />
+      </section>
+    );
+  }
 
   if (!video) {
     return (
@@ -1149,6 +1461,8 @@ export function ModelMenu(props: {
 /** A dock chip: its value, and a menu that opens upward. */
 function ChipMenu(props: {
   name: string;
+  /** the wide page's card title over the value (board 11); the dock draws none */
+  label?: string;
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
@@ -1177,8 +1491,10 @@ function ChipMenu(props: {
         aria-expanded={props.open}
         onClick={props.onOpen}
         disabled={props.disabled}
+        data-card={props.label ? "1" : undefined}
       >
-        {props.value}
+        {props.label ? <small className="dgk-chip-lab">{props.label}</small> : null}
+        <span className="dgk-chip-val">{props.value}</span>
         {props.disabled ? null : <ChevronDown strokeWidth={2} className="dg-chev" />}
       </button>
       {props.open ? (
@@ -1193,6 +1509,7 @@ function ChipMenu(props: {
 /** The Lens card: focal length, aperture and a look, each tapped on or off.
  *  Words in the prompt on every model (no clip model has a lens setting). */
 function LensMenu(props: {
+  label?: string;
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
@@ -1218,8 +1535,10 @@ function LensMenu(props: {
         aria-haspopup="dialog"
         aria-expanded={props.open}
         onClick={props.onOpen}
+        data-card={props.label ? "1" : undefined}
       >
-        {lensValue(props.cat, props.pick)}
+        {props.label ? <small className="dgk-chip-lab">{props.label}</small> : null}
+        <span className="dgk-chip-val">{props.label && !any ? "None" : lensValue(props.cat, props.pick)}</span>
         <ChevronDown strokeWidth={2} className="dg-chev" />
       </button>
       {props.open ? (
@@ -1341,9 +1660,11 @@ function PicturePicker({ room, note, onClose, onAdd }: { room: number; note: str
 
 /** The stage (a still) or the theatre (a clip): what is being looked at,
  *  drawn, or what went wrong. */
-function Stage({ shown, video, onStarter, onReuse, onCancel }: {
+function Stage({ shown, video, onStarter, onReuse, onCancel, noStarters }: {
   shown: Shown | null;
   video: boolean;
+  /** the wide page draws its starters as a row of cards under the stage */
+  noStarters?: boolean;
   onStarter: (t: string) => void;
   onReuse: (s: Shown) => void;
   onCancel: (s: Shown) => void;
@@ -1358,14 +1679,18 @@ function Stage({ shown, video, onStarter, onReuse, onCancel }: {
               ? "Text alone, one start frame, or several pictures held as references on the models that take them. Everything also lands in your Library."
               : "And in your Library, with everything else you have made. Nothing is drawn until Generate."}
           </p>
-          <div className="dg-starters">
-            {STARTERS[video ? "video" : "image"].map((s) => (
-              <button key={s} type="button" onClick={() => onStarter(s)}>
-                {s}
-              </button>
-            ))}
-          </div>
-          <small>A starter only fills the prompt.</small>
+          {noStarters ? null : (
+            <>
+              <div className="dg-starters">
+                {STARTERS[video ? "video" : "image"].map((s) => (
+                  <button key={s} type="button" onClick={() => onStarter(s)}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <small>A starter only fills the prompt.</small>
+            </>
+          )}
         </div>
       </div>
     );
@@ -1468,12 +1793,14 @@ function Stage({ shown, video, onStarter, onReuse, onCancel }: {
 
 /** This visit's makes, then the Library's newest of this kind. A click puts
  *  one on the stage; nothing here navigates away. */
-function History({ made, recent, shownId, onShow, video }: {
+function History({ made, recent, shownId, onShow, video, grid }: {
   made: Shown[];
   recent: Shown[];
   shownId: string | null;
   onShow: (id: string) => void;
   video?: boolean;
+  /** the wide page's Generations tab: a grid, not a strip */
+  grid?: boolean;
 }) {
   const tile = (s: Shown) => (
     <li key={s.id}>
@@ -1502,7 +1829,7 @@ function History({ made, recent, shownId, onShow, video }: {
     </li>
   );
   return (
-    <aside className="dg-history" data-video={video ? "1" : undefined} aria-label="Made on this visit and in your Library">
+    <aside className="dg-history" data-video={video ? "1" : undefined} data-grid={grid ? "1" : undefined} aria-label="Made on this visit and in your Library">
       {made.length ? (
         <>
           <span className="dg-lab">This visit</span>

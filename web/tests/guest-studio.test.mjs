@@ -70,7 +70,8 @@ test("Image and Video: a signed-out Generate opens the sign-up sheet, never the 
   const go = code.slice(code.indexOf("function go()"), code.indexOf("function go()") + 200);
   assert.match(go, /if \(signedOut\) \{\s*setSignup\(prompt\.trim\(\)\);\s*return;\s*\}\s*void generate\(\);/);
   // every form goes through go(): none calls generate() itself
-  assert.equal((code.match(/onSubmit=/g) ?? []).length, 3);
+  // Image panel, Image phone box, Video dock, and the wide card panel (2026-11-03)
+  assert.equal((code.match(/onSubmit=/g) ?? []).length, 4);
   assert.doesNotMatch(code, /onSubmit=\{\(e\) => \{\s*e\.preventDefault\(\);\s*void generate\(\);/);
   assert.match(code, /signedOut \? "Sign up to generate" :/);
   assert.match(code, /<SignupSheet prompt=\{signup\} onClose=\{closeSignup\} back=\{PAGE\[kind\]\} \/>/);

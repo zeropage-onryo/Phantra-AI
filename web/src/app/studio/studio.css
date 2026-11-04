@@ -50,6 +50,7 @@
   /* surfaces, darkest first (the noir set's values) */
   --void: #040405;
   --ground: #0b0b0b;
+  --panel-black: #000000;   /* the Image and Video side panel (2026-11-03, board 11) */
   /* the grey a drawn element sheet is painted on (prompts/element_sheet_character.txt) */
   --sheet-ground: #d0d0d0;
   --well: #0f0f0e;
