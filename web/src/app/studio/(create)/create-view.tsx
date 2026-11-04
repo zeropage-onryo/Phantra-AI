@@ -259,7 +259,11 @@ import {
 } from "@/lib/talking-photo";
 import { beginDub, clipChoices, dubRequest, languageName, type DubMenu, type DubState } from "@/lib/dubbing";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
-import { needsCredits } from "@/lib/out-of-credits";
+import { TOP_UP_HREF, needsCredits } from "@/lib/out-of-credits";
+import { OwlLockup } from "@/components/owl-lockup";
+
+/** the phone's low-credits bar shows under this many (a still is ~10) */
+const LOW_CREDITS = 20;
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
@@ -3592,6 +3596,11 @@ function Composer() {
           />
         ) : null}
         {empty && composePage ? (
+          // the phone's Create (2026-11-04): the lockup right above the box;
+          // composer.css draws it under 720px only and hides the greeting there
+          <OwlLockup className="zc-phone-lockup" />
+        ) : null}
+        {empty && composePage ? (
           // the compose page's greeting (the phone's Create): Vesper above it
           // eslint-disable-next-line @next/next/no-img-element -- the mascot's own R2 frame
           <img className="zc-greet-face" src={mascotSrc(DEFAULT_MASCOT, "awake", 128)} alt="" width={96} height={96} />
@@ -4255,6 +4264,14 @@ function Composer() {
             </motion.div>
           ) : null}
         </div>
+        {empty && composePage && balance && !balance.exempt && balance.available < LOW_CREDITS ? (
+          // phone only (composer.css): a slim bar under the box, outside it
+          <Link href={TOP_UP_HREF} className="zc-lowbar">
+            <span className="zc-lowbar-dot" aria-hidden />
+            <span className="zc-lowbar-words">Credits are running low</span>
+            <span className="zc-lowbar-go">Top up</span>
+          </Link>
+        ) : null}
         {homePage && thread.length ? (
           // the conversation lives on its own page now; the home says it is there
           <Link href="/studio/chat" className="zc-resume">

@@ -16,30 +16,27 @@
    phone's top bar: credits live on the Profile tab (/studio/me). None of
    this is drawn above 720px. Nothing here spends. */
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
-  AtSign,
   AudioLines,
-  CalendarDays,
   Clapperboard,
   FolderKanban,
-  Handshake,
   House,
   ImageIcon,
   LayoutGrid,
-  Megaphone,
-  Menu,
-  Palette,
+  PanelLeft,
+  PanelLeftClose,
+  Plus,
   Plug,
-  Settings,
   Sparkles,
   UserRound,
-  X,
 } from "lucide-react";
-import { OwlLockup } from "@/components/owl-lockup";
+import { OwlLockup, OwlMark } from "@/components/owl-lockup";
 import { effectsDoor, EFFECTS_TAB_HREF, type Capabilities } from "@/lib/create-v2";
-import { SETTINGS_HOME } from "@/lib/settings-sections";
+import { useShell } from "@/components/studio/shell";
+import { useAssistantThread } from "@/components/studio/assistant-thread";
+import { listChats, type ChatSummary } from "@/lib/assistant";
 import "./phone.css";
 
 /** Where the Create button goes: the compose page, the box alone. */
@@ -62,17 +59,23 @@ export function phoneTabOf(pathname: string): PhoneTab {
   return null;
 }
 
-/** The phone's top bar: the menu on the left, then the logo. */
+/** The phone's top bar (2026-11-04, Mike's mobile canvas): the menu on the
+ *  left and, until there is a plan, a yellow Upgrade on the right. The logo
+ *  is in the drawer and above the Create box, not here. */
 export function PhoneTop({ onMenu }: { onMenu: () => void }) {
+  const { balance, signedOut } = useShell();
+  const upgrade = !signedOut && balance !== null && !balance.plan && !balance.exempt;
   return (
     <header className="ph-top">
-      <button type="button" className="ph-round" onClick={onMenu} aria-label="Menu">
-        <Menu strokeWidth={2} />
+      <button type="button" className="ph-round ph-bare" onClick={onMenu} aria-label="Menu">
+        <PanelLeft strokeWidth={1.9} />
       </button>
-      <Link href="/studio" className="ph-logo" aria-label="Phantra home">
-        {/* the site's own lockup: the owl behind the hand-drawn "phantra" */}
-        <OwlLockup intro className="ph-lockup" />
-      </Link>
+      <span className="ph-top-gap" />
+      {upgrade ? (
+        <Link href="/studio/settings/plan" className="ph-upgrade">
+          Upgrade
+        </Link>
+      ) : null}
     </header>
   );
 }
@@ -151,10 +154,18 @@ export function PhoneTabs({ caps, unseen = 0 }: { caps: Capabilities; unseen?: n
   );
 }
 
-/** Everything that left the bar, as one full-screen sheet. */
+/** THE DRAWER (2026-11-04, Mike's mobile canvas after Higgsfield's mobile
+ *  site): a 322px panel on the left over a dimmed page. STATIC on purpose --
+ *  it appears and goes at once, no slide, fade or bounce (no transition or
+ *  animation anywhere in .ph-menu). Create, Image, Video, Effects, Projects,
+ *  MCP, the three latest chats and the account card. What left it (Ad Studio,
+ *  Elements, Brand kits, Calendar, Plugins, Affiliate) is on the Profile tab. */
 export function PhoneMenu({ open, onClose, caps }: { open: boolean; onClose: () => void; caps: Capabilities }) {
-  // every link in it closes it on the way (onClick), so there is no
-  // route watcher here
+  const { me, balance, signedOut } = useShell();
+  const router = useRouter();
+  const pathname = usePathname() || "/studio";
+  const { openChat } = useAssistantThread();
+  const [chats, setChats] = useState<ChatSummary[] | null>(null);
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -166,42 +177,91 @@ export function PhoneMenu({ open, onClose, caps }: { open: boolean; onClose: () 
       document.body.style.overflow = was;
     };
   }, [open, onClose]);
+  // the latest chats are read each time the drawer opens
+  useEffect(() => {
+    if (!open || signedOut) return;
+    let live = true;
+    listChats()
+      .then((l) => live && setChats(l.chats.slice(0, 3)))
+      .catch(() => live && setChats([]));
+    return () => {
+      live = false;
+    };
+  }, [open, signedOut]);
   if (!open) return null;
-  const row = (href: string, label: string, Icon: typeof House) => (
-    <Link href={href} className="ph-menu-row" onClick={onClose}>
+  const here = phoneTabOf(pathname);
+  const row = (href: string, label: string, Icon: typeof House, opts: { on?: boolean; tag?: string } = {}) => (
+    <Link href={href} className="ph-menu-row" aria-current={opts.on ? "page" : undefined} onClick={onClose}>
       <Icon strokeWidth={1.9} />
-      {label}
+      <span className="ph-menu-name">{label}</span>
+      {opts.tag ? <span className="ph-tag">{opts.tag}</span> : null}
     </Link>
   );
+  async function pick(c: ChatSummary) {
+    onClose();
+    try {
+      if (!c.open) await openChat(c.id);
+      router.push("/studio/chat");
+    } catch {
+      /* the chat could not be opened: stay where we are */
+    }
+  }
+  const who = me?.user.display_name || me?.user.email || "Your account";
+  const credits = balance ? (balance.exempt ? "Not charged" : `${Math.max(balance.available, 0).toLocaleString("en-US")} credits`) : "";
   return (
     <div className="ph-menu" role="dialog" aria-modal="true" aria-label="Menu">
-      <header className="ph-top">
-        <button type="button" className="ph-round" onClick={onClose} aria-label="Close menu">
-          <X strokeWidth={2.2} />
-        </button>
-        <Link href="/studio" className="ph-logo" aria-label="Phantra home" onClick={onClose}>
-          <OwlLockup className="ph-lockup" />
-        </Link>
-      </header>
-      <nav className="ph-menu-list" aria-label="Tools">
-        {row("/studio/projects", "Projects", FolderKanban)}
-        {row("/studio/video", "Video", Clapperboard)}
-        {row("/studio/image", "Image", ImageIcon)}
-        {/* the rail's own flag (QA 2026-11-02 T15: Voice had no way in on a phone) */}
-        {caps.voice_tab === true ? row("/studio/voice", "Voice", AudioLines) : null}
-        {row("/studio/ads", "Ad Studio", Megaphone)}
-        {row("/studio/elements", "Elements", AtSign)}
-        {row("/studio/brand", "Brand kits", Palette)}
-        {row("/studio/calendar", "Calendar", CalendarDays)}
-        {row("/studio/plugins", "Plugins", Plug)}
-        {row(SETTINGS_HOME, "Settings", Settings)}
-        {row("/affiliates", "Affiliate Program", Handshake)}
+      <button type="button" className="ph-scrim" onClick={onClose} aria-label="Close menu" tabIndex={-1} />
+      <nav className="ph-drawer" aria-label="Studio">
+        <header className="ph-drawer-top">
+          <Link href="/studio" className="ph-logo" aria-label="Phantra home" onClick={onClose}>
+            <OwlLockup className="ph-lockup ph-lockup-lg" />
+          </Link>
+          <button type="button" className="ph-round ph-bare" onClick={onClose} aria-label="Close menu">
+            <PanelLeftClose strokeWidth={1.9} />
+          </button>
+        </header>
+        <div className="ph-drawer-list">
+          {row(COMPOSE_HREF, "Create", Plus, { on: here === "create" || here === "home" })}
+          {row("/studio/image", "Image", ImageIcon)}
+          {row("/studio/video", "Video", Clapperboard)}
+          {caps.voice_tab === true ? row("/studio/voice", "Voice", AudioLines) : null}
+          {row(effectsHref(caps), "Effects", Sparkles, { tag: "NEW" })}
+          {row("/studio/projects", "Projects", FolderKanban)}
+          <Link href="/mcp" className="ph-menu-row ph-menu-mcp" onClick={onClose}>
+            <Plug strokeWidth={1.9} />
+            <span className="ph-menu-name">MCP</span>
+            <span className="ph-pill">Connect</span>
+          </Link>
+          {chats && chats.length > 0 ? (
+            <>
+              <div className="ph-drawer-label">Recent chats</div>
+              {chats.map((c) => (
+                <button key={c.id} type="button" className="ph-chat-row" data-open={c.open ? "1" : undefined} onClick={() => pick(c)}>
+                  <span>{c.title || "New chat"}</span>
+                </button>
+              ))}
+            </>
+          ) : null}
+        </div>
+        <div className="ph-drawer-foot">
+          {signedOut ? (
+            <Link href="/studio/me" className="ph-account" onClick={onClose}>
+              <span className="ph-account-text">
+                <b>Sign in</b>
+              </span>
+            </Link>
+          ) : (
+            <Link href="/studio/me" className="ph-account" onClick={onClose}>
+              <OwlMark className="ph-account-owl" />
+              <span className="ph-account-text">
+                <b>{who}</b>
+                {credits ? <span>{credits}</span> : null}
+              </span>
+              {balance && !balance.plan && !balance.exempt ? <span className="ph-account-up">Upgrade</span> : null}
+            </Link>
+          )}
+        </div>
       </nav>
-      <div className="ph-menu-foot">
-        <Link href={COMPOSE_HREF} className="ph-go" onClick={onClose}>
-          Start creating
-        </Link>
-      </div>
     </div>
   );
 }

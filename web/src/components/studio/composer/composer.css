@@ -1925,3 +1925,124 @@
     height: 44px;
   }
 }
+
+/* ── THE PHONE'S CREATE, MID-SCREEN, 2026-11-04 ──
+   Mike's mobile canvas (after Higgsfield's mobile site): the lockup right
+   above a smaller box in the middle of the screen, a slim credits bar under
+   it. At rest nothing is pinned; once the box has focus it comes down onto
+   the keyboard (the tab bar steps aside, phone.css) and the lockup moves up
+   to make room. 16px text so iOS never zooms; two lines at rest, growing
+   to about eight, then scrolling inside the box. Static: no transitions. */
+.zc .zc-phone-lockup,
+.zc-lowbar {
+  display: none;
+}
+@media (max-width: 720px) {
+  .view[data-page="compose"] {
+    padding-bottom: 0;
+  }
+  .view[data-page="compose"] > .zc.hero.zc-empty {
+    min-height: calc(100dvh - 60px - 64px - env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 16px 24px;
+  }
+  .zc .zc-phone-lockup {
+    display: block;
+    width: 250px;
+    max-width: 70%;
+    height: auto;
+    margin: 0 auto 22px;
+    color: var(--text);
+  }
+  .view[data-page="compose"] .zc-greet-face,
+  .view[data-page="compose"] .zc.hero h1,
+  .view[data-page="compose"] .zc .zc-new,
+  .view[data-page="compose"] .zc .zc-starters,
+  .view[data-page="compose"] .zc .zc-hint,
+  .view[data-page="compose"] .zc .zc-vesper,
+  .view[data-page="compose"] .zc .vv-peek {
+    display: none;
+  }
+  /* the box in the page, not pinned */
+  .view[data-page="compose"] .zc .stack {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+  .view[data-page="compose"] .zc .zc-box {
+    border-radius: 26px;
+  }
+  .view[data-page="compose"] .zc .zc-box textarea {
+    min-height: 52px;
+    max-height: 176px;
+    padding: 16px 18px 0;
+    font-size: 16px;
+    line-height: 22px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .view[data-page="compose"] .zc .zc-box textarea::placeholder {
+    white-space: normal;
+  }
+  /* typing: the box rides the keyboard, the lockup stays above it */
+  .zps:has(.view[data-page="compose"] .zc-box textarea:focus) .view[data-page="compose"] > .zc.hero.zc-empty {
+    justify-content: flex-start;
+    padding-top: 50px;
+  }
+  .zps:has(.view[data-page="compose"] .zc-box textarea:focus) .view[data-page="compose"] .zc .stack {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 8px;
+    width: auto;
+    z-index: 30;
+  }
+  .zps:has(.view[data-page="compose"] .zc-box textarea:focus) .zc-lowbar {
+    display: none;
+  }
+  /* credits running low: a bar under the box, outside it */
+  .zc-lowbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 8px 8px 8px 16px;
+    border: 1px solid var(--edge-hi);
+    border-radius: 24px;
+    background: var(--raise);
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .zc-lowbar-dot {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--signal);
+  }
+  .zc-lowbar-words {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .zc-lowbar-go {
+    height: 34px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    border-radius: 17px;
+    background: var(--text);
+    color: var(--on-signal);
+    font-weight: 700;
+  }
+}

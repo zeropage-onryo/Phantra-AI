@@ -13,6 +13,16 @@ import { TOP_UP_HREF } from "@/lib/out-of-credits";
 import { SETTINGS_ROOT } from "@/lib/settings-sections";
 /* eslint-disable @next/next/no-img-element -- the person's own avatar, any host their sign-in gave */
 
+// what the phone's drawer no longer carries (2026-11-04)
+const MORE: [string, string][] = [
+  ["/studio/ads", "Ad Studio"],
+  ["/studio/elements", "Elements"],
+  ["/studio/brand", "Brand kits"],
+  ["/studio/calendar", "Calendar"],
+  ["/studio/plugins", "Plugins"],
+  ["/affiliates", "Affiliate Program"],
+];
+
 const ROWS: [string, string][] = [
   [`${SETTINGS_ROOT}/plan`, "Plan and billing"],
   [`${SETTINGS_ROOT}/usage`, "Usage"],
@@ -66,6 +76,15 @@ export function ProfilePage() {
           Add credits
         </Link>
       </div>
+
+      <nav className="ph-me-list" aria-label="More tools">
+        {MORE.map(([href, label]) => (
+          <Link key={href} href={href}>
+            {label}
+            <ChevronRight strokeWidth={2.2} aria-hidden />
+          </Link>
+        ))}
+      </nav>
 
       <nav className="ph-me-list" aria-label="Account">
         {ROWS.map(([href, label]) => (

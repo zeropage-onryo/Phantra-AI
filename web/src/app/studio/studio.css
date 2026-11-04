@@ -23,6 +23,8 @@
   /* signal: the one accent, Phantra yellow (2026-10-20, the owl icon's
      ground; it was signal red #e4002b) */
   --signal: #fee32d;
+  --signal-wash: #272409;
+  --signal-line: #4a4416;
   /* yellow TEXT on near-black: the signal itself reads at 14:1 there */
   --signal-hi: #fee32d;
   /* a yellow fill, pressed */

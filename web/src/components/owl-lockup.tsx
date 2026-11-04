@@ -111,3 +111,12 @@ export function OwlLockup({ intro = false, className = "" }: { intro?: boolean; 
     </svg>
   );
 }
+
+/** The owl alone (the account card's avatar). */
+export function OwlMark({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="-166 -146 208 196" className={className} aria-hidden focusable="false">
+      <path d={OWL} fill="currentColor" fillRule="evenodd" />
+    </svg>
+  );
+}

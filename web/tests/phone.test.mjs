@@ -23,11 +23,23 @@ test("the bottom bar is Home, Assets, Create, Effects, Profile, in that order", 
   assert.match(code, /effectsDoor\(caps\) === "tab" \? EFFECTS_TAB_HREF : `\$\{COMPOSE_HREF\}\?open=effects`/);
 });
 
-test("the top bar is the menu on the left, then the logo, and nothing else", () => {
+test("the top bar is the menu on the left and, with no plan, Upgrade on the right", () => {
   const code = strip(src("../src/components/studio/phone/phone-chrome.tsx"));
   const top = code.slice(code.indexOf("export function PhoneTop"), code.indexOf("const Star"));
-  assert.ok(top.indexOf('aria-label="Menu"') < top.indexOf('className="ph-logo"'), "menu before logo");
-  assert.doesNotMatch(top, /Credit|balance|Search|ActivityTray/);
+  assert.ok(top.indexOf('aria-label="Menu"') < top.indexOf('className="ph-upgrade"'), "menu before Upgrade");
+  assert.doesNotMatch(top, /Credit|Search|ActivityTray|OwlLockup/);
+});
+
+test("the menu is a static left drawer: Create, Image, Video, Effects, Projects, MCP, three chats, the account", () => {
+  const code = strip(src("../src/components/studio/phone/phone-chrome.tsx"));
+  const menu = code.slice(code.indexOf("export function PhoneMenu"));
+  const order = [...menu.matchAll(/row\((?:COMPOSE_HREF|"[^"]+"|effectsHref\(caps\)), "(\w+)"/g)].map((m) => m[1]);
+  assert.deepEqual(order, ["Create", "Image", "Video", "Voice", "Effects", "Projects"]);
+  assert.match(menu, /href="\/mcp"/);
+  assert.match(menu, /l\.chats\.slice\(0, 3\)/);
+  const css = src("../src/components/studio/phone/phone.css");
+  assert.match(css, /\.ph-menu \* \{\s*transition: none !important;\s*animation: none !important;/);
+  assert.doesNotMatch(css.slice(css.indexOf("THE DRAWER"), css.indexOf("the two buttons")), /@keyframes|transition: (?!none)/);
 });
 
 test("the phone chrome is drawn only under 720px, and the desktop rail and header step aside there", () => {

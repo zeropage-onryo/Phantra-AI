@@ -66,6 +66,21 @@
     width: 22px;
     height: 22px;
   }
+  .ph-top-gap {
+    flex: 1;
+  }
+  .ph-upgrade {
+    height: 40px;
+    padding: 0 18px;
+    display: flex;
+    align-items: center;
+    border-radius: 20px;
+    background: var(--signal);
+    color: var(--on-signal);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+  }
   .ph-logo {
     display: flex;
     align-items: center;
@@ -150,44 +165,184 @@
       0 0 0 5px var(--signal);
   }
 
+  /* THE DRAWER (2026-11-04): static. No transition or animation on
+     anything in here, on purpose (Mike: "it should be static"). */
   .ph-menu {
     position: fixed;
     inset: 0;
     z-index: 60;
+    display: block;
+    color: var(--text);
+  }
+  .ph-menu * {
+    transition: none !important;
+    animation: none !important;
+  }
+  .ph-scrim {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.62);
+  }
+  .ph-drawer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(322px, 86vw);
     display: flex;
     flex-direction: column;
     background: var(--ground);
-    color: var(--text);
-    overflow-y: auto;
+    border-right: 1px solid var(--edge-hi);
+    padding-top: env(safe-area-inset-top);
   }
-  .ph-menu-list {
+  .ph-drawer-top {
+    height: 84px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 16px 0 20px;
+  }
+  .ph-lockup.ph-lockup-lg {
+    height: 34px;
+  }
+  .zps .ph-round.ph-bare {
+    background: transparent;
+    color: var(--dim);
+  }
+  .ph-drawer-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 10px 0;
     display: flex;
     flex-direction: column;
-    padding: 8px 8px 0;
+    gap: 4px;
   }
   .ph-menu-row {
-    min-height: 60px;
+    min-height: 52px;
+    flex: none;
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 0 14px;
+    padding: 0 12px 0 16px;
+    border: 1px solid transparent;
     border-radius: 16px;
     color: var(--text);
     text-decoration: none;
     font-size: 19px;
     font-weight: 600;
   }
-  .ph-menu-row:active {
-    background: var(--raise);
+  .ph-menu-row[aria-current="page"] {
+    min-height: 56px;
+    background: var(--signal-wash);
+    border-color: var(--signal-line);
+    color: var(--signal);
+    font-weight: 700;
+    font-size: 20px;
   }
   .ph-menu-row svg {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
+    flex: none;
+  }
+  .ph-menu-name {
+    flex: 1;
+  }
+  .ph-tag {
+    background: var(--signal);
+    color: var(--on-signal);
+    font-size: 12px;
+    font-weight: 800;
+    font-style: italic;
+    padding: 3px 9px;
+    border-radius: 7px;
+  }
+  .ph-pill {
+    background: var(--signal);
+    color: var(--on-signal);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 20px;
+  }
+  .ph-drawer-label {
+    margin-top: 18px;
+    padding: 0 16px 6px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--dim);
+  }
+  .zps .ph-chat-row {
+    height: 48px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 500;
+    text-align: left;
+  }
+  .ph-chat-row[data-open] {
+    background: var(--raise);
+  }
+  .ph-chat-row span {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ph-drawer-foot {
+    flex: none;
+    padding: 12px 10px calc(16px + env(safe-area-inset-bottom));
+  }
+  .ph-account {
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 20px 0 14px;
+    border: 1px solid var(--edge-hi);
+    border-radius: 44px;
+    background: var(--raise);
+    color: var(--text);
+    text-decoration: none;
+  }
+  .ph-account-owl {
+    width: 56px;
+    height: 56px;
+    flex: none;
     color: var(--signal);
   }
-  .ph-menu-foot {
-    margin-top: auto;
-    padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  .ph-account-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ph-account-text b {
+    font-size: 18px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ph-account-text span {
+    font-size: 16px;
+    color: var(--dim);
+  }
+  .ph-account-up {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--signal);
   }
 }
 
