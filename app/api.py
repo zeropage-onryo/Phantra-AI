@@ -6204,6 +6204,36 @@ def _effect_view(name: str) -> dict:
             "made_with": spec.get("model_label") or ""}
 
 
+EFFECTS_CATALOG_PATH = "web/src/content/effects-catalog.json"
+
+
+def public_effects_catalog() -> dict:
+    """Every effect in the table as the PUBLIC /effects pages read it
+    (2026-11-05, docs/tasks/task-public-effects-pages.md): the same
+    `_effect_view` the studio's gallery gets, for every row, whichever
+    switches this machine has on -- the public pages show only effects with
+    a kept showcase example, so a row's switch is not theirs to decide.
+
+    GENERATED into web/src/content/effects-catalog.json by
+    `python -m ops.export_effects_catalog` and committed, like pricing.json;
+    tests/test_effects_catalog.py fails when the two drift. Export only: it
+    flips the two row switches in os.environ for the length of the call."""
+    from src import effect_recipes, effects, free_looks
+    keys = (free_looks.ENV, effect_recipes.ENV)
+    saved = {k: os.environ.get(k) for k in keys}
+    try:
+        for k in keys:
+            os.environ[k] = "1"
+        items = [_effect_view(name) for name in effects.EFFECT_NAMES]
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    return {"version": 1, "items": items}
+
+
 @router.get("/effects")
 def effects_list(account_id: int = Depends(auth.current_account_id)):
     """The effects gallery: a PROJECTION of src/effects.py, never a second

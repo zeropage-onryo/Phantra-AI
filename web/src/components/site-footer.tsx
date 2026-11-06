@@ -24,7 +24,9 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
     // every /make landing page, off its own entry, so the site links to
     // each one from every page (crawlers find it; the person does too)
     // and the /make hub first (2026-10-27), which groups them
-    links: [["All tools", "/make"], ...pagesIn("make").map((page): [string, string] => [page.h1, makePath(page)])],
+    // and the public Effects gallery (2026-11-05): its one link off the
+    // site's chrome, by Mike's call -- not in the header, not on the home
+    links: [["All tools", "/make"], ["Effects", "/effects"], ...pagesIn("make").map((page): [string, string] => [page.h1, makePath(page)])],
   },
   {
     // every model's own page, under /models (2026-10-05, Mike's call)

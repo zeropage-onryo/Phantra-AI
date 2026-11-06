@@ -227,6 +227,7 @@ import {
   type Effect,
   type EffectState,
 } from "@/lib/effects";
+import { PRESET_OPTION } from "@/lib/effects-wall";
 import { adRequest, beginAd, withPreview, type AdState } from "@/lib/ad-card";
 import {
   applyOp,
@@ -829,19 +830,23 @@ function Composer() {
   // card opens once the thread has loaded, and the address loses the
   // param so a reload does not open a second one.
   const openParam = params.get("open");
+  // ?open=effect&effect=<tile key> (2026-11-05, the public /effects pages'
+  // "Try it"): that one effect's card, its template already chosen
+  const effectParam = params.get("effect") ?? "";
   const appliedOpen = useRef(false);
   useEffect(() => {
-    if (!ready || appliedOpen.current || (openParam !== "talking-photo" && openParam !== "effects" && openParam !== "costume")) return;
+    if (!ready || appliedOpen.current || (openParam !== "talking-photo" && openParam !== "effects" && openParam !== "costume" && openParam !== "effect")) return;
     // a card opened from the home would land in a thread the home does not
     // show ("Continue your chat"): the arrival moves to the chat page first,
     // and the card opens there (2026-10-27)
     if (homePage && openParam !== "effects") {
-      router.replace(`/studio/chat?open=${encodeURIComponent(openParam)}`, { scroll: false });
+      const keep = openParam === "effect" && effectParam ? `&effect=${encodeURIComponent(effectParam)}` : "";
+      router.replace(`/studio/chat?open=${encodeURIComponent(openParam)}${keep}`, { scroll: false });
       return;
     }
-    // ?open=costume (2026-10-27, the Halloween try-on page): the costume
-    // card itself, which needs the effects listing first
-    if (openParam === "costume" && !fx) return;
+    // ?open=costume (2026-10-27, the Halloween try-on page) and ?open=effect:
+    // the card itself, which needs the effects listing first
+    if ((openParam === "costume" || openParam === "effect") && !fx) return;
     appliedOpen.current = true;
     // ?open=effects (2026-10-26): the phone's Effects tab when the Effects
     // page's flag is off -- the composer's own gallery, opened here
@@ -850,10 +855,20 @@ function Composer() {
       const item = fx?.items.find((e) => e.id === COSTUME_EFFECT);
       if (item) startEffect(item);
       else openEffects();
+    } else if (openParam === "effect") {
+      // a tile's key: the row id, or <row id>:<template value> (lib/effects-wall.ts)
+      const at = effectParam.indexOf(":");
+      const id = at < 0 ? effectParam : effectParam.slice(0, at);
+      const value = at < 0 ? null : effectParam.slice(at + 1);
+      const item = fx?.items.find((e) => e.id === id);
+      const option = PRESET_OPTION[id];
+      const legal = item && value !== null && option ? (item.options?.[option]?.values ?? []).map(String).includes(value) : false;
+      if (item && (value === null || legal)) startEffect(item, legal && option ? { [option]: value } : undefined);
+      else openEffects();
     } else startTalk();
     router.replace(pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
-  }, [ready, openParam, fx, homePage]);
+  }, [ready, openParam, effectParam, fx, homePage]);
 
   // Back from the sign-up a signed-out send opened (2026-10-26): the prompt
   // it kept goes back in the box, once, if the box is empty. Never sent.
@@ -2127,8 +2142,8 @@ function Composer() {
     });
   }, [fx, fxCandidates, setTurnsRaw]);
   // a pick from the gallery: a card in the thread, and nothing has run
-  function startEffect(item: Effect) {
-    const state = begin(item, fxCandidates, newMadeId(), { on: fxOn, hookFor: fxHookFor });
+  function startEffect(item: Effect, options?: Record<string, unknown>) {
+    const state = begin(item, fxCandidates, newMadeId(), { on: fxOn, hookFor: fxHookFor, options });
     setThread((all) => [...all, { role: "assistant", content: item.label, effect: state }]);
     closeEffects();
   }
