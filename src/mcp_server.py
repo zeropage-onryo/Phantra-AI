@@ -57,7 +57,7 @@ from typing import Annotated, Any, Literal, Optional
 # down there (2026-10-08: /mcp unmounted after #165) while CI (3.12) and
 # this Mac (3.13) passed. tests/test_mcp_server.py builds every surface
 # under 3.11's rule.
-from pydantic import Field
+from pydantic import Field, WithJsonSchema
 from typing_extensions import TypedDict
 
 from . import accounts, db, imagesearch, outcomes, preprod, refbin
@@ -142,6 +142,7 @@ TITLES = {
     "dub_clip": "Dub a clip into another language (quoted, spends credits)",
     "elements": "List your elements",
     "add_element": "Add a picture as an element (no credits)",
+    "add_attached_photo": "Add a photo attached in this chat as an element (no credits)",
     "write_scene": "Save a scene you wrote",
     "quote": "Price the keyframes and the clip",
     "open_in_studio": "Open a prompt in the studio to make it there (no credits here)",
@@ -889,8 +890,16 @@ LISTED_DESCRIPTIONS = {
         "Add ONE picture to your elements -- the characters, props and places "
         f"a scene is held to. {_ELEMENT_ARGS} `source` is the picture: "
         f"{_ELEMENT_URL}, or `gen:<id>` -- an image `generate_image` made "
-        f"here, or one `project` lists among a project's renders. "
-        f"{_ELEMENT_RESULT}"
+        f"here, or one `project` lists among a project's renders. A photo the "
+        "person attached in this conversation goes to `add_attached_photo` "
+        f"instead. {_ELEMENT_RESULT}"
+    ),
+    "add_attached_photo": (
+        "Add ONE photo the person attached in this conversation to their "
+        "elements -- the characters, props and places a scene is held to. Use "
+        "this, not `add_element`, when the picture is a file in the chat and "
+        f"not a web address. {_ELEMENT_ARGS} `file` is the attached image "
+        f"(jpg, png or webp, up to 15 MB). {_ELEMENT_RESULT}"
     ),
     "image_models": (
         "The image models `generate_image` can name: id, label, what each is "
@@ -930,6 +939,9 @@ LISTED_DESCRIPTIONS = {
         "`asset:<id>` from `library` instead. Read-only."
     ),
 }
+
+# a render-listing-only tool: its one wording is the base one too
+DESCRIPTIONS["add_attached_photo"] = LISTED_DESCRIPTIONS["add_attached_photo"]
 
 # The Claude listing's wording where it differs again: nothing there renders,
 # so no description may point at `approve`, `job` or `generate_image`.
@@ -993,6 +1005,8 @@ HINTS = {
     "elements":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     # open world: `source` may be an https address, fetched from here
     "add_element":       {"read": False, "destructive": False, "idempotent": False, "open_world": True},
+    # open world: the attachment is fetched from ChatGPT's file host
+    "add_attached_photo": {"read": False, "destructive": False, "idempotent": False, "open_world": True},
     # destructive: `scene_id` REPLACES a scene (OpenAI counts an overwrite
     # as destructive, undo or not)
     "write_scene":       {"read": False, "destructive": True,  "idempotent": False, "open_world": False},
@@ -1120,7 +1134,7 @@ HINTS = {
 # single-use token and the own-ids-only rule are the same code as before.
 # The studio surface keeps `effects` / `apply_effect`.
 LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
-                "elements", "add_element", "upload_link", "image_models", "video_models",
+                "elements", "add_element", "add_attached_photo", "upload_link", "image_models", "video_models",
                 "generate_image", "edit_image", "remove_background", "animate_still",
                 "camera_move", "upscale_clip", "add_sound", "reframe_clip",
                 "write_scene", "scene", "quote", "approve", "job",
@@ -2924,7 +2938,7 @@ def _element_as_listed(kind: str, slug: str, dsn, account_id) -> Optional[dict]:
 
 def add_element(kind: str, name: str, source: str, notes: str = "", *,
                 create_element=None, dsn: Optional[str] = None,
-                account_id: Optional[int] = None) -> dict[str, Any]:
+                account_id: Optional[int] = None, picture=None) -> dict[str, Any]:
     """File ONE picture as an element (or onto one the account already
     has under that name), and answer with the element as `elements` lists
     it -- the new photo's `ref` is what `write_scene` takes.
@@ -2936,6 +2950,11 @@ def add_element(kind: str, name: str, source: str, notes: str = "", *,
     an image, a file over the size bound -- and last that the bytes
     really decode as a picture. What is saved is an upright JPEG under a
     content-hashed name, so the same picture added twice is one file.
+
+    `picture` stands in for `source` (`add_attached_photo`, 2026-11-05):
+    a callable returning what `_picture` returns, called at the point
+    `_picture` would be -- after the kind, the name and the gate -- so a
+    refused caller fetches nothing.
 
     `create_element` is app/api.py's body behind an adapter
     (app/mcp_mount.connector_element): it draws no sheet and spends no
@@ -2963,7 +2982,8 @@ def add_element(kind: str, name: str, source: str, notes: str = "", *,
                       "the studio (Elements)")
     _create_gate(account_id, dsn)        # the page's gate, before any fetch
 
-    data, came_from, page = _picture(source, dsn, account_id)
+    data, came_from, page = (picture() if picture is not None
+                             else _picture(source, dsn, account_id))
     jpeg = refbin.to_jpeg(data)
     if not jpeg:
         raise ValueError("that picture was not added: it is not an image this can "
@@ -2994,6 +3014,69 @@ def add_element(kind: str, name: str, source: str, notes: str = "", *,
                        "were spent.")
         out["next"] = "pass the photo's `ref` as one of a scene's `refs`"
     return out
+
+
+# --- a photo attached in the ChatGPT conversation (2026-11-05) ---------------
+#
+# docs/tasks/task-chatgpt-attachments.md. ChatGPT hands a tool a file the
+# person attached in the chat when the tool names that parameter in
+# `_meta["openai/fileParams"]` (the Apps SDK reference): the argument
+# arrives as {download_url, file_id, mime_type?, file_name?}. Until now a
+# photo in the chat had to go out to an upload page and back. On the render
+# listing ONLY: Claude passes no attachments to a connector, and the
+# studio surface has `import_file`.
+#
+# The download address is fetched exactly as `add_element` fetches a
+# stranger's address (refbin.fetch_public_image: https at every hop, public
+# hosts only, the 15 MB bound), decoded to prove it is a picture, and then
+# filed through the same create body. The address is never stored.
+
+# The file object ChatGPT sends for an `openai/fileParams` field, written
+# out inline (no `$defs`: every published schema is screened for a "$"). The
+# two optional fields are declared, as the spec asks, without a nullable
+# branch.
+ATTACHED_FILE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "download_url": {"type": "string",
+                         "description": "A temporary address ChatGPT gives for the file."},
+        "file_id": {"type": "string", "description": "ChatGPT's id for the file."},
+        "mime_type": {"type": "string", "description": "The file's type, when ChatGPT says it."},
+        "file_name": {"type": "string", "description": "The file's name, when ChatGPT says it."},
+    },
+    "required": ["download_url", "file_id"],
+    "additionalProperties": True,
+    "description": "The photo the person attached in this conversation.",
+}
+ATTACHED_IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif")
+
+
+def add_attached_photo(kind: str, name: str, file: dict, notes: str = "", *,
+                       create_element=None, dsn: Optional[str] = None,
+                       account_id: Optional[int] = None) -> dict[str, Any]:
+    """`add_element` for a photo attached in the ChatGPT conversation.
+    `file` is the {download_url, file_id, mime_type?, file_name?} object.
+    A file ChatGPT says is not a picture is refused before anything; the
+    address is fetched only after `add_element`'s own checks pass."""
+    file = file if isinstance(file, dict) else {}
+    url = str(file.get("download_url") or "").strip()
+    if not url:
+        raise ValueError("`file` has no download_url -- attach the photo in the chat "
+                         "and pass the file ChatGPT gives this tool")
+    mime = str(file.get("mime_type") or "").strip().lower()
+    if mime and mime not in ATTACHED_IMAGE_TYPES:
+        raise ValueError(f"that attachment is {mime}, not a photo -- an element's picture "
+                         "is a jpg, png or webp")
+
+    def picture():
+        try:
+            return (refbin.fetch_public_image(url, max_bytes=ELEMENT_PHOTO_BYTES),
+                    "attachment", {})
+        except refbin.ImageRefused as e:
+            raise ValueError(f"that attachment was not added: {e}") from e
+
+    return add_element(kind, name, "", notes=notes, create_element=create_element,
+                       dsn=dsn, account_id=account_id, picture=picture)
 
 
 # --- getting files in: a one-time upload page (2026-10-11, PR 1) -----------
@@ -5466,13 +5549,14 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
             return LISTED_DESCRIPTIONS[name]
         return DESCRIPTIONS[name]
 
-    def _reg(name: str):
+    def _reg(name: str, meta: Optional[dict] = None):
         if name not in offered:
             return lambda fn: fn          # not on this server
+        meta = {**(mcp_widget.tool_meta(card[1]) if card and name in mcp_widget.TOOLS
+                   else {}), **(meta or {})}
         register = server.tool(name=name, title=TITLES[name],
                                description=_describe(name), annotations=_ann(name),
-                               **({"meta": mcp_widget.tool_meta(card[1])}
-                                  if card and name in mcp_widget.TOOLS else {}))
+                               **({"meta": meta} if meta else {}))
         if not studio:
             note = mcp_widget.NOTE_TOOLS.get(name) if listing == "render" else None
             if not note:
@@ -5611,6 +5695,22 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
             notes: Annotated[str, _arg("What it is, in a few words. Optional.")] = ""
     ) -> dict:
         return _t(add_element, kind, name, source, notes=notes,
+                  create_element=create_element, dsn=dsn, account_id=account_id)
+
+    # A photo attached in the ChatGPT conversation (2026-11-05): the render
+    # listing only. `openai/fileParams` is what tells ChatGPT to hand the
+    # attachment over as `file`.
+    @_reg("add_attached_photo", meta={"openai/fileParams": ["file"]})
+    def add_attached_photo_tool(
+            kind: _ElementKindArg,
+            name: Annotated[str, _arg(
+                "What to call the element; a name you already have of that kind gains "
+                "this picture instead of making a second element.")],
+            file: Annotated[dict, WithJsonSchema(ATTACHED_FILE_SCHEMA), _arg(
+                "The photo the person attached in this conversation.")],
+            notes: Annotated[str, _arg("What it is, in a few words. Optional.")] = ""
+    ) -> dict:
+        return _t(add_attached_photo, kind, name, file, notes=notes,
                   create_element=create_element, dsn=dsn, account_id=account_id)
 
     # A file from the person's own device, through a one-time page (2026-10-11,

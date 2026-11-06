@@ -596,6 +596,12 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
 - **References are ids, never URLs**: `gen:<id>`, `asset:<id>`, a photo ref exactly as
   `elements` lists it. The one tool that takes a URL is `add_element` (an image or a product
   page); `upload_link` mints a one-time page for a file from a phone.
+  **A photo attached in ChatGPT** (2026-11-05, `docs/tasks/task-chatgpt-attachments.md`):
+  `add_attached_photo`, the render listing only, names `file` in `_meta["openai/fileParams"]`,
+  so ChatGPT passes the attachment as `{download_url, file_id, mime_type?, file_name?}`; it is
+  fetched through `refbin.fetch_public_image` after `add_element`'s own checks and filed by the
+  same create body. The schema is inline (the listed screen refuses any `$`, so no `$defs`).
+  Claude passes no attachments to a connector, so the Claude listing keeps `upload_link`.
 - Tools beyond making: projects and their chats, `library`, `share_link`, `reformat`,
   `trim_clip`, `assemble_clips` (free edits on a scratch cut), reading tools (`balance`,
   `search`, `whoami`, `recent`, `credit_history`, `video_models`, `recommend_model`), write tools
