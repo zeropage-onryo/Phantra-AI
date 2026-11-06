@@ -18,6 +18,7 @@ export function CreateCtaButton({
   label,
   spark,
   open,
+  to,
   size = "lg",
   variant = "default",
   className,
@@ -25,12 +26,15 @@ export function CreateCtaButton({
   label: string;
   spark: string;
   open?: string;
+  /** a studio path to land on after sign-in, over `open` and `spark`
+   *  (2026-11-05: a public effect page's "Try it", `/studio?open=effect&...`) */
+  to?: string;
   size?: "lg" | "default";
   variant?: "default" | "link";
   className?: string;
 }) {
   const go = () =>
-    goToSignIn("signup", open ? `/studio?open=${encodeURIComponent(open)}` : `/studio?spark=${encodeURIComponent(spark)}`);
+    goToSignIn("signup", to ?? (open ? `/studio?open=${encodeURIComponent(open)}` : `/studio?spark=${encodeURIComponent(spark)}`));
   if (variant === "link") {
     return (
       <button

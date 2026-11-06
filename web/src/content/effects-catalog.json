@@ -1,0 +1,1552 @@
+{
+ "version": 1,
+ "items": [
+  {
+   "id": "nano-banana-edit",
+   "label": "Nano Banana edit",
+   "category": "image_edit",
+   "blurb": "Change an image by describing the change. Keeps faces and identity.",
+   "takes": "image",
+   "output": "image",
+   "sources": {
+    "min": 1,
+    "max": 4
+   },
+   "prompt": "required",
+   "options": {
+    "aspect_ratio": {
+     "values": [
+      "auto",
+      "21:9",
+      "16:9",
+      "3:2",
+      "4:3",
+      "5:4",
+      "1:1",
+      "4:5",
+      "3:4",
+      "2:3",
+      "9:16"
+     ],
+     "default": "auto",
+     "required": false
+    }
+   },
+   "credits": 10,
+   "free": false,
+   "tags": [
+    "product",
+    "social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "flux-kontext-pro",
+   "label": "FLUX Kontext Pro",
+   "category": "image_edit",
+   "blurb": "Precise local edits: swap an object, change text, restyle one area.",
+   "takes": "image",
+   "output": "image",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "required",
+   "options": {
+    "aspect_ratio": {
+     "values": [
+      "21:9",
+      "16:9",
+      "4:3",
+      "3:2",
+      "1:1",
+      "2:3",
+      "3:4",
+      "9:16",
+      "9:21"
+     ],
+     "default": null,
+     "required": false
+    }
+   },
+   "credits": 10,
+   "free": false,
+   "tags": [
+    "product"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "seedream-edit",
+   "label": "Seedream 4 edit",
+   "category": "image_edit",
+   "blurb": "Combine up to four images into one, or restyle one.",
+   "takes": "image",
+   "output": "image",
+   "sources": {
+    "min": 1,
+    "max": 4
+   },
+   "prompt": "required",
+   "options": {},
+   "credits": 10,
+   "free": false,
+   "tags": [
+    "product",
+    "social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "remove-background",
+   "label": "Remove background",
+   "category": "image_edit",
+   "blurb": "Cut the subject out on a transparent background.",
+   "takes": "image",
+   "output": "image",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {},
+   "credits": 10,
+   "free": false,
+   "tags": [
+    "product"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "costume-preview",
+   "label": "Halloween Costume",
+   "category": "image_edit",
+   "blurb": "You in a Halloween costume: pick one and see it on your own photo, face kept.",
+   "takes": "image",
+   "output": "image",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "costume": {
+     "values": [
+      "vampire",
+      "witch",
+      "pirate",
+      "skeleton",
+      "zombie_bride",
+      "werewolf",
+      "mummy",
+      "devil",
+      "angel",
+      "ghost",
+      "scarecrow",
+      "black_cat"
+     ],
+     "default": null,
+     "required": true
+    },
+    "aspect_ratio": {
+     "values": [
+      "auto",
+      "21:9",
+      "16:9",
+      "3:2",
+      "4:3",
+      "5:4",
+      "1:1",
+      "4:5",
+      "3:4",
+      "2:3",
+      "9:16"
+     ],
+     "default": "auto",
+     "required": false
+    }
+   },
+   "credits": 10,
+   "free": false,
+   "tags": [
+    "social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "kling-effect",
+   "label": "Kling effects",
+   "category": "video_effect",
+   "blurb": "One-click animated templates on a still: 98 looks, 5 or 10 seconds.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 2
+   },
+   "prompt": "none",
+   "options": {
+    "effect_scene": {
+     "values": [
+      "heart_gesture",
+      "bullet_time_360",
+      "swish_swish",
+      "running_man",
+      "swing_swing",
+      "building_sweater",
+      "pure_white_wings",
+      "black_wings",
+      "golden_wing",
+      "pink_pink_wings",
+      "countdown_teleport",
+      "instant_christmas",
+      "birthday_star",
+      "tiger_hug_pro",
+      "pet_lion_pro",
+      "drunk_dance",
+      "drunk_dance_pet",
+      "daoma_dance",
+      "bouncy_dance",
+      "smooth_sailing_dance",
+      "new_year_greeting",
+      "lion_dance",
+      "prosperity",
+      "great_success",
+      "golden_horse_fortune",
+      "red_packet_box",
+      "lucky_horse_year",
+      "lucky_red_packet",
+      "lucky_money_come",
+      "lion_dance_pet",
+      "dumpling_making_pet",
+      "fish_making_pet",
+      "pet_red_packet",
+      "lantern_glow",
+      "expression_challenge",
+      "overdrive",
+      "heart_gesture_dance",
+      "poping",
+      "martial_arts",
+      "running",
+      "nezha",
+      "motorcycle_dance",
+      "subject_3_dance",
+      "ghost_step_dance",
+      "phantom_jewel",
+      "zoom_out",
+      "cheers_2026",
+      "kiss_pro",
+      "fight_pro",
+      "hug_pro",
+      "heart_gesture_pro",
+      "dollar_rain_pro",
+      "pet_bee_pro",
+      "santa_random_surprise",
+      "magic_match_tree",
+      "happy_birthday",
+      "thumbs_up_pro",
+      "surprise_bouquet",
+      "bouquet_drop",
+      "glamour_photo_shoot",
+      "box_of_joy",
+      "first_toast_of_the_year",
+      "my_santa_pic",
+      "santa_gift",
+      "steampunk_christmas",
+      "snowglobe",
+      "christmas_photo_shoot",
+      "ornament_crash",
+      "santa_express",
+      "coronation_of_frost",
+      "spark_in_the_snow",
+      "scarlet_and_snow",
+      "bullet_time_lite",
+      "jumping_ginger_joy",
+      "venomous_spider",
+      "throne_of_king",
+      "luminous_elf",
+      "woodland_elf",
+      "snowboarding",
+      "witch_transform",
+      "vampire_transform",
+      "pumpkin_head_transform",
+      "demon_transform",
+      "mummy_transform",
+      "zombie_transform",
+      "cute_pumpkin_transform",
+      "halloween_escape",
+      "korean_baseball",
+      "girlfriend",
+      "boyfriend",
+      "splashsplash"
+     ],
+     "default": null,
+     "required": true
+    },
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 68,
+   "free": false,
+   "tags": [
+    "social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "pixverse-effect",
+   "label": "PixVerse effects",
+   "category": "video_effect",
+   "blurb": "One-click animated templates on a still: 154 looks, 5 seconds.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "effect": {
+     "values": [
+      "Kiss Me AI",
+      "Kiss",
+      "Muscle Surge",
+      "Warmth of Jesus",
+      "Anything, Robot",
+      "The Tiger Touch",
+      "Hug",
+      "Holy Wings",
+      "Microwave",
+      "Zombie Mode",
+      "Squid Game",
+      "Baby Face",
+      "Black Myth: Wukong",
+      "Long Hair Magic",
+      "Leggy Run",
+      "Fin-tastic Mermaid",
+      "Punch Face",
+      "Creepy Devil Smile",
+      "Thunder God",
+      "Eye Zoom Challenge",
+      "Who's Arrested?",
+      "Baby Arrived",
+      "Werewolf Rage",
+      "Bald Swipe",
+      "BOOM DROP",
+      "Huge Cutie",
+      "Liquid Metal",
+      "Sharksnap!",
+      "Dust Me Away",
+      "3D Figurine Factor",
+      "Bikini Up",
+      "My Girlfriends",
+      "My Boyfriends",
+      "Subject 3 Fever",
+      "Earth Zoom",
+      "Pole Dance",
+      "Vroom Dance",
+      "GhostFace Terror",
+      "Dragon Evoker",
+      "Skeletal Bae",
+      "Summoning succubus",
+      "Halloween Voodoo Doll",
+      "3D Naked-Eye AD",
+      "Package Explosion",
+      "Dishes Served",
+      "Ocean ad",
+      "Supermarket AD",
+      "Tree doll",
+      "Come Feel My Abs",
+      "The Bicep Flex",
+      "London Elite Vibe",
+      "Flora Nymph Gown",
+      "Christmas Costume",
+      "It's Snowy",
+      "Reindeer Cruiser",
+      "Snow Globe Maker",
+      "Pet Christmas Outfit",
+      "Adopt a Polar Pal",
+      "Cat Christmas Box",
+      "Starlight Gift Box",
+      "Xmas Poster",
+      "Pet Christmas Tree",
+      "City Santa Hat",
+      "Stocking Sweetie",
+      "Christmas Night",
+      "Xmas Front Page Karma",
+      "Grinch's Xmas Hijack",
+      "Giant Product",
+      "Truck Fashion Shoot",
+      "Beach AD",
+      "Shoal Surround",
+      "Mechanical Assembly",
+      "Lighting AD",
+      "Billboard AD",
+      "Product close-up",
+      "Parachute Delivery",
+      "Dreamlike Cloud",
+      "Macaron Machine",
+      "Poster AD",
+      "Truck AD",
+      "Graffiti AD",
+      "3D Figurine Factory",
+      "The Exclusive First Class",
+      "Art Zoom Challenge",
+      "I Quit",
+      "Hitchcock Dolly Zoom",
+      "Smell the Lens",
+      "I believe I can fly",
+      "Strikout Dance",
+      "Courtside Cam",
+      "Pit Crew Moment",
+      "K-Baseball Sprint",
+      "Toddler Doodle",
+      "Idol Ending",
+      "Apex Dance",
+      "OmniHero Forge",
+      "Palm Decode",
+      "The Age Ripple",
+      "My Future Is Limitless",
+      "Knee Slide",
+      "Epic Goal Save",
+      "Sideline Ball Boy",
+      "Cup Celebration",
+      "Victory Roar",
+      "Vuvuzela Fan",
+      "World Champion Lift",
+      "Tunnel to Captain",
+      "Liquid Soccer Morph",
+      "Jump Into Crowd 2",
+      "Golden Pitch Crasher",
+      "Stadium Fan Cam",
+      "Broadcast Moto GP",
+      "The Grotesque Clay",
+      "Rookie Star Card",
+      "The Final Hug",
+      "Sharp Post-Match Comment",
+      "Street Maverick",
+      "Pitch Legend",
+      "One Step At A Time",
+      "Birthday Mirror",
+      "Superstar Lobby",
+      "Final Battle Room",
+      "Top of the World",
+      "Mini Me Unboxed",
+      "WonderPOP Surprise",
+      "White Chicks",
+      "Kiss me",
+      "What a Day",
+      "The Last Leap at Sunset",
+      "Tiny Sticker Chef Chaos",
+      "Mini Squeeze Toy",
+      "Tearful Gunman",
+      "Street Fashion Caricature",
+      "Mini Me Makeover",
+      "Street Art Awakening",
+      "Hug Together",
+      "ACAI dance Duet",
+      "PUBG Winner Hit!",
+      "Blocky Mini-Me",
+      "Cheat Day Busted",
+      "MiniSocial Recharge",
+      "My Little Perler Charm",
+      "Where did this cobweb come from?",
+      "Holy Beast Summoning Technique",
+      "IT'S THE FIRST OF THE MONTH",
+      "Pet Editorial",
+      "Three lifetime bond",
+      "Pixel World",
+      "Mint in Box",
+      "Hands up, Hand",
+      "Flora Nymph Go",
+      "Somber Embrace",
+      "Beam me up",
+      "Suit Swagger"
+     ],
+     "default": null,
+     "required": true
+    },
+    "resolution": {
+     "values": [
+      "360p",
+      "540p",
+      "720p",
+      "1080p"
+     ],
+     "default": "720p",
+     "required": false
+    },
+    "duration": {
+     "values": [
+      "5"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 48,
+   "free": false,
+   "tags": [
+    "social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "camera-move",
+   "label": "Camera move (PixVerse 4.5)",
+   "category": "camera",
+   "blurb": "A named camera move on a still: push in, orbit, crane, and more.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "required",
+   "options": {
+    "camera_movement": {
+     "values": [
+      "horizontal_left",
+      "horizontal_right",
+      "vertical_up",
+      "vertical_down",
+      "zoom_in",
+      "zoom_out",
+      "crane_up",
+      "quickly_zoom_in",
+      "quickly_zoom_out",
+      "smooth_zoom_in",
+      "camera_rotation",
+      "robo_arm",
+      "super_dolly_out",
+      "whip_pan",
+      "hitchcock",
+      "left_follow",
+      "right_follow",
+      "pan_left",
+      "pan_right",
+      "fix_bg"
+     ],
+     "default": null,
+     "required": true
+    },
+    "resolution": {
+     "values": [
+      "360p",
+      "540p",
+      "720p",
+      "1080p"
+     ],
+     "default": "720p",
+     "required": false
+    },
+    "style": {
+     "values": [
+      "anime",
+      "3d_animation",
+      "clay",
+      "comic",
+      "cyberpunk"
+     ],
+     "default": null,
+     "required": false
+    },
+    "duration": {
+     "values": [
+      "5"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 48,
+   "free": false,
+   "tags": [
+    "cinematic",
+    "product"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "upscale",
+   "label": "Upscale / smooth (Topaz)",
+   "category": "finish",
+   "blurb": "Sharpen a clip to twice its size, or smooth its motion to 24, 30 or 60 fps.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "upscale_factor": {
+     "values": [
+      1,
+      2
+     ],
+     "default": 2,
+     "required": false
+    },
+    "target_fps": {
+     "values": [
+      24,
+      30,
+      60
+     ],
+     "default": null,
+     "required": false
+    }
+   },
+   "credits": null,
+   "free": false,
+   "tags": [
+    "cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "add-sound",
+   "label": "Add sound (MMAudio)",
+   "category": "finish",
+   "blurb": "Sound effects and ambience made to fit a clip's picture.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "required",
+   "options": {},
+   "credits": null,
+   "free": false,
+   "tags": [
+    "cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "reframe",
+   "label": "Re-frame (Luma Ray 2 Flash)",
+   "category": "finish",
+   "blurb": "The same clip in a new shape: the frame is extended, not cropped.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "aspect_ratio": {
+     "values": [
+      "1:1",
+      "16:9",
+      "9:16",
+      "4:3",
+      "3:4",
+      "21:9",
+      "9:21"
+     ],
+     "default": null,
+     "required": true
+    }
+   },
+   "credits": null,
+   "free": false,
+   "tags": [
+    "social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "reframe-hq",
+   "label": "Re-frame, higher quality (Luma Ray 2)",
+   "category": "finish",
+   "blurb": "A new shape for a clip, at higher quality and a higher price.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "aspect_ratio": {
+     "values": [
+      "1:1",
+      "16:9",
+      "9:16",
+      "4:3",
+      "3:4",
+      "21:9",
+      "9:21"
+     ],
+     "default": null,
+     "required": true
+    }
+   },
+   "credits": null,
+   "free": false,
+   "tags": [
+    "social",
+    "cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "remove-video-background",
+   "label": "Remove a clip's background (VEED)",
+   "category": "finish",
+   "blurb": "Cut a clip's subject out on a transparent background.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "subject_is_person": {
+     "values": [
+      true,
+      false
+     ],
+     "default": true,
+     "required": false
+    },
+    "refine_foreground_edges": {
+     "values": [
+      true,
+      false
+     ],
+     "default": true,
+     "required": false
+    }
+   },
+   "credits": null,
+   "free": false,
+   "tags": [
+    "product"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "remove-video-background-pro",
+   "label": "Remove or replace a clip's background (Bria)",
+   "category": "finish",
+   "blurb": "Remove or replace a clip's background, sound kept.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "background_color": {
+     "values": [
+      "Transparent",
+      "Black",
+      "White",
+      "Gray",
+      "Red",
+      "Green",
+      "Blue",
+      "Yellow",
+      "Cyan",
+      "Magenta",
+      "Orange"
+     ],
+     "default": "Transparent",
+     "required": false
+    },
+    "output_container_and_codec": {
+     "values": [
+      "webm_vp9",
+      "mp4_h264",
+      "mov_proresks"
+     ],
+     "default": "webm_vp9",
+     "required": false
+    }
+   },
+   "credits": null,
+   "free": false,
+   "tags": [
+    "product"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "film_grade",
+   "label": "Film Grade",
+   "category": "look",
+   "blurb": "A teal-and-orange film grade with fine grain, letterboxed to 2.39:1. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "letterbox": {
+     "values": [
+      true,
+      false
+     ],
+     "default": true,
+     "required": false
+    }
+   },
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "noir",
+   "label": "Noir",
+   "category": "look",
+   "blurb": "True black and white with a vignette and grain. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {},
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "flash_2000s",
+   "label": "2000s Flash",
+   "category": "look",
+   "blurb": "Flash pops, a cheap-digicam grade and a date stamp. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "stamp": {
+     "values": [
+      true,
+      false
+     ],
+     "default": true,
+     "required": false
+    }
+   },
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "crash_zoom",
+   "label": "Crash-Zoom Hook",
+   "category": "look",
+   "blurb": "A fast punch-in on the first beat with a whoosh. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "zoom": {
+     "values": [
+      1.25,
+      1.35,
+      1.5
+     ],
+     "default": 1.35,
+     "required": false
+    }
+   },
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Social",
+    "Product"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "vertical_ready",
+   "label": "Vertical Ready",
+   "category": "look",
+   "blurb": "A centred 9:16 crop, ready for Reels, TikTok and Shorts. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {},
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "title_sequence",
+   "label": "Title Sequence",
+   "category": "look",
+   "blurb": "Scratched film, jittering frames and strobe flashes: a horror opening-titles look. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "strobe": {
+     "values": [
+      true,
+      false
+     ],
+     "default": true,
+     "required": false
+    }
+   },
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Cinematic",
+    "Social"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "the_ward",
+   "label": "The Ward",
+   "category": "look",
+   "blurb": "Cold green fluorescent light that buzzes and flickers, heavy grain. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {},
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "haunted_manor",
+   "label": "Haunted Manor",
+   "category": "look",
+   "blurb": "A dusty sepia-green grade with a ghost trailing just behind the subject. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {},
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "found_tape",
+   "label": "Found Tape",
+   "category": "look",
+   "blurb": "A worn VHS tape: colour bleed, scanlines, a rolling tracking band. Free.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "stamp": {
+     "values": [
+      true,
+      false
+     ],
+     "default": true,
+     "required": false
+    }
+   },
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Social",
+    "Cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "make_it_pro",
+   "label": "Make It Pro",
+   "category": "look",
+   "blurb": "Film Grade then Vertical Ready, free; then a Sound Pass card you can approve.",
+   "takes": "video",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {},
+   "credits": 0,
+   "free": true,
+   "tags": [
+    "Cinematic",
+    "Social",
+    "Product"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "float_drop",
+   "label": "Float Drop",
+   "category": "video_effect",
+   "blurb": "They fall back in slow motion while everything they hold floats past the camera.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "product"
+   ],
+   "recipe": true,
+   "hint": "The product to linger on (optional)",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "window_grab",
+   "label": "Window Grab",
+   "category": "video_effect",
+   "blurb": "A smash through a car window, the product snatched, a getaway run.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "product"
+   ],
+   "recipe": true,
+   "hint": "The product on the seat (optional)",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "gone",
+   "label": "Gone",
+   "category": "video_effect",
+   "blurb": "They vanish in an instant and their empty clothes drop to the floor.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "iris_dive",
+   "label": "Iris Dive",
+   "category": "video_effect",
+   "blurb": "The camera dives into their eye and comes out in a new world.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "Where the camera comes out (optional)",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "echo_crowd",
+   "label": "Echo Crowd",
+   "category": "video_effect",
+   "blurb": "Copies of them fill the scene, every one moving in sync.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "time_stop",
+   "label": "Time Stop",
+   "category": "video_effect",
+   "blurb": "They freeze mid-jump while the world keeps moving around them.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "city_giant",
+   "label": "City Giant",
+   "category": "video_effect",
+   "blurb": "They tower over a city street, taller than the buildings.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "meltdown",
+   "label": "Meltdown",
+   "category": "video_effect",
+   "blurb": "They melt into a glossy puddle, clothes and all.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "pocket_me",
+   "label": "Pocket Me",
+   "category": "video_effect",
+   "blurb": "A tiny copy of them in their hands, and a smaller one in its, forever.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "none",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "overhead_flip",
+   "label": "Overhead Flip",
+   "category": "video_effect",
+   "blurb": "The camera flips over their head and lands them somewhere new.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "Where they land (optional)",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "coven",
+   "label": "Coven",
+   "category": "video_effect",
+   "blurb": "A ring of candles, black lace and a crown of bone; they look up into the light.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "One more detail (optional): a raven on the shoulder, a spell book",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "sideshow",
+   "label": "Sideshow",
+   "category": "video_effect",
+   "blurb": "A 1950s carnival tent at night: they bow under a hand-painted banner.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "What the banner bills them as (optional)",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "seance",
+   "label": "Séance",
+   "category": "video_effect",
+   "blurb": "Candlelight, joined hands, a flame that bends; their eyes roll white.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "One more detail (optional)",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "the_hotel",
+   "label": "The Hotel",
+   "category": "video_effect",
+   "blurb": "The camera glides down a red-gold Art Deco hallway to where they wait.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "What they are holding or wearing (optional)",
+   "made_with": "Kling 3 Turbo Pro"
+  },
+  {
+   "id": "costume_try_on",
+   "label": "Costume Try-On",
+   "category": "video_effect",
+   "blurb": "They spin once and come back around in the costume, same face.",
+   "takes": "image",
+   "output": "video",
+   "sources": {
+    "min": 1,
+    "max": 1
+   },
+   "prompt": "optional",
+   "options": {
+    "duration": {
+     "values": [
+      "5",
+      "10"
+     ],
+     "default": "5",
+     "required": false
+    }
+   },
+   "credits": 168,
+   "free": false,
+   "tags": [
+    "transform"
+   ],
+   "recipe": true,
+   "hint": "The costume (optional): a vampire, a pirate, Frankenstein's bride",
+   "made_with": "Kling 3 Turbo Pro"
+  }
+ ]
+}
