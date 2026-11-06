@@ -164,7 +164,7 @@ are what it does, kept for reference.
    numbers, Stripe charges the Price's.
 2. `.env` (and Fly secrets): `STRIPE_SECRET_KEY`, `STRIPE_PRICE_STARTER`,
    `STRIPE_PRICE_CREATOR`, `STRIPE_PRICE_STUDIO`, their `_YEAR` twins,
-   `STRIPE_PRICE_TOPUP`, and for the Agency plan (2026-11-03, $199 / $1,910, its own
+   `STRIPE_PRICE_TOPUP`, and for the Agency plan (2026-11-06, $449 / $4,310, its own
    switch: unset, only Agency is off sale) `STRIPE_PRICE_AGENCY` and `_YEAR`,
    `BILLING_RETURN_URL=https://zpf-web.vercel.app` (where Checkout sends people back;
    defaults to `STUDIO_URL`). Until these are set the plan buttons say "Checkout isn't

@@ -15,17 +15,18 @@ Creatify; re-check the vendors' own pages before changing a price.)
 
 ## Mike's answers (2026-11-03)
 
-- Agency: **$199 a month, 19,900 credits** (the plans' own 1c a credit), yearly $1,910.
-- **5 seats.**
+- Agency: **$449 a month, 44,900 credits** (the plans' own 1c a credit), yearly $4,310, **10 seats**
+  (repriced 2026-11-06, Mike: the $450-500 tier first, against Foreplay Agency $459 / 10 seats and
+  Selzee Agencies $500; it was $199 / 5 seats on 2026-11-03).
 - **Solo below Agency**: Standard, Pro and Max keep one person.
 - **Clients are a project + brand kit each**, inside one workspace and one credit pool (no
   workspace per client, no cross-workspace billing).
 
 ## As built
 
-- `pricing.Plan` gains `seats` (default 1) and `yearly_usd_set` ($199 x 12 x 0.8 = $1,910.40 is not
-  whole dollars). `PLANS["agency"]`: `STRIPE_PRICE_AGENCY` / `_YEAR`, 400 GB (ceiling 424),
-  `BRAIN_USD` 8. Max's blurb no longer says "agencies". `public_catalog` plans carry `seats`.
+- `pricing.Plan` gains `seats` (default 1) and `yearly_usd_set` ($449 x 12 x 0.8 = $4,310.40 is not
+  whole dollars). `PLANS["agency"]`: `STRIPE_PRICE_AGENCY` / `_YEAR`, 800 GB (ceiling 970),
+  `BRAIN_USD` 16. Max's blurb no longer says "agencies". `public_catalog` plans carry `seats`.
 - Billing: `balance` carries `buyable` / `buyable_yearly` per plan, and `checkout_configured` is
   "any plan can be bought", so an unset Agency Price no longer switches checkout off for the
   others. Settings shows an unpriced plan as "Not on sale yet".
@@ -49,7 +50,7 @@ Creatify; re-check the vendors' own pages before changing a price.)
 ## Mike's steps before it sells
 
 1. `venv/bin/python -m ops.stripe_setup --live --fly` creates the Agency Product and its two
-   Prices ($199/month, $1,910/year, read off `pricing.PLANS`), reuses the other seven and the
+   Prices ($449/month, $4,310/year, read off `pricing.PLANS`), reuses the other seven and the
    webhook, and pushes `STRIPE_PRICE_AGENCY` / `_YEAR` to Fly. Until then Agency shows
    "Not on sale yet" and the other plans keep selling.
 3. Check the live database for anybody who belongs to more than one workspace and has switched

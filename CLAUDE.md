@@ -199,7 +199,7 @@ No Supabase token is stored after sign-in.
   only chooses among workspaces the person belongs to), else their OLDEST membership. It was
   always the oldest before (`docs/tasks/task-agency-plan.md` says why it moved). The connectors
   still use the oldest.
-- **Seats** (2026-11-03): an owner on a plan with seats (`pricing.Plan.seats`: Agency 5, the rest
+- **Seats** (2026-11-03): an owner on a plan with seats (`pricing.Plan.seats`: Agency 10, the rest
   1) invites by address from Settings -> Workspace (`POST /api/account/members`,
   `accounts.add_teammate`) and removes (`DELETE /api/account/members/{id}`); nothing is emailed.
 - **The studio gets its session by handoff, never cross-site.** The studio's fetches go to its
@@ -600,7 +600,7 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
 
 ### Billing and credits (`docs/BILLING.md`)
 
-Four plans (`pricing.PLANS`: Standard, Pro, Max, and Agency at $199 / 19,900 credits / 5 seats
+Four plans (`pricing.PLANS`: Standard, Pro, Max, and Agency at $449 / 44,900 credits / 10 seats
 since 2026-11-03), monthly and yearly (yearly is a schedule released monthly, never a
 twelve-month lot), top-ups, Stripe Checkout and portal (`app/billing.py`, `src/billing.py`), grants
 through `/billing/webhook` (at `https://api.phantra.ai/billing/webhook`). Renders and stills cost

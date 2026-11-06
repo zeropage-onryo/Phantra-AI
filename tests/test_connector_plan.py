@@ -33,7 +33,7 @@ def test_every_plan_carries_storage_its_numbers_can_pay_for():
 def test_the_catalog_publishes_storage_and_no_connector_flag():
     catalog = pricing.public_catalog()
     assert catalog["trial"]["storage_gb"] == pricing.FREE_STORAGE_GB
-    assert [p["storage_gb"] for p in catalog["plans"]] == [25, 70, 200, 400]
+    assert [p["storage_gb"] for p in catalog["plans"]] == [25, 70, 200, 800]
     # the connector is not a plan feature any more, so no plan says so
     assert all("mcp" not in p for p in catalog["plans"])
 
@@ -107,9 +107,9 @@ def test_a_sign_in_with_no_workspace_is_still_refused():
 def test_seats_are_solo_below_agency_and_five_on_it():
     # 2026-11-03, Mike: inviting teammates is the Agency plan's reason to exist
     assert {k: p.seats for k, p in pricing.PLANS.items()} == {
-        "starter": 1, "creator": 1, "studio": 1, "agency": 5}
+        "starter": 1, "creator": 1, "studio": 1, "agency": 10}
     agency = pricing.PLANS["agency"]
-    assert (agency.monthly_usd, agency.credits) == (199, 19900)
-    # twelve discounted months are $1,910.40; the plan names the whole-dollar price
-    assert agency.yearly_usd == 1910 and agency.price_env_yearly == "STRIPE_PRICE_AGENCY_YEAR"
-    assert [p["seats"] for p in pricing.public_catalog()["plans"]] == [1, 1, 1, 5]
+    assert (agency.monthly_usd, agency.credits) == (449, 44900)
+    # twelve discounted months are $4,310.40; the plan names the whole-dollar price
+    assert agency.yearly_usd == 4310 and agency.price_env_yearly == "STRIPE_PRICE_AGENCY_YEAR"
+    assert [p["seats"] for p in pricing.public_catalog()["plans"]] == [1, 1, 1, 10]

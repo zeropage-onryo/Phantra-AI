@@ -256,7 +256,7 @@ class Plan:
     # (app/api.py account_invite). 1 = solo; Mike: solo below Agency.
     seats: int = 1
     # a yearly price set by hand when twelve discounted months do not land
-    # on whole dollars ($199 x 12 x 0.8 = $1,910.40 -> $1,910)
+    # on whole dollars ($449 x 12 x 0.8 = $4,310.40 -> $4,310)
     yearly_usd_set: Optional[int] = None
 
     @property
@@ -294,15 +294,16 @@ PLANS: dict[str, Plan] = {
     "studio": Plan("studio", "Max", "premium", 95, 9500,
                    "For heavy solo use and client work.",
                    "STRIPE_PRICE_STUDIO", storage_gb=200),
-    # AGENCY (2026-11-03, Mike, docs/tasks/task-agency-plan.md): the business
-    # tier. Five people share one workspace and its credit pool, each client
-    # kept apart as a project with its own brand kit. Priced just above
-    # Creatify Business ($195) at the plans' own 1c a credit. Its Stripe
-    # Prices (STRIPE_PRICE_AGENCY, _YEAR) are separate from the first three,
-    # so checkout for the others keeps working while they are unset.
-    "agency": Plan("agency", "Agency", "premium", 199, 19900,
-                   "For agencies and teams: five seats on one credit pool, a project and brand kit per client.",
-                   "STRIPE_PRICE_AGENCY", storage_gb=400, seats=5, yearly_usd_set=1910),
+    # AGENCY (2026-11-03, Mike; repriced 2026-11-06, docs/tasks/task-agency-plan.md):
+    # the business tier. Ten people share one workspace and its credit pool,
+    # each client kept apart as a project with its own brand kit. Priced under
+    # Foreplay Agency ($459, 10 seats) and Selzee Agencies ($500) at the plans'
+    # own 1c a credit. Its Stripe Prices (STRIPE_PRICE_AGENCY, _YEAR) are
+    # separate from the first three, so checkout for the others keeps working
+    # while they are unset.
+    "agency": Plan("agency", "Agency", "premium", 449, 44900,
+                   "For agencies and teams: ten seats on one credit pool, a project and brand kit per client.",
+                   "STRIPE_PRICE_AGENCY", storage_gb=800, seats=10, yearly_usd_set=4310),
 }
 
 # EVERY PLAN RENDERS EVERY MODEL (2026-10-20, Mike's call). A plan's `tier`
@@ -322,7 +323,7 @@ STORAGE_SHARE = "0.10"           # of the worst month's margin
 STRIPE_PCT, STRIPE_FIXED_USD = "0.029", "0.30"
 # What the assistant (free on a plan) is allowed to cost a month, per plan,
 # in the ceiling below -- an estimate, not a meter reading.
-BRAIN_USD = {"starter": 1, "creator": 2, "studio": 4, "agency": 8}
+BRAIN_USD = {"starter": 1, "creator": 2, "studio": 4, "agency": 16}
 
 
 def storage_ceiling_gb(plan: Plan) -> int:

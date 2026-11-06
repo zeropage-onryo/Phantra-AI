@@ -232,7 +232,7 @@ export function WorkspaceSection() {
                     ? "Every seat is taken. Remove someone to invite another person."
                     : "Nothing is emailed: they join when they sign in at phantra.ai with that address, and share this workspace’s credits."
                   : members.data.role === "owner"
-                    ? "Inviting teammates comes with the Agency plan: five seats on one credit pool."
+                    ? "Inviting teammates comes with the Agency plan: ten seats on one credit pool."
                     : "People are invited by the workspace’s owner."}
               </p>
             </>
