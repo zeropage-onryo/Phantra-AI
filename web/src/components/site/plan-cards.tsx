@@ -36,7 +36,12 @@ function illustrate() {
 
 function planFeatures(plan: Plan): string[] {
   const features = [
+    // the business tier's reason to exist leads its card (2026-11-03)
+    ...(plan.seats > 1
+      ? [`${plan.seats} seats on one credit pool`, "A project and brand kit per client"]
+      : []),
     "Every AI video and image model",
+    "Ad Studio: ad formats, briefs and versions",
     "Agentic creative collaborator",
     `${num(plan.storage_gb)} GB storage`,
     // every workspace, the trial too (2026-10-21): credits pay for what it spends
@@ -146,7 +151,7 @@ export function PlanCards() {
       <div className="mb-8 flex justify-center">
         <IntervalToggle value={interval} onChange={setInterval} />
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <FreeCard />
         {PLANS.map((plan) => {
           const { cheapest, dearest } = illustrate();

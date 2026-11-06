@@ -320,11 +320,18 @@ def current_account(request: Request,
     member_of = _memberships(request, user)
     if not member_of:
         return None
+    return _open_of(request, member_of)
+
+
+def _open_of(request: Request, member_of: list) -> dict[str, Any]:
+    """The membership the person has OPEN: the one the account cookie
+    names, else their OLDEST (the lowest id -- the tenant rule before
+    2026-11-03, so nobody who never switched sees a different workspace)."""
     preferred = request.cookies.get(ACCOUNT_COOKIE)
     for account in member_of:
         if account["slug"] == preferred:
             return account
-    return member_of[0]
+    return min(member_of, key=lambda a: int(a["id"]))
 
 
 def current_account_id(request: Request) -> int:
@@ -345,14 +352,19 @@ def current_account_id(request: Request) -> int:
     questions. current_account resolves the workspace the person has
     OPEN: it reads the account cookie and returns the membership whose
     slug matches, which is what the switcher changes. This returns the
-    TENANT: the user's oldest membership, whichever workspace is open.
+    TENANT.
 
-    The distinction dates from when Mike's one operator account was two
-    brand rows sharing one board (2026-09-02): scoping data by
-    current_account made switching to the second one empty every list.
-    "Oldest membership" picks the tenant. It stops being the right rule
-    the day one person legitimately belongs to two different operators'
-    workspaces; that is when the open workspace has to become the tenant.
+    **The tenant is the OPEN workspace since 2026-11-03** (the Agency plan:
+    a teammate invited into an agency's workspace who already had a
+    workspace of their own must work in the one they switched to, or their
+    renders and spend land in the wrong place). Before that it was the
+    OLDEST membership whichever was open, because Mike's one operator
+    account was two brand rows sharing one board (2026-09-02) and scoping
+    by the open one emptied every list; the brand rows are gone
+    (2026-10-15), and the old docstring said this was the day to change it.
+    With no switch made (no cookie, or one naming a workspace the person
+    is not in) it is still the oldest, so nothing moves for anyone who
+    never switched. The cookie only ever picks among real memberships.
     """
     user = current_user(request)
     if user is None:
@@ -362,7 +374,20 @@ def current_account_id(request: Request) -> int:
     if not member_of:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="no account access")
-    return min(int(a["id"]) for a in member_of)
+    return int(_open_of(request, member_of)["id"])
+
+
+def oldest_account_id(request: Request) -> Optional[int]:
+    """The caller's OLDEST membership: the account an MCP connector call
+    acts on (app/mcp_auth.py, which has no workspace cookie). Since the
+    studio's tenant became the OPEN workspace (2026-11-03) the two can
+    differ; the Connect to Claude panel asks this one. None with no
+    session or no membership."""
+    user = current_user(request)
+    if not user:
+        return None
+    member_of = _memberships(request, user)
+    return min(int(a["id"]) for a in member_of) if member_of else None
 
 
 def tenant_account(request: Request, account_id: Optional[int]) -> Optional[dict[str, Any]]:
@@ -452,7 +477,7 @@ def dev_account_id(request: Request) -> int:
     if user is not None:
         member_of = accounts.memberships(user["id"])
         if member_of:
-            return min(int(a["id"]) for a in member_of)
+            return int(_open_of(request, member_of)["id"])
     with db.connect() as conn:
         bootstrap = db.bootstrap_account_id(conn)
     if bootstrap is None:

@@ -755,21 +755,13 @@ def test_no_query_against_an_owned_table_forgets_its_owner():
 # the tenant is not the brand
 # --------------------------------------------------------------------------
 
-def test_the_brand_pill_does_not_empty_the_board(two_accounts, monkeypatch):
-    """The bug this closes, found by running the migration against a copy
-    of the live database rather than by reading the code.
-
-    `accounts` was doing double duty: the two brands were also two
-    account rows Mike was a member of.
-    auth.current_account reads the brand cookie and returns the matching
-    membership -- that is what the pill switches and what colours the UI.
-    Scope the DATA by that and clicking ANTIHERO scopes every query to
-    account 2, which the backfill gave nothing: an empty board, no
-    locations, no cast, on a database with eleven concepts in it.
-
-    So current_account_id returns the tenant (oldest membership) and the
-    pill goes on filtering by brand inside it.
-    """
+def test_the_open_workspace_is_the_tenant_and_no_switch_means_the_oldest(two_accounts, monkeypatch):
+    """2026-11-03 (the Agency plan): a person in two workspaces works in the
+    one they have OPEN -- an invited teammate who already had their own
+    must render and spend in the agency's once they switch to it. Before,
+    the tenant was always the oldest membership (the brand rows of
+    2026-09-02, gone since 2026-10-15). With no switch, or a cookie naming
+    a workspace the person is not in, it is still the oldest."""
     from app import auth
 
     path, a, b = two_accounts
@@ -777,56 +769,29 @@ def test_the_brand_pill_does_not_empty_the_board(two_accounts, monkeypatch):
         user_id = conn.execute(
             "SELECT user_id FROM account_members ORDER BY account_id"
         ).fetchone()["user_id"]
-        # both concepts to the tenant, the way the backfill leaves them
         conn.execute("UPDATE shoot_concepts SET account_id = %s", (a,))
+        slugs = {r["id"]: r["slug"] for r in conn.execute(
+            "SELECT id, slug FROM accounts WHERE id IN (%s, %s)", (a, b)).fetchall()}
 
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": user_id})
     monkeypatch.setenv("DATABASE_URL", path)
 
     class Request:
-        def __init__(self, brand):
-            self.cookies = {auth.ACCOUNT_COOKIE: brand}
+        def __init__(self, slug=None):
+            self.cookies = {auth.ACCOUNT_COOKIE: slug} if slug else {}
             self.state = State()
 
-    for brand in ("first", "second"):
-        scoped_to = auth.current_account_id(Request(brand))
-        assert scoped_to == a, f"the {brand} pill switched tenants"
-        assert len(preprod.list_concepts(dsn=path, account_id=scoped_to)) == 2
-
-
-def test_the_brand_pill_does_not_empty_the_dev_console(two_accounts, monkeypatch):
-    """The same rule, for the other door (2026-09-02).
-
-    dev_account_id resolved the BRAND, not the tenant, so with the pill
-    on ANTIHERO the Dev Studio scoped itself to the account the backfill
-    gave nothing: "Draw ungraded concept (0)" against 29 concepts, and
-    the board's taste signal reading zero.
-
-    The half that would have cost data rather than a confusing page:
-    four dev routes write (fresh grade, new video, metrics, reference
-    pick), and a write made under the wrong pill lands on an account the
-    board and the judge never read."""
-    from app import auth
-
-    path, a, _b = two_accounts
-    with db.connect(path) as conn:
-        user_id = conn.execute(
-            "SELECT user_id FROM account_members ORDER BY account_id"
-        ).fetchone()["user_id"]
-        conn.execute("UPDATE shoot_concepts SET account_id = %s", (a,))
-
-    monkeypatch.setattr(auth, "current_user", lambda request: {"id": user_id})
-    monkeypatch.setenv("DATABASE_URL", path)
-
-    class Request:
-        def __init__(self, brand):
-            self.cookies = {auth.ACCOUNT_COOKIE: brand}
-            self.state = State()
-
-    for brand in ("first", "second"):
-        assert auth.dev_account_id(Request(brand)) == a, f"the {brand} pill switched tenants"
-        # and it agrees with the door /api comes through
-        assert auth.dev_account_id(Request(brand)) == auth.current_account_id(Request(brand))
+    assert auth.current_account_id(Request()) == a                    # no switch: the oldest
+    assert auth.current_account_id(Request("not-mine")) == a          # a stranger's slug: ignored
+    assert auth.current_account_id(Request(slugs[a])) == a
+    assert auth.current_account_id(Request(slugs[b])) == b            # switched: that one
+    assert len(preprod.list_concepts(dsn=path, account_id=a)) == 2
+    assert preprod.list_concepts(dsn=path, account_id=b) == []
+    # the dev console and the shell's active account agree with the data door
+    for slug in (None, slugs[a], slugs[b]):
+        req = Request(slug)
+        assert auth.dev_account_id(req) == auth.current_account_id(req)
+        assert int(auth.current_account(req)["id"]) == auth.current_account_id(req)
 
 
 def test_the_dev_console_still_works_with_no_session(two_accounts, monkeypatch):

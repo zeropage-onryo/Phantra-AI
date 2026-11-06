@@ -65,7 +65,7 @@ PROMPT_MAX = 1000
 # Audio length per plan (Mike, 2026-10-20): the dearest clip a plan can
 # make is 30s / 60s / 120s x $0.105 = $3.15 / $6.30 / $12.60. An account
 # with no plan (the sign-up trial) gets Starter's: its credits are the wall.
-PLAN_AUDIO_CAP = {"starter": 30, "creator": 60, "studio": 120}
+PLAN_AUDIO_CAP = {"starter": 30, "creator": 60, "studio": 120, "agency": 120}
 DEFAULT_AUDIO_CAP = PLAN_AUDIO_CAP["starter"]
 
 # --- ElevenLabs v3: script -> voice ----------------------------------------

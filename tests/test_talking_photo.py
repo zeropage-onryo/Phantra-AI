@@ -39,7 +39,7 @@ def test_the_rows_are_the_ones_read_off_fal_that_day():
 
 
 def test_the_plan_caps_are_mikes_and_their_dearest_clips():
-    assert tp.PLAN_AUDIO_CAP == {"starter": 30, "creator": 60, "studio": 120}
+    assert tp.PLAN_AUDIO_CAP == {"starter": 30, "creator": 60, "studio": 120, "agency": 120}
     assert set(tp.PLAN_AUDIO_CAP) == set(pricing.PLANS)
     assert [tp.talk_usd(s) for s in (30, 60, 120)] == [3.15, 6.3, 12.6]
 

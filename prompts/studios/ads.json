@@ -2,7 +2,6 @@
   "id": "ads",
   "title": "Ad Studio",
   "tagline": "Pick a format, point at the product, and Vesper writes the ad around it.",
-  "addon": "studios",
   "intake": [
     {
       "id": "platform",

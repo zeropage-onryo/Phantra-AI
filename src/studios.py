@@ -221,7 +221,9 @@ def public(studio_id, *, account_id: Optional[int] = None) -> Optional[dict]:
         "intake": studio.get("intake") or [],
         "formats": formats,
         "entitled": addons.active(account_id, addon_key) if addon_key else True,
-        "gated": addons.gate_on(),
+        # a studio with no add-on in its config (the Ad Studio since
+        # 2026-11-03: included on every plan) is never gated
+        "gated": bool(addon_key) and addons.gate_on(),
         "addon": {
             "key": addon.key, "name": addon.name, "blurb": addon.blurb,
             "monthly_usd": addon.monthly_usd,

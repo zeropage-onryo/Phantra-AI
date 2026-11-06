@@ -300,7 +300,9 @@ def test_a_plan_puts_a_tier_on_the_account_and_no_model_is_refused_by_it(studio,
 
 
 def test_the_plans_are_the_three_tiers_in_ascending_order():
-    assert [p.tier for p in pricing.PLANS.values()] == list(providers.TIERS)
+    # each plan's band, in ascending order; Agency shares Max's (2026-11-03)
+    tiers = [providers.TIERS.index(p.tier) for p in pricing.PLANS.values()]
+    assert tiers == sorted(tiers) and set(providers.TIERS) <= {p.tier for p in pricing.PLANS.values()}
     prices = [p.monthly_usd for p in pricing.PLANS.values()]
     credits = [p.credits for p in pricing.PLANS.values()]
     assert prices == sorted(prices) and credits == sorted(credits)

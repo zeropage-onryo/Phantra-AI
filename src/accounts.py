@@ -308,6 +308,76 @@ def add_member(account_id: int, user_id: str, role: str = "owner",
         )
 
 
+# --------------------------------------------------------------------------
+# seats -- teammates invited from Settings (2026-11-03, the Agency plan)
+# --------------------------------------------------------------------------
+
+def seats_for(account_id: int, dsn: Optional[str] = None) -> int:
+    """How many members this workspace's plan allows (pricing.Plan.seats):
+    1 with no plan, a plan below Agency, or a plan this build no longer
+    lists."""
+    from . import pricing
+    plan = pricing.PLANS.get(plan_of(account_id, dsn=dsn) or "")
+    return plan.seats if plan else 1
+
+
+def add_teammate(account_id: int, email: str, dsn: Optional[str] = None) -> dict[str, Any]:
+    """Make the person with this address a MEMBER of this workspace,
+    within its plan's seats. The caller has already checked that the asker
+    is an owner (app/api.py account_invite).
+
+    Like invite(): no identity is created and nothing is sent. A new
+    address gets an unclaimed users row that their first sign-in with that
+    exact email claims (so they land in this workspace, and open sign-up
+    makes them no workspace of their own); an existing person gains the
+    membership beside theirs and opens it from the workspace switch.
+
+    Raises ValueError("bad_email" | "already_member" | "no_seats" |
+    "seats_full", message)."""
+    email = (email or "").strip().lower()
+    if not email or "@" not in email or " " in email or len(email) > 254:
+        raise ValueError("bad_email", "that does not look like an email address")
+    allowed = seats_for(account_id, dsn=dsn)
+    if allowed <= 1:
+        raise ValueError("no_seats", "inviting teammates comes with the Agency plan")
+    with connect(dsn) as conn:
+        # one invite at a time per workspace, so two at once cannot both
+        # take the last seat
+        conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (7101, int(account_id)))
+        user = conn.execute("SELECT id FROM users WHERE email = %s", (email,)).fetchone()
+        if user is not None and conn.execute(
+                "SELECT 1 FROM account_members WHERE account_id = %s AND user_id = %s",
+                (int(account_id), str(user["id"]))).fetchone():
+            raise ValueError("already_member", f"{email} is already in this workspace")
+        used = conn.execute("SELECT COUNT(*) AS n FROM account_members WHERE account_id = %s",
+                            (int(account_id),)).fetchone()["n"]
+        if used >= allowed:
+            raise ValueError("seats_full", f"all {allowed} seats are taken -- remove someone first")
+        created = user is None
+        user_id = str(user["id"]) if user else None
+        if created:
+            user_id = str(uuid.uuid4())
+            conn.execute("INSERT INTO users (id, email, created_at) VALUES (%s, %s, %s)",
+                         (user_id, email, _now()))
+        conn.execute("INSERT INTO account_members (account_id, user_id, role) "
+                     "VALUES (%s, %s, 'member') ON CONFLICT (account_id, user_id) DO NOTHING",
+                     (int(account_id), user_id))
+    return {"user_id": user_id, "email": email, "created_user": created,
+            "seats": allowed, "used": used + 1}
+
+
+def remove_teammate(account_id: int, user_id: str, dsn: Optional[str] = None) -> bool:
+    """Take a MEMBER out of this workspace. An owner is never removed here
+    (a workspace must keep its owner). Their renders and scenes stay: they
+    were the workspace's, made on its credits. Returns whether anybody was
+    removed."""
+    with connect(dsn) as conn:
+        row = conn.execute(
+            "DELETE FROM account_members WHERE account_id = %s AND user_id = %s "
+            "AND role <> 'owner' RETURNING user_id", (int(account_id), str(user_id))).fetchone()
+    return row is not None
+
+
 def memberships(user_id: str, dsn: Optional[str] = None) -> list[dict[str, Any]]:
     """The accounts this user may enter. Empty list == signed in but no
     access -- the state the membership gate renders, fixed only by an

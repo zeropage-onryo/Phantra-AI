@@ -52,7 +52,7 @@ def test_auth_reuses_lookups_only_within_the_request(monkeypatch):
     first = request()
     assert auth.current_user(first)['id'] == 'reader'
     assert auth.current_account(first)['slug'] == 'second-studio'
-    assert auth.current_account_id(first) == 1
+    assert auth.current_account_id(first) == 2      # the open one (2026-11-03)
     get_user.assert_called_once()
     memberships.assert_called_once()
     memberships.return_value = []

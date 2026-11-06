@@ -52,6 +52,8 @@ export const getMe = () => apiFetch<Me>("/me");
 export type Member = {
   name: string;
   email: string | null;
+  /** the member's id, sent to an owner only (what Remove takes) */
+  id?: string | null;
   avatar_url: string | null;
   role: string;
   /** false: invited, and has not signed in yet */
@@ -63,11 +65,25 @@ export type Members = {
   role: string;
   can_see_emails: boolean;
   members: Member[];
-  /** the workspace the studio's data routes act on: the caller's FIRST
-   *  one, whichever is open (app/auth.py current_account_id) */
+  /** the workspace the studio's data routes act on: the OPEN one since
+   *  2026-11-03 (app/auth.py current_account_id) */
   home?: { id: number; slug: string; label: string } | null;
+  /** the plan's seats and how many are used (2026-11-03, the Agency plan) */
+  seats?: number;
+  used?: number;
+  /** an owner on a plan with seats to give */
+  can_invite?: boolean;
 };
 export const getMembers = () => apiFetch<Members>("/account/members");
+/** Invite a teammate by address into the open workspace (owner only, within
+ *  the plan's seats). Nothing is emailed: they sign in with that address. */
+export const inviteMember = (email: string) =>
+  apiFetch<{ ok: boolean; email: string; seats: number; used: number; joined_existing_user: boolean }>(
+    "/account/members",
+    { method: "POST", body: JSON.stringify({ email }) },
+  );
+export const removeMember = (id: string) =>
+  apiFetch<{ ok: boolean }>(`/account/members/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 /* whether THIS person has connected Claude to this account
    (src/mcp_connections.py): recorded when they press Allow on the consent
@@ -1221,12 +1237,16 @@ export type CreditLot = {
 export type Balance = {
   available: number;
   outstanding: number;
-  plan: { key: string; name: string; tier: string; credits: number; monthly_usd: number } | null;
+  plan: { key: string; name: string; tier: string; credits: number; monthly_usd: number; seats?: number } | null;
   exempt: boolean;
   lots: CreditLot[];
   schedules: { plan: string; months_released: number; months_total: number; next_release_at: string | null }[];
   checkout_configured: boolean;
   yearly_configured: boolean;
+  /** which plans can be bought here, by key (2026-11-03: the Agency plan's
+   *  Stripe Prices are set apart, so one unset plan no longer stops the rest) */
+  buyable?: Record<string, boolean>;
+  buyable_yearly?: Record<string, boolean>;
   portal: boolean;
   /** what a still costs on THIS server (app/billing.action_prices) */
   /** `sheet`: an element sheet, GPT Image 2.5 Sunburst since 2026-10-26 (Nano Banana Pro at 2K before) */

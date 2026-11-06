@@ -2635,7 +2635,7 @@ function Composer() {
         if (project) form.append("project_id", String(project.id));
         else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
         // the Ad Studio's brief (lib/ad-studio.ts): told to every turn of this
-        // conversation; the server drops it for a workspace without the add-on
+        // conversation (included on every plan since 2026-11-03)
         if (draft.studio) form.append("studio", JSON.stringify(draft.studio));
         // The Fast / Reasoning pill. Without it the Guide answered every
         // turn on the reasoning tier -- ~1.5c a message for "which

@@ -43,9 +43,9 @@ What a signed-in person has:
   composer -- a format (each rides on an ad skill), a product element, a short brief and a brand
   kit -- whose "Start in Create" link carries them into the box and puts the brief on the
   conversation's draft (`studio`), told to every turn by `src/studios.py`. Config in
-  `prompts/studios/`. A paid flat add-on (`src/addons.py`, OWNED `account_addons`,
-  `pricing.ADDONS`): its Stripe events are routed before any plan branch; the page is open to
-  all, the brief reaches the brain only with the add-on.
+  `prompts/studios/`. Included on every plan since 2026-11-03 (`docs/tasks/task-agency-plan.md`):
+  its config names no add-on; the add-on machinery (`src/addons.py`, OWNED `account_addons`,
+  `pricing.ADDONS`, Stripe events routed before any plan branch) stays for a studio that names one.
   **Results and versions** (2026-10-29, `docs/tasks/task-ad-results.md`): a dropped Meta /
   TikTok ad-level CSV (`src/ad_results.py`, OWNED `ad_results`) is tied to renders by the ad
   code in the ad's name (`PH<generated_assets.id>`, shown in the Library viewer); a plan's scene
@@ -203,9 +203,14 @@ No Supabase token is stored after sign-in.
   A new sign-up gets its own workspace and a one-time 100-credit trial
   (`PHANTRA_SIGNUP_CREDITS`); `PHANTRA_OPEN_SIGNUP=0` restores the invite-only gate, where a
   sign-in with no membership sees "no account access yet" until a member invites them.
-- **The tenant** of every `/api` route is `auth.current_account_id`: the caller's OLDEST
-  membership. The `phantra_account` cookie (set by `POST /account/{slug}`) only chooses among
-  workspaces the person belongs to.
+- **The tenant** of every `/api` route is `auth.current_account_id`: the workspace the person
+  has OPEN since 2026-11-03 (the `phantra_account` cookie, set by `POST /account/{slug}`, which
+  only chooses among workspaces the person belongs to), else their OLDEST membership. It was
+  always the oldest before (`docs/tasks/task-agency-plan.md` says why it moved). The connectors
+  still use the oldest.
+- **Seats** (2026-11-03): an owner on a plan with seats (`pricing.Plan.seats`: Agency 10, the rest
+  1) invites by address from Settings -> Workspace (`POST /api/account/members`,
+  `accounts.add_teammate`) and removes (`DELETE /api/account/members/{id}`); nothing is emailed.
 - **The studio gets its session by handoff, never cross-site.** The studio's fetches go to its
   own origin and Next proxies `/api`, `/auth`, `/signin`, `/account` and the photo routes to
   `API_UPSTREAM`; sign-in navigates to the API origin (`NEXT_PUBLIC_AUTH_ORIGIN`), and a trusted
@@ -609,7 +614,8 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
 
 ### Billing and credits (`docs/BILLING.md`)
 
-Three plans (`pricing.PLANS`), monthly and yearly (yearly is a schedule released monthly, never a
+Four plans (`pricing.PLANS`: Standard, Pro, Max, and Agency at $449 / 44,900 credits / 10 seats
+since 2026-11-03), monthly and yearly (yearly is a schedule released monthly, never a
 twelve-month lot), top-ups, Stripe Checkout and portal (`app/billing.py`, `src/billing.py`), grants
 through `/billing/webhook` (at `https://api.phantra.ai/billing/webhook`). Renders and stills cost
 credits; writing scenes and the brain's text cost none on a plan (the one exception: the two Claude brains in the picker are priced per message, held at a ceiling and settled to what the turn used, `src/text_charge.py`), but `charge.create_refusal`

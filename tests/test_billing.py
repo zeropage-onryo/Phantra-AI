@@ -308,9 +308,9 @@ def test_portal_needs_a_customer(shop, monkeypatch):
 
 
 def test_balance_names_the_workspace_whose_credits_it_counts(shop, monkeypatch):
-    """Credits live in the caller's FIRST workspace whichever one is open
-    (auth.current_account_id), so the answer says which that is and
-    Settings can name it when another is open."""
+    """Credits are the OPEN workspace's since 2026-11-03
+    (auth.current_account_id): a teammate who switches into an agency's
+    workspace spends its pool. With no switch it is the oldest."""
     dsn = shop["dsn"]
     north = accounts.upsert_account("north", "North Films", dsn=dsn)
     south = accounts.upsert_account("south", "South Co", dsn=dsn)
@@ -328,13 +328,15 @@ def test_balance_names_the_workspace_whose_credits_it_counts(shop, monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: row)
     app.dependency_overrides.pop(auth.current_account_id, None)
     try:
-        for opened in ("south", "north", None):
+        for opened, want, label, credits in (("south", south, "South Co", 70),
+                                             ("north", north, "North Films", 500),
+                                             (None, north, "North Films", 500)):
             client.cookies.clear()
             if opened:
                 client.cookies.set(auth.ACCOUNT_COOKIE, opened)
             answer = client.get("/api/billing/balance").json()
-            assert answer["account"] == {"id": north, "label": "North Films"}, opened
-            assert answer["available"] == 500, opened
+            assert answer["account"] == {"id": want, "label": label}, opened
+            assert answer["available"] == credits, opened
     finally:
         client.cookies.clear()
 
@@ -383,6 +385,12 @@ def test_balance_reports_credits_plan_and_whether_checkout_is_configured(shop, m
     assert r["plan"]["key"] == "studio" and r["plan"]["tier"] == "premium"
     assert r["checkout_configured"] is True and r["portal"] is True
     assert {lot["kind"] for lot in r["lots"]} == {"purchase", "subscription"}
+    # each plan says whether it can be bought (2026-11-03): an unset Agency
+    # Price leaves the other plans on sale
+    monkeypatch.delenv("STRIPE_PRICE_AGENCY", raising=False)
+    r = client.get("/api/billing/balance").json()
+    assert r["buyable"]["agency"] is False and r["checkout_configured"] is True
+    assert r["buyable"]["studio"] is bool(billing.price_id("studio"))
 
 
 def test_the_return_url_is_the_public_site(monkeypatch):

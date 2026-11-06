@@ -822,9 +822,19 @@
   justify-content: space-between;
   min-height: 34px;
 }
+.zset-invite {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.zset-invite .zset-field {
+  flex: 1;
+  min-width: 0;
+}
 .zset-plans {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* four plans since the Agency tier (2026-11-03): two by two until there is room for four */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
 .zset-plan {

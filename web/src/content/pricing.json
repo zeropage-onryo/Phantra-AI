@@ -39,7 +39,8 @@
       "credits": 1500,
       "blurb": "For creators testing ideas and posting a few clips a month.",
       "popular": false,
-      "storage_gb": 25
+      "storage_gb": 25,
+      "seats": 1
     },
     {
       "key": "creator",
@@ -51,7 +52,8 @@
       "credits": 3500,
       "blurb": "For creators and filmmakers posting every week.",
       "popular": true,
-      "storage_gb": 70
+      "storage_gb": 70,
+      "seats": 1
     },
     {
       "key": "studio",
@@ -61,9 +63,23 @@
       "yearly_usd": 912,
       "yearly_monthly_usd": 76,
       "credits": 9500,
-      "blurb": "For agencies, client work and heavy solo use.",
+      "blurb": "For heavy solo use and client work.",
       "popular": false,
-      "storage_gb": 200
+      "storage_gb": 200,
+      "seats": 1
+    },
+    {
+      "key": "agency",
+      "name": "Agency",
+      "tier": "premium",
+      "monthly_usd": 449,
+      "yearly_usd": 4310,
+      "yearly_monthly_usd": 359,
+      "credits": 44900,
+      "blurb": "For agencies and teams: ten seats on one credit pool, a project and brand kit per client.",
+      "popular": false,
+      "storage_gb": 800,
+      "seats": 10
     }
   ],
   "topup": {
@@ -245,13 +261,18 @@
         {
           "seconds": 120,
           "credits": 3024
+        },
+        {
+          "seconds": 120,
+          "credits": 3024
         }
       ],
       "min_seconds": 4,
       "max_seconds": {
         "starter": 30,
         "creator": 60,
-        "studio": 120
+        "studio": 120,
+        "agency": 120
       },
       "voice_preview_from": 10
     }
