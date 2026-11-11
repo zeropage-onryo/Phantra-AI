@@ -426,12 +426,19 @@ def checkout_url(account_id: int, key: str, *, interval: str = "month",
     # a referred buyer's first monthly payment carries the partner discount
     # (src/affiliates.py). Stripe forbids discounts + allow_promotion_codes
     # together, so a discounted checkout trades the code box for the coupon.
+    # The welcome offer (src/welcome_offer.py) goes first: Checkout takes
+    # ONE discount, and the welcome coupon is the larger. It is applied only
+    # when the coupon reads as valid, so a deleted or expired coupon is a
+    # full-price checkout, never a refused one.
     discount = None
     if is_plan(key):
-        from . import affiliates
-        coupon = affiliates.coupon_id()
-        if coupon and affiliates.buyer_discount_applies(account_id, interval, dsn=dsn):
-            discount = [{"coupon": coupon}]
+        from . import affiliates, welcome_offer
+        if welcome_offer.applies(account_id, interval, dsn=dsn) and welcome_offer.describe():
+            discount = [{"coupon": welcome_offer.coupon_id()}]
+        else:
+            coupon = affiliates.coupon_id()
+            if coupon and affiliates.buyer_discount_applies(account_id, interval, dsn=dsn):
+                discount = [{"coupon": coupon}]
     # an add-on is bought from its studio, and comes back to it
     back = "/studio/ads" if addon else "/pricing"
     session = stripe.checkout.Session.create(

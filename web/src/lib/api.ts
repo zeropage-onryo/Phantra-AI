@@ -84,6 +84,12 @@ export async function apiFetch<T>(
       throw new ApiError(UNREACHABLE, res.status, "unreachable");
     }
     heard(true);
+    // a 402 is only ever an empty balance: the upgrade popup decides
+    // whether to open. The event is lib/upgrade.ts's UPGRADE_EVENT, spelled
+    // out so this file stays import-free (tests/upgrade.test.mjs holds the
+    // two together)
+    if (res.status === 402 && typeof window !== "undefined")
+      window.dispatchEvent(new CustomEvent("phantra:upgrade", { detail: { reason: "refused" } }));
     throw new ApiError(message, res.status, code, credits);
   }
   heard(true);

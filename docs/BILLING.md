@@ -236,6 +236,24 @@ Dry-run on 2026-09-29, without a Stripe key, on the local server:
 - A wrong signature got a 400.
 - The walk's customer read `exempt: false`, `available: 0` before the grant.
 
+## The out-of-credits popup and the welcome offer (2026-11-10)
+
+Mike: "get people to sign up after using credits with like a popup ... maybe like a discount".
+
+- **The popup** (`web/src/components/studio/upgrade-modal.tsx`, rules in `web/src/lib/upgrade.ts`):
+  any 402 from `/api` (`lib/api.ts` fires `phantra:upgrade`), and any error toast the shell
+  recognises as an empty balance, asks for it. It opens by itself at most once per 10 minutes per
+  page; the "Choose a plan" / "Buy credits" buttons (toast and `<TopUpLink>`) always open it. An old
+  refusal in a reopened chat does not. A workspace with no plan sees the three plans, monthly, each
+  button straight to Checkout; one on a plan sees the top-up. Exempt accounts never see it.
+- **The welcome offer** (`src/welcome_offer.py`): `STRIPE_WELCOME_COUPON` names a Stripe coupon.
+  A workspace with no plan, not exempt, that has never paid (no `subscription` / `purchase` lot)
+  gets it on a MONTHLY plan checkout (`billing.checkout_url`), and the balance carries
+  `welcome_offer` (its label, read off the coupon: "30% off your first month") so the popup can
+  strike through the first month. It wins over the affiliate coupon (Checkout takes one discount);
+  the partner's commission is booked off what the invoice charged either way. An unreadable or
+  invalid coupon is a full-price checkout, never a refused one; every read fails closed (no offer).
+
 ## Still open
 
 - Phase 4 of the Stripe task doc — a per-account daily Gemini budget — is not
