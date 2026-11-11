@@ -60,6 +60,13 @@ What a signed-in person has:
   Veo, Seedance, LTX, Wan). The priced button on the card is the only place a clip is paid for.
 - **Elements** (`/studio/elements`): the characters, products and places a scene is held to,
   each with photos and a drawn reference sheet. A scene with no photographs does not render.
+- **Public effects pages** (`/effects`, `/effects/<slug>`, 2026-11-05,
+  `docs/tasks/task-public-effects-pages.md`): one SEO page per wall tile with a kept showcase
+  example, everything derived (`web/src/lib/public-effects.ts`) from the committed
+  `content/effects-catalog.json` (`python -m ops.export_effects_catalog`; CI fails when stale),
+  the showcase manifest and `effects-page.json`. Linked from the footer and each other only,
+  never the header or home; "Try it" lands on `/studio?open=effect&effect=<tile key>`. The
+  `phantra-new-effect` skill walks adding one.
 - **Library** (`/studio/assets`) and **Renders** (`/studio/renders`): everything made, with
   effects, download and draft-then-finish.
 - **The editor** (`/studio/cut`): a timeline over the rendered clips, with an agent that

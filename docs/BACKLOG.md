@@ -1638,3 +1638,18 @@ the bucket is public at a fixed address; it stops working the day the bucket goe
   make sure the `/renders` route and every tile mint it through `media.url_for`.
 Either is a migration of stored rows too (report first, `--write` to act). Not built with the
 scene-442 fixes because it is a change to the media layer, not to the leak.
+
+## 32. Then & Now glow-up and free photo templates  (2026-11-03 to 11-06 -- parked, Mike's call)
+The "You'll never look 25 again" glow-up was specced as a one-click effect (three then photos cut
+at 0.8 s, a Kling 4 reveal animated from the person's own now photo, captions; ~120 credits;
+spec in the claude.ai project, `claude/then_and_now_effect_spec_2026-11-03.md`), then as a FREE
+CapCut-style template (photo slots, live preview, ffmpeg export, sign-up to download, the free
+mark on it, the AI reveal as the one paid upgrade). Both parked on 2026-11-06:
+- CapCut already does the montage free, with the trend's sound, and ranks for every template
+  phrase (`capcut.com/explore/glow-up-at-25`, `/then-vs-now-...`). A paid montage loses; a free
+  one competes with a free tool owned by TikTok's parent.
+- Higgsfield, the closer competitor, has no non-AI templates at all: every effect is a model
+  run priced in credits, and its traffic comes from one SEO page per effect. Phantra follows
+  that: AI effects only, each on its own public page (`docs/tasks/task-public-effects-pages.md`).
+Reopen only if a posted glow-up shows real demand for the AI-reveal version; then it is a
+Kling-reveal effect with a free montage around it, not a template product.
