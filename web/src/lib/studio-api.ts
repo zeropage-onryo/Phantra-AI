@@ -1234,6 +1234,9 @@ export type Balance = {
   /** the workspace these credits belong to: the person's FIRST one,
    *  whichever is open (lib/credits `countedElsewhere`) */
   account?: { id: number; label: string } | null;
+  /** the first-plan discount the out-of-credits popup offers
+   *  (src/welcome_offer.py); null when this workspace has none */
+  welcome_offer?: import("@/lib/upgrade").WelcomeOffer | null;
 };
 export const getBalance = () => apiFetch<Balance>("/billing/balance");
 /* Settings → Usage (2026-10-11): where the credits went. One row per
