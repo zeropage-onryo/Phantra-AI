@@ -1183,3 +1183,98 @@ def test_an_effect_the_balance_cannot_cover_is_a_refusal_with_no_link(effect_doo
     assert out["available"] == 3 and out["needs"] > 3
     assert "upgrade_url" not in out and "http" not in str(out) and not _dollars(out)
     assert w["ran"] == []
+
+
+# --------------------------------------------------------------------------
+# a photo attached in the ChatGPT conversation (2026-11-05,
+# docs/tasks/task-chatgpt-attachments.md)
+# --------------------------------------------------------------------------
+
+ATTACHED = "https://files.oaiusercontent.com/file-abc123?se=2026-11-05&sig=xyz"
+
+
+def _attach(world, who, kind, name, file, **kw):
+    return mcp_server.add_attached_photo(kind, name, file, create_element=world["create"],
+                                         dsn=world["dsn"], account_id=world[who], **kw)
+
+
+def _listed(listed):
+    ok = lambda *a, **k: {}          # noqa: E731
+    return mcp_server.build_server(dsn="unused", listed=listed, approve_render=ok,
+                                   approve_keyframes=ok,
+                                   job_status=lambda job_id, account_id=None: None)
+
+
+def test_only_the_render_listing_asks_chatgpt_for_the_attachment():
+    """ChatGPT hands a tool a file the person attached only for a field its
+    `_meta["openai/fileParams"]` names, and only when that field is the
+    file object the Apps SDK reference describes."""
+    tools = {t.name: t for t in asyncio.run(_listed(True).list_tools())}
+    tool = tools["add_attached_photo"]
+    assert tool.meta == {"openai/fileParams": ["file"]}
+    schema = tool.input_schema["properties"]["file"]
+    assert schema["type"] == "object"
+    assert set(schema["required"]) == {"download_url", "file_id"}
+    assert set(schema["properties"]) >= {"download_url", "file_id", "mime_type", "file_name"}
+    assert "file" in tool.input_schema["required"]
+    assert "$defs" not in tool.input_schema           # the screen reads every "$"
+    # Claude hands a connector no attachments; the studio has import_file
+    claude = {t.name for t in asyncio.run(_listed("claude").list_tools())}
+    studio = {t.name for t in asyncio.run(
+        mcp_server.build_server(dsn="unused", job_status=lambda *a, **k: None,
+                                cancel_job=lambda *a, **k: None).list_tools())}
+    assert "add_attached_photo" not in claude | studio
+    assert "add_element" in claude and "add_element" in studio
+
+
+def test_an_attached_photo_is_fetched_once_and_saved_as_the_persons_element(world, web):
+    web["pages"][ATTACHED] = _Response(headers={"content-type": "image/png"}, body=_png())
+    out = _attach(world, "a", "character", "Black cat",
+                  {"download_url": ATTACHED, "file_id": "file-abc123",
+                   "mime_type": "image/png", "file_name": "cat.png"}, notes="green eyes")
+    assert out["added"] is True and out["credits"] == 0
+    assert out["photo"]["ref"].startswith("/characters/black-cat/photo/add-")
+    assert [u for u, _ in web["seen"]] == [ATTACHED]     # through the guard, once
+    [row] = entities.list_characters(dsn=world["dsn"], account_id=world["a"])
+    assert row["name"] == "Black cat" and row["notes"] == "green eyes"
+    # the temporary address is never kept on the element
+    assert "oaiusercontent" not in str(out) and "oaiusercontent" not in str(row)
+    assert world["calls"]["drawn"] == []
+
+
+@pytest.mark.parametrize("file, why", [
+    ({"file_id": "file-1"}, "no download_url"),
+    ({"download_url": "", "file_id": "file-1"}, "no download_url"),
+    ({"download_url": ATTACHED, "file_id": "file-1", "mime_type": "application/pdf"},
+     "application/pdf, not a photo"),
+    ({"download_url": "http://files.oaiusercontent.com/f", "file_id": "file-1"},
+     "must start with https://"),
+])
+def test_an_attachment_that_is_not_a_photo_is_refused_and_nothing_is_saved(world, web,
+                                                                           file, why):
+    with pytest.raises(ValueError, match=why):
+        _attach(world, "a", "prop", "Can", file)
+    assert not world["dirs"]["prop"].exists()
+
+
+def test_a_refused_caller_never_fetches_the_attachment(world, web, monkeypatch):
+    """add_element's own order: the kind, the name and the Elements page's
+    gate come before the file is read."""
+    from src import charge
+    web["pages"][ATTACHED] = _Response(headers={"content-type": "image/png"}, body=_png())
+    file = {"download_url": ATTACHED, "file_id": "file-1"}
+    with pytest.raises(ValueError, match="kind must be one of"):
+        _attach(world, "a", "monster", "Can", file)
+    monkeypatch.setattr(charge, "create_refusal",
+                        lambda account_id, dsn=None: charge.CREATE_REFUSAL)
+    with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
+        _attach(world, "a", "prop", "Can", file)
+    assert web["seen"] == []
+
+
+def test_a_file_that_only_claims_to_be_an_image_is_refused(world, web):
+    web["pages"][ATTACHED] = _Response(headers={"content-type": "image/png"},
+                                       body=b"<html>not a png</html>")
+    with pytest.raises(ValueError, match="not an image this can read"):
+        _attach(world, "a", "prop", "Can", {"download_url": ATTACHED, "file_id": "f"})
+    assert not world["dirs"]["prop"].exists()
