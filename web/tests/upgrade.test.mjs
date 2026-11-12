@@ -33,3 +33,21 @@ test('lib/api.ts fires the same event the popup listens for', () => {
   assert.ok(src('../src/components/studio/upgrade-modal.tsx').includes('UPGRADE_EVENT'));
   assert.ok(src('../src/components/studio/shell.tsx').includes('<UpgradeModal />'));
 });
+
+test('a card prices yearly from the catalog and never puts the welcome offer on it', async () => {
+  const { cardPrice, howMany } = await import('../src/lib/upgrade.ts');
+  const pro = { monthly_usd: 35, yearly_usd: 336, yearly_monthly_usd: 28 };
+  assert.deepEqual(cardPrice(pro, 'year', OFFER30), {
+    cents: 2800, wasCents: 3500, chip: '−20% · Save $84/yr', note: 'billed yearly, $336',
+  });
+  assert.deepEqual(cardPrice(pro, 'month', OFFER30), {
+    cents: 2450, wasCents: 3500, chip: '−30% first month', note: 'first month, then $35/mo',
+  });
+  assert.deepEqual(cardPrice(pro, 'month', null), {
+    cents: 3500, wasCents: null, chip: null, note: 'billed monthly · cancel any time',
+  });
+  const five = { ...OFFER30, percent_off: null, amount_off_cents: 500 };
+  assert.equal(cardPrice(pro, 'month', five).chip, '$5 off first month');
+  assert.equal(howMany(3500, 162), 21);
+  assert.equal(howMany(100, 0), 0);
+});

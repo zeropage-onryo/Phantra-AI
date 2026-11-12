@@ -69,3 +69,42 @@ export function dollars(cents: number): string {
     maximumFractionDigits: whole ? 0 : 2,
   })}`;
 }
+
+/** What one plan card prints for its price, at one billing interval
+    (2026-11-12, the Higgsfield-shaped popup): the big figure, the
+    struck-through one beside it, the chip inside the button, and the line
+    under the price. Yearly never carries the welcome offer (the server
+    applies it to monthly plans only, src/welcome_offer.py). */
+export type CardPrice = { cents: number; wasCents: number | null; chip: string | null; note: string };
+
+export function cardPrice(
+  plan: { monthly_usd: number; yearly_usd: number; yearly_monthly_usd: number },
+  interval: "month" | "year",
+  offer: WelcomeOffer | null | undefined,
+): CardPrice {
+  const full = Math.round(plan.monthly_usd * 100);
+  if (interval === "year") {
+    const yearCents = Math.round(plan.yearly_usd * 100);
+    const saved = full * 12 - yearCents;
+    const pct = Math.round((saved / (full * 12)) * 100);
+    return {
+      cents: Math.round(plan.yearly_monthly_usd * 100),
+      wasCents: saved > 0 ? full : null,
+      chip: saved > 0 ? `−${pct}% · Save ${dollars(saved)}/yr` : null,
+      note: `billed yearly, ${dollars(yearCents)}`,
+    };
+  }
+  const first = firstMonthCents(plan.monthly_usd, offer);
+  if (offer && first < full) {
+    const chip = offer.percent_off
+      ? `−${offer.percent_off}% first month`
+      : `${dollars(full - first)} off first month`;
+    return { cents: first, wasCents: full, chip, note: `first month, then ${dollars(full)}/mo` };
+  }
+  return { cents: full, wasCents: null, chip: null, note: "billed monthly · cancel any time" };
+}
+
+/** How many of something a month's credits buy, floored, never negative. */
+export function howMany(credits: number, each: number): number {
+  return each > 0 ? Math.max(0, Math.floor(credits / each)) : 0;
+}

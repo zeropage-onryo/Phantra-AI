@@ -40,6 +40,10 @@
 
   /* danger: errors, failures and destructive actions stay red, so a
      warning never reads as the accent */
+  /* the Max plan's card in the upgrade popup (2026-11-12, Higgsfield's shape:
+     the top tier glows hot pink beside Pro's yellow); white text on both */
+  --tier-max: #ff3d8b;
+  --tier-max-deep: #6e0a37;
   --danger: #e4002b;
   /* red TEXT on near-black: the red itself is 4.1:1 there, this 6:1 */
   --danger-hi: #ff4d6a;
