@@ -398,9 +398,9 @@ def test_the_first_page_carries_the_summary_and_later_pages_do_not(book):
 
 
 def test_every_page_says_whose_history_it_is(book, monkeypatch):
-    """The history is the caller's FIRST workspace's whichever one is open
-    (auth.current_account_id); the answer names it so Usage can say so
-    when another workspace is open."""
+    """The history is the OPEN workspace's since 2026-11-03
+    (auth.current_account_id); with no switch, the oldest. The answer
+    names it."""
     dsn, a, b = _two_books(book)
     ledger.hold(a, 10, ref="still.jpg", provider="fal", dsn=dsn)
 
@@ -415,13 +415,18 @@ def test_every_page_says_whose_history_it_is(book, monkeypatch):
     # ABOUT who the caller is: the real gate runs
     app.dependency_overrides.pop(auth.current_account_id, None)
     try:
-        client.cookies.set(auth.ACCOUNT_COOKIE, "south")              # South is open; North is where the credits are
+        # no switch: the oldest, North
         first = client.get("/api/billing/history", params={"limit": 2}).json()
         later = client.get("/api/billing/history", params={"limit": 2, "before": first["next"]}).json()
         for answer in (first, later):
             assert answer["account"] == {"id": a, "label": "North"}
         text = json.dumps([first, later])
         assert "North's scene" in text and "South's scene" not in text
+        # South open: South's own history, never North's
+        client.cookies.set(auth.ACCOUNT_COOKIE, "south")
+        south = client.get("/api/billing/history", params={"limit": 50}).json()
+        assert south["account"] == {"id": b, "label": "South"}
+        assert "North's scene" not in json.dumps(south)
     finally:
         client.cookies.clear()
 

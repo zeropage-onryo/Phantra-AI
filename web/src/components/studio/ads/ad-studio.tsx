@@ -278,7 +278,7 @@ function AdStudioPage() {
         <span className={`as-state${page.entitled ? " is-on" : ""}`}>
           {page.entitled ? (
             <>
-              <Check size={13} strokeWidth={2.4} /> {page.gated ? "Add-on active" : "Open"}
+              <Check size={13} strokeWidth={2.4} /> {page.gated ? "Add-on active" : "Included"}
             </>
           ) : (
             <>

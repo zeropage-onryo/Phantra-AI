@@ -119,7 +119,7 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "How much does it cost?",
         a: (
           <p>
-            Three monthly plans — see <Link href="/pricing">pricing</Link> — and a one-time top-up for accounts on a plan. One credit
+            Four monthly plans, including Agency for teams of up to five — see <Link href="/pricing">pricing</Link> — and a one-time top-up for accounts on a plan. One credit
             is one cent; a render costs the model&apos;s own rate for the length you picked, so the cheapest
             clip is a few dozen credits and the most expensive a few hundred.
           </p>

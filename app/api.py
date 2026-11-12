@@ -679,6 +679,8 @@ def account_members(request: Request, account_id: int = Depends(auth.current_acc
             "name": (row.get("display_name") or "").strip()
                     or (address.split("@")[0] if shown else "Member"),
             "email": address if shown else None,
+            # an owner gets each member's id, the handle Remove takes
+            "id": str(row["id"]) if owner else None,
             "avatar_url": row.get("avatar_url"),
             "role": row.get("role") or "member",
             # has this person ever signed in? an invite sits unclaimed until then
@@ -696,9 +698,63 @@ def account_members(request: Request, account_id: int = Depends(auth.current_acc
             "role": active.get("role") or "member",
             "can_see_emails": owner,
             "members": members,
+            # the plan's seats (2026-11-03, the Agency plan): an owner invites
+            # from this page while `used` is under `seats`
+            "seats": accounts.seats_for(int(active["id"])),
+            "used": len(members),
+            "can_invite": owner and accounts.seats_for(int(active["id"])) > 1,
             "home": ({"id": home["id"], "slug": home["slug"],
                       "label": home.get("display_name") or home["slug"]} if home else None)}
 
+
+
+class InviteBody(BaseModel):
+    email: str
+
+
+def _owner_of_open(request: Request) -> Optional[dict]:
+    """The OPEN workspace when the caller is its owner, else None."""
+    user = auth.current_user(request) or {}
+    active = auth.current_account(request, user or None)
+    if not active or (active.get("role") or "") != "owner":
+        return None
+    return active
+
+
+@router.post("/account/members")
+def account_invite(body: InviteBody, request: Request,
+                   account_id: int = Depends(auth.current_account_id)):
+    """Invite a teammate into the open workspace (2026-11-03, the Agency
+    plan; BACKLOG #22's "invite from the page"). OWNER only, within the
+    plan's seats (pricing.Plan.seats: 5 on Agency, none below it). Nothing
+    is sent: the person signs in at phantra.ai with that address and lands
+    here, or, already a Phantra user, opens it from the workspace switch.
+    403 not_owner; 402 no_seats (a plan without seats); 409 seats_full or
+    already_member; 400 bad_email."""
+    active = _owner_of_open(request)
+    if active is None:
+        return _error(403, "not_owner", "only the workspace's owner can invite people")
+    try:
+        added = accounts.add_teammate(int(active["id"]), body.email)
+    except ValueError as e:
+        code, message = (e.args + ("",))[:2]
+        status = {"bad_email": 400, "no_seats": 402}.get(code, 409)
+        return _error(status, code, message or str(e))
+    return {"ok": True, "email": added["email"], "seats": added["seats"], "used": added["used"],
+            "joined_existing_user": not added["created_user"]}
+
+
+@router.delete("/account/members/{user_id}")
+def account_remove(user_id: str, request: Request,
+                   account_id: int = Depends(auth.current_account_id)):
+    """Take a member out of the open workspace. OWNER only; an owner is
+    never removed. What they made stays in the workspace."""
+    active = _owner_of_open(request)
+    if active is None:
+        return _error(403, "not_owner", "only the workspace's owner can remove people")
+    if not accounts.remove_teammate(int(active["id"]), user_id):
+        return _error(404, "not_found", "no such member (an owner cannot be removed)")
+    return {"ok": True}
 
 @router.get("/mcp/connection")
 def mcp_connection(request: Request, account_id: int = Depends(auth.current_account_id)):
@@ -710,7 +766,10 @@ def mcp_connection(request: Request, account_id: int = Depends(auth.current_acco
     never another member's. Nothing here calls Supabase or claude.ai."""
     user = auth.current_user(request) or {}
     from src import mcp_connections
-    return mcp_connections.status(account_id, str(user.get("id") or ""))
+    # the CONNECTOR's account (the oldest membership), which is not the
+    # open workspace once a person has switched (2026-11-03)
+    return mcp_connections.status(auth.oldest_account_id(request) or account_id,
+                                  str(user.get("id") or ""))
 
 
 # --- settings: the person's own row and their password --------------------

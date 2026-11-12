@@ -746,13 +746,19 @@ def balance(account_id: int, *, dsn: Optional[str] = None) -> dict:
         "available": ledger.available(account_id, dsn),
         "outstanding": ledger.outstanding(account_id, dsn),
         "plan": ({"key": plan.key, "name": plan.name, "tier": plan.tier,
-                  "credits": plan.credits, "monthly_usd": plan.monthly_usd}
+                  "credits": plan.credits, "monthly_usd": plan.monthly_usd,
+                  "seats": plan.seats}
                  if plan else None),
         "exempt": accounts.is_credit_exempt(account_id, dsn=dsn),
         "lots": lots,
         "schedules": pending,
-        "checkout_configured": configured() and all(price_id(k) for k in pricing.PLANS),
-        "yearly_configured": configured() and all(price_id(k, "year") for k in pricing.PLANS),
+        # which plans can be bought here, by key and interval (2026-11-03): the
+        # Agency plan's Prices are set apart from the first three, so one
+        # unset plan no longer switches checkout off for every plan
+        "buyable": {k: configured() and bool(price_id(k)) for k in pricing.PLANS},
+        "buyable_yearly": {k: configured() and bool(price_id(k, "year")) for k in pricing.PLANS},
+        "checkout_configured": configured() and any(price_id(k) for k in pricing.PLANS),
+        "yearly_configured": configured() and any(price_id(k, "year") for k in pricing.PLANS),
         "portal": bool(accounts.stripe_customer_of(account_id, dsn=dsn)),
         # the add-ons this workspace holds (src/addons.py): the row's own
         # status, so Settings says what was bought, not what a gate allows

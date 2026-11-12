@@ -30,7 +30,6 @@ from src import (
     creative_guide,
     db,
     ledger,
-    pricing,
     scene_chain,
     skills,
     studios,
@@ -128,16 +127,26 @@ def workspace(pg, monkeypatch):
     return {"dsn": pg, "account_id": account_id}
 
 
-def test_a_pick_reaches_the_brain_only_with_the_add_on(workspace, monkeypatch):
+def test_the_ad_studio_is_included_on_every_plan(workspace):
+    # 2026-11-03 (Mike): no add-on to buy -- every workspace's pick reaches
+    # the brain, with or without a grant row
     acct = workspace["account_id"]
     raw = {"id": "ads", "format": "ugc"}
+    assert "addon" not in studios.get("ads")
+    assert studios.for_account(raw, acct)["format"] == "ugc"
+    addons.grant("phantra", "studios", False)
+    assert studios.for_account(raw, acct)["format"] == "ugc"
+
+
+def test_a_studio_that_names_an_add_on_is_still_gated_by_it(workspace, monkeypatch):
+    acct = workspace["account_id"]
+    raw = {"id": "ads", "format": "ugc"}
+    gated = {**studios.get("ads"), "addon": "studios"}
+    monkeypatch.setattr(studios, "get", lambda sid: gated if sid == "ads" else None)
     assert studios.for_account(raw, acct) is None
-    assert studios.for_account(raw, None) is None
     addons.grant("phantra", "studios", True)
     assert studios.for_account(raw, acct)["format"] == "ugc"
     addons.grant("phantra", "studios", False)
-    assert studios.for_account(raw, acct) is None
-    # an installation with nothing to sell opens it to everyone
     monkeypatch.setenv(addons.GATE_ENV, "0")
     assert studios.for_account(raw, acct)["format"] == "ugc"
 
@@ -194,14 +203,12 @@ def test_the_page_is_open_to_everyone_and_shows_no_prompt_note(signed_in):
     r = client.get("/api/studios/ads")
     assert r.status_code == 200, r.text
     page = r.json()
-    assert page["title"] == "Ad Studio" and page["entitled"] is False and page["gated"] is True
+    assert page["title"] == "Ad Studio" and page["entitled"] is True and page["gated"] is False
+    assert page["addon"] is None
     assert [f["id"] for f in page["formats"]][:2] == ["product_showcase", "ugc"]
     assert all("note" not in f for f in page["formats"])
     assert page["formats"][0]["skill_title"] == "Ad"
-    assert page["addon"]["key"] == "studios" and page["addon"]["has_plan"] is False
-    assert page["addon"]["on_sale"] is False          # no Stripe key in the suite
-    assert page["addon"]["monthly_usd"] == pricing.ADDONS["studios"].monthly_usd
-    addons.grant("phantra", "studios", True)
+    addons.grant("phantra", "studios", False)
     assert client.get("/api/studios/ads").json()["entitled"] is True
     assert client.get("/api/studios/fashion").status_code == 404
 
@@ -246,10 +253,11 @@ def test_the_turn_gets_the_pick_with_the_add_on(monkeypatch):
     assert job["studio"]["format"] == "ugc"
 
 
-def test_the_turn_without_the_add_on_is_the_plain_composers(monkeypatch):
+def test_the_ad_studio_turn_needs_no_add_on_and_no_pick_is_the_plain_composer(monkeypatch):
+    # included on every plan (2026-11-03): the add-on's answer does not matter
     pick = json.dumps({"id": "ads", "format": "ugc"})
     seen, job = _turn(monkeypatch, {"studio": pick}, entitled=False)
-    assert seen["studio"] is None and job["studio"] is None
+    assert seen["studio"]["format"] == "ugc" and job["studio"]["format"] == "ugc"
     seen, _ = _turn(monkeypatch, {}, entitled=True)
     assert seen["studio"] is None
 

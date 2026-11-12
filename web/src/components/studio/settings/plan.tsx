@@ -247,6 +247,12 @@ export function PlanSection() {
   const canBuy = balance.checkout_configured;
   const yearlyOffered = balance.yearly_configured && !plan;
   const at: Interval = yearlyOffered ? interval : "month";
+  // a plan whose Stripe Price is unset is shown but not sold (2026-11-03);
+  // an older API with no per-plan map leaves every plan on canBuy
+  const onSale = (key: string) => {
+    const map = at === "year" ? balance.buyable_yearly : balance.buyable;
+    return map ? map[key] !== false : true;
+  };
 
   return (
     <>
@@ -352,6 +358,12 @@ export function PlanSection() {
                     <Check strokeWidth={2} aria-hidden />
                     {num(p.storage_gb)} GB storage
                   </li>
+                  {p.seats > 1 ? (
+                    <li>
+                      <Check strokeWidth={2} aria-hidden />
+                      {p.seats} seats on one credit pool
+                    </li>
+                  ) : null}
                 </ul>
                 {current ? (
                   <Button disabled>Your plan</Button>
@@ -367,9 +379,9 @@ export function PlanSection() {
                   <Button
                     variant={p.popular ? "primary" : "ghost"}
                     onClick={() => checkout(p.key, at)}
-                    disabled={!canBuy || busy !== null}
+                    disabled={!canBuy || !onSale(p.key) || busy !== null}
                   >
-                    {busy === p.key ? "Opening checkout…" : `Choose ${p.name}`}
+                    {busy === p.key ? "Opening checkout…" : onSale(p.key) ? `Choose ${p.name}` : "Not on sale yet"}
                   </Button>
                 )}
               </article>
