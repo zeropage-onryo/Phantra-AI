@@ -64,16 +64,23 @@ import {
   ArrowUp,
   ArrowUpFromLine,
   AtSign,
+  Brain,
   ChevronDown,
+  Clock,
   ChevronUp,
   Ellipsis,
+  Gauge,
   History,
   Image as ImageIcon,
   ImageOff,
+  Palette,
   Paperclip,
   Play,
   Plus,
+  RectangleHorizontal,
+  RectangleVertical,
   Search,
+  Square,
   Video,
   X,
 } from "lucide-react";
@@ -330,6 +337,16 @@ const FILTERS: [Filter, string][] = [
 const FRAMES_PER_ASSET = 3;
 const EASE = [0.22, 0.61, 0.36, 1] as const;
 
+/* the frame chip's glyph follows its shape (9:16 tall, 16:9 wide, 1:1
+   square), the way Higgsfield's aspect chip draws the frame it names */
+function FrameGlyph({ label }: { label: string }) {
+  const m = /^(\d+(?:\.\d+)?)\s*[:x]\s*(\d+(?:\.\d+)?)$/.exec(label.trim());
+  const w = m ? Number(m[1]) : 1;
+  const h = m ? Number(m[2]) : 1;
+  if (!m || Math.abs(w - h) / Math.max(w, h) < 0.08) return <Square strokeWidth={1.8} />;
+  return w > h ? <RectangleHorizontal strokeWidth={1.8} /> : <RectangleVertical strokeWidth={1.8} />;
+}
+
 /* one of the settings in the toolbar's line: a word, a menu under it */
 function OptMenu({
   heading,
@@ -337,6 +354,7 @@ function OptMenu({
   value,
   onChange,
   label,
+  icon,
   chevron,
   className,
 }: {
@@ -345,6 +363,7 @@ function OptMenu({
   value: string;
   onChange: (id: string) => void;
   label: React.ReactNode;
+  icon?: React.ReactNode;
   chevron?: boolean;
   className?: string;
 }) {
@@ -361,8 +380,9 @@ function OptMenu({
   return (
     <span className="pillwrap" ref={box}>
       <button type="button" className={`zc-opt${className ? ` ${className}` : ""}`} aria-expanded={open} title={heading} onClick={() => setOpen((v) => !v)}>
-        {label}
-        {chevron ? <ChevronDown strokeWidth={2} /> : null}
+        {icon}
+        <span className="zc-opt-label">{label}</span>
+        {chevron ? <ChevronDown className="zc-opt-chev" strokeWidth={2} /> : null}
       </button>
       {open ? (
         <span className="pillmenu" role="menu">
@@ -512,7 +532,10 @@ function Composer() {
       .catch(() => setKits([]));
   }, []);
   const threadKit = kits.find((k) => k.id === draft.brand_kit_id) ?? null;
-  const [kitOff, setKitOff] = useState(false);
+  // a project's kit starts OFF on a still (Mike, 2026-11-12: the chip reads
+  // "Brand" until it is picked, never pre-selected); the switch then holds
+  // for the conversation rather than being spent on one still
+  const [kitOff, setKitOff] = useState(true);
   const [caps, setCaps] = useState<Capabilities>({});
   const [assets, setAssets] = useState<Asset[]>([]);
   // an element deleted from the shelf took its frames off the box; an Undo
@@ -1148,7 +1171,7 @@ function Composer() {
   }, [projectParam, sparkParam, kindParam]);
   const kitProjectId = project?.id ?? null;
   useEffect(() => {
-    setKitOff(false);
+    setKitOff(true);
     if (kitProjectId === null) {
       setProjectKit(null);
       return;
@@ -1515,10 +1538,7 @@ function Composer() {
       // the project's brand kit draws the still's look, unless the chip was
       // switched off for this one; the switch is spent on it
       if (project) form.append("project_id", String(project.id));
-      if (project && kitOff) {
-        form.append("brand_kit", "off");
-        setKitOff(false);
-      }
+      if (project && kitOff) form.append("brand_kit", "off");
       // outside a project: the kit picked for this conversation
       if (!project && draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
     } else {
@@ -4080,69 +4100,79 @@ function Composer() {
                 </>
               ) : null}
               <span className="zc-opts">
+                {/* Higgsfield's chips (2026-11-11): each setting is its own
+                    filled pill with a glyph and a word, no "·" between them */}
                 {!explore && output === "image" ? (
-                  <OptMenu heading="Image shape" value={aspect} onChange={setAspect} options={IMAGE_ASPECTS} label={aspect} />
+                  <OptMenu
+                    heading="Image shape"
+                    value={aspect}
+                    onChange={setAspect}
+                    options={IMAGE_ASPECTS}
+                    label={aspect}
+                    icon={<FrameGlyph label={aspect} />}
+                  />
                 ) : null}
                 {!explore && output === "video" && ratios.length ? (
-                  <OptMenu heading="Frame" value={ratio} onChange={setRatio} options={ratios} label={frameLabel} />
+                  <OptMenu
+                    heading="Frame"
+                    value={ratio}
+                    onChange={setRatio}
+                    options={ratios}
+                    label={frameLabel}
+                    icon={<FrameGlyph label={frameLabel} />}
+                  />
                 ) : null}
                 {!explore && output === "video" && lengths ? (
-                  <>
-                    <span className="zc-dot" aria-hidden>
-                      ·
-                    </span>
-                    <DurationPill
-                      seconds={seconds}
-                      span={lengths}
-                      onChange={setSeconds}
-                      trigger={(open) => (
-                        <button type="button" className="zc-opt" aria-expanded={open} title="How long the scene is">
-                          {seconds}s
-                        </button>
-                      )}
-                    />
-                  </>
+                  <DurationPill
+                    seconds={seconds}
+                    span={lengths}
+                    onChange={setSeconds}
+                    trigger={(open) => (
+                      <button type="button" className="zc-opt" aria-expanded={open} title="How long the scene is">
+                        <Clock strokeWidth={1.8} />
+                        <span className="zc-opt-label">{seconds}s</span>
+                      </button>
+                    )}
+                  />
                 ) : null}
                 {brains.length ? (
-                  <>
-                    {explore ? null : (
-                      <span className="zc-dot" aria-hidden>
-                        ·
-                      </span>
-                    )}
-                    <OptMenu
-                      heading={guideReady ? "Which model thinks" : "Which model writes"}
-                      value={brain}
-                      onChange={setBrain}
-                      options={brains}
-                      label={brainLabel}
-                      chevron
-                    />
-                  </>
+                  <OptMenu
+                    heading={guideReady ? "Which model thinks" : "Which model writes"}
+                    value={brain}
+                    onChange={setBrain}
+                    options={brains}
+                    label={brainLabel}
+                    icon={<Brain strokeWidth={1.8} />}
+                    chevron
+                  />
                 ) : null}
                 {project && projectKit && !explore ? (
-                  <>
-                    {/* no "·" before it: its own dot is the separator, and the
-                        line has no room to spare in Image mode */}
-                    <button
-                      type="button"
-                      className="zc-opt zc-kit"
-                      aria-pressed={!kitOff}
-                      aria-label={`Brand kit ${projectKit.name}: ${kitOff ? "off for the next still" : "on"}`}
-                      disabled={output !== "image"}
-                      title={
-                        output !== "image"
-                          ? `This project's scenes render with ${projectKit.name}'s look. Change the kit on the project's panel.`
-                          : kitOff
-                            ? `The next still is drawn without ${projectKit.name}. Click to turn it back on.`
-                            : `The next still takes ${projectKit.name}'s look. Click to leave it off for one still.`
-                      }
-                      onClick={() => setKitOff((v) => !v)}
-                    >
-                      <span className="zc-kit-dot" aria-hidden />
-                      <span className="zc-kit-name">Kit: {projectKit.name}</span>
-                    </button>
-                  </>
+                  // a still: "Brand" until switched on, then the kit's name
+                  // in yellow; a scene always renders with the project's kit
+                  // (changed on the project's panel), so in Video it shows
+                  // that, locked
+                  <button
+                    type="button"
+                    className="zc-opt zc-kit"
+                    aria-pressed={output !== "image" || !kitOff}
+                    aria-label={
+                      output !== "image"
+                        ? `Brand kit ${projectKit.name}: this project's scenes use it`
+                        : `Brand kit ${projectKit.name}: ${kitOff ? "off" : "on"}`
+                    }
+                    disabled={output !== "image"}
+                    title={
+                      output !== "image"
+                        ? `This project's scenes render with ${projectKit.name}'s look. Change the kit on the project's panel.`
+                        : kitOff
+                          ? `Click to draw stills with ${projectKit.name}'s look.`
+                          : `Stills take ${projectKit.name}'s look. Click to turn it off.`
+                    }
+                    onClick={() => setKitOff((v) => !v)}
+                  >
+                    <Palette strokeWidth={1.8} />
+                    <span className="zc-kit-name">{output !== "image" || !kitOff ? projectKit.name : "Brand"}</span>
+                  </button>
                 ) : null}
                 {!project && !explore && kits.length ? (
                   <OptMenu
@@ -4151,15 +4181,12 @@ function Composer() {
                     value={threadKit ? String(threadKit.id) : ""}
                     onChange={(id) => setDraft({ brand_kit_id: id ? Number(id) : null })}
                     options={[
-                      { id: "", label: "No kit", note: "nothing branded" },
+                      { id: "", label: "None", note: "nothing branded" },
                       ...kits.map((k) => ({ id: String(k.id), label: k.name, note: k.note })),
                     ]}
-                    label={
-                      <>
-                        <span className="zc-kit-dot" aria-hidden />
-                        <span className="zc-kit-name">Kit: {threadKit ? threadKit.name : "none"}</span>
-                      </>
-                    }
+                    icon={<Palette strokeWidth={1.8} />}
+                    label={<span className="zc-kit-name">{threadKit ? threadKit.name : "Brand"}</span>}
+                    chevron
                   />
                 ) : null}
                 {draft.studio && !explore ? (
@@ -4177,30 +4204,27 @@ function Composer() {
                   </span>
                 ) : null}
                 {guideReady && !explore ? (
-                  <>
-                    <span className="zc-dot" aria-hidden>
-                      ·
-                    </span>
-                    {v2 ? (
-                      <OptMenu
-                        heading="How much Vesper does on its own"
-                        value={autonomy}
-                        onChange={setAutonomy}
-                        options={AUTONOMY_MODES}
-                        label={autonomyLabel(autonomy)}
-                        chevron
-                      />
-                    ) : (
-                      <OptMenu
-                        heading="Before a still is drawn"
-                        value={generate}
-                        onChange={setGenerate}
-                        options={GENERATE_MODES}
-                        label={generate === "ask" ? "Ask first" : "Auto"}
-                        chevron
-                      />
-                    )}
-                  </>
+                  v2 ? (
+                    <OptMenu
+                      heading="How much Vesper does on its own"
+                      value={autonomy}
+                      onChange={setAutonomy}
+                      options={AUTONOMY_MODES}
+                      label={autonomyLabel(autonomy)}
+                      icon={<Gauge strokeWidth={1.8} />}
+                      chevron
+                    />
+                  ) : (
+                    <OptMenu
+                      heading="Before a still is drawn"
+                      value={generate}
+                      onChange={setGenerate}
+                      options={GENERATE_MODES}
+                      label={generate === "ask" ? "Ask first" : "Auto"}
+                      icon={<Gauge strokeWidth={1.8} />}
+                      chevron
+                    />
+                  )
                 ) : null}
               </span>
               {explore ? null : (
