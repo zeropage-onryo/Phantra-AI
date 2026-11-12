@@ -2,10 +2,17 @@
 
 /* Beside a refusal for an empty balance: the way to fix it (2026-10-11;
    lib/out-of-credits.ts). It draws NOTHING for any other failure, so a
-   caller can put it after every failure line without asking first. */
+   caller can put it after every failure line without asking first.
+
+   Since 2026-11-10 a click opens the upgrade popup (lib/upgrade.ts). It
+   does NOT ask for the popup just by being drawn: an old refusal in a
+   reopened chat is history, not news. The fresh refusal already asked
+   (lib/api.ts, on its 402). It stays a link to /pricing underneath, so a
+   middle-click or no script still lands somewhere that sells credits. */
 import Link from "next/link";
 import { useShell } from "@/components/studio/shell";
 import { TOP_UP_HREF, needsCredits, shortfall, topUpLabel } from "@/lib/out-of-credits";
+import { requestUpgrade } from "@/lib/upgrade";
 
 export function TopUpLink({ text, always, className }: { text?: string | null; always?: boolean; className?: string }) {
   const { balance } = useShell();
@@ -18,6 +25,11 @@ export function TopUpLink({ text, always, className }: { text?: string | null; a
       href={TOP_UP_HREF}
       className={className ?? "ztopup"}
       title={more > 0 ? `${more.toLocaleString("en-US")} more credit${more === 1 ? "" : "s"} needed` : undefined}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        requestUpgrade("clicked");
+      }}
     >
       {topUpLabel(balance)}
     </Link>

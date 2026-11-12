@@ -23,7 +23,7 @@
    links that need it (Finish a draft, the editor's empty state). Edit
    leaves the phone's bottom bar only, for now: the editor has no phone
    layout. */
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   createContext,
@@ -81,7 +81,9 @@ import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestHistory, requestNewSession } from "@/lib/assistant";
-import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
+import { needsCredits, topUpLabel } from "@/lib/out-of-credits";
+import { requestUpgrade } from "@/lib/upgrade";
+import { UpgradeModal } from "@/components/studio/upgrade-modal";
 import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 import { halloweenOn } from "@/lib/effects-wall";
 import { EDITOR_IN_UI } from "@/lib/editor-flag";
@@ -307,7 +309,6 @@ function MenuTail({ close }: { close: () => void }) {
 
 export function StudioShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/studio";
-  const router = useRouter();
   const view = VIEW_BY_PATH.find(([p]) => pathname.startsWith(p))?.[1] ?? "studio";
   // an open project (/studio/cut/<id>) is the editor: it takes the whole
   // stage and draws its own top bar, so the shell's bar steps aside
@@ -542,12 +543,13 @@ export function StudioShell({ children }: { children: ReactNode }) {
       const id = ++toastSeq.current;
       if (opts?.onClose) toastClose.current.set(id, opts.onClose);
       // a refusal for an empty balance is the one error with a way out:
-      // any page's toast about it carries the door (lib/out-of-credits.ts)
+      // any page's toast about it carries the door (lib/out-of-credits.ts),
+      // and the first one opens the upgrade popup by itself (lib/upgrade.ts)
+      const broke = kind === "err" && needsCredits(text);
+      if (broke) requestUpgrade("refused");
       const action =
         opts?.action ??
-        (kind === "err" && needsCredits(text)
-          ? { label: topUpLabel(balanceNow.current), run: () => router.push(TOP_UP_HREF) }
-          : undefined);
+        (broke ? { label: topUpLabel(balanceNow.current), run: () => requestUpgrade("clicked") } : undefined);
       const item: ToastItem = { id, text, kind, action };
       toastList.current = [...toastList.current, item];
       setToasts((all) => [...all, item]);
@@ -560,7 +562,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
         dropToast(oldest.id, false);
       }
     },
-    [armToast, dropToast, router],
+    [armToast, dropToast],
   );
   // Leaving the page runs every deferred half still waiting: the change
   // was asked for and never undone. (Moving between studio pages does not
@@ -826,6 +828,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
           toast={toast}
           onSwitchAccount={pickAccount}
         />
+        <UpgradeModal />
 
         <MotionConfig reducedMotion="user">
           <div className="ztoasts">
