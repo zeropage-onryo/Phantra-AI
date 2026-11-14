@@ -11,11 +11,10 @@ discount Stripe will not give.
 
 Who gets it: a workspace with no plan, not credit-exempt, that has never
 paid (no subscription or purchase lot), buying a plan MONTHLY (a yearly
-plan already carries its own 20% off). When a referred buyer also qualifies
-for the affiliate discount (src/affiliates.py), this one wins: Checkout
-takes one discount, and the welcome offer is the larger by design. The
-partner's commission is booked off what the invoice actually charged, so
-it is unaffected by which coupon was used.
+plan already carries its own 20% off), on a solo plan the margin guard
+below allows. A buyer who came through an affiliate link gets the affiliate
+discount instead, never both (the partner's commission on top of a
+discounted first month loses money).
 
 Every read fails CLOSED here (no offer), the opposite of the consent page:
 a missing discount costs a sale at worst, a wrong one costs money."""
@@ -24,6 +23,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+from fractions import Fraction
 from typing import Optional
 
 from . import accounts, db
@@ -126,16 +126,107 @@ def eligible(account_id: int, *, dsn: Optional[str] = None) -> bool:
         return False
 
 
-def applies(account_id: int, interval: str, *, dsn: Optional[str] = None) -> bool:
-    """Whether THIS checkout carries the welcome coupon: eligible, and a
-    monthly plan."""
-    return (interval or "month") == "month" and eligible(account_id, dsn=dsn)
+# --- the margin guard (2026-11-14, Mike: "make sure im not losing money on this")
+#
+# A discount is only offered on a plan where it CANNOT lose money: the first
+# month is priced for the worst customer -- one who spends every credit on
+# the thinnest-margin model (Veo 3.1 at 1.15x today) -- after Stripe's fee
+# and the assistant's monthly estimate (pricing.BRAIN_USD). With today's
+# markups that leaves room for only a few percent, so a bigger coupon is
+# simply not offered on the plans it would lose on, until Mike either raises
+# the thinnest markup or names an accepted loss below. `report` prints the
+# numbers.
+ALLOW_LOSS_ENV = "PHANTRA_WELCOME_ALLOW_LOSS_USD"
+
+
+def allowed_loss_usd() -> Fraction:
+    """The worst-case first-month loss Mike has accepted per new customer
+    (`PHANTRA_WELCOME_ALLOW_LOSS_USD`, dollars); 0, and never negative, when
+    unset or unreadable."""
+    try:
+        return max(Fraction(str((os.environ.get(ALLOW_LOSS_ENV) or "0").strip())), Fraction(0))
+    except (ValueError, ZeroDivisionError):
+        return Fraction(0)
+
+
+def thinnest_markup() -> Fraction:
+    """The lowest markup anything in the studio is sold at."""
+    from . import pricing
+    return min(Fraction(str(m)) for m in (pricing.MARKUP, *pricing.MARKUP_BY_MODEL.values()))
+
+
+def worst_first_month_usd(plan_key: str, info: Optional[dict]) -> Optional[Fraction]:
+    """What the plan's first month nets in the worst case with this
+    discount: the price paid, less Stripe, less the assistant's estimate,
+    less every credit spent at the thinnest markup. None for no such plan."""
+    from . import pricing
+    plan = pricing.PLANS.get(plan_key)
+    if plan is None:
+        return None
+    price = Fraction(plan.monthly_usd)
+    if info and info.get("percent_off"):
+        price = price * (1 - Fraction(str(info["percent_off"])) / 100)
+    elif info and info.get("amount_off_cents"):
+        price = max(price - Fraction(int(info["amount_off_cents"]), 100), Fraction(0))
+    stripe = price * Fraction(pricing.STRIPE_PCT) + Fraction(pricing.STRIPE_FIXED_USD)
+    delivery = Fraction(plan.credits * pricing.CREDIT_CENTS, 100) / thinnest_markup()
+    return price - stripe - pricing.BRAIN_USD.get(plan_key, 0) - delivery
+
+
+def safe_on(plan_key: str, info: Optional[dict]) -> bool:
+    """Whether this discount may be offered on this plan: a solo plan whose
+    worst first month loses no more than Mike has accepted."""
+    from . import pricing
+    plan = pricing.PLANS.get(plan_key)
+    if plan is None or plan.seats > 1:      # Agency is sold by hand, not discounted here
+        return False
+    worst = worst_first_month_usd(plan_key, info)
+    return worst is not None and worst >= -allowed_loss_usd()
+
+
+def safe_plans(info: Optional[dict]) -> list[str]:
+    from . import pricing
+    return [k for k in pricing.PLANS if safe_on(k, info)]
+
+
+def report() -> str:
+    """The guard's numbers for the coupon named now (or a 30% example)."""
+    from . import pricing
+    info = describe() or _shape({"percent_off": 30, "duration": "once"})
+    lines = [f"welcome offer: {info['label']}  (coupon {coupon_id() or 'not set: showing 30% as an example'})",
+             f"thinnest markup: {float(thinnest_markup()):.2f}x   accepted loss: ${float(allowed_loss_usd()):.2f}",
+             "worst first month (every credit on the thinnest model, after Stripe and the assistant):"]
+    for key, plan in pricing.PLANS.items():
+        worst = worst_first_month_usd(key, info)
+        full = worst_first_month_usd(key, None)
+        verdict = "OFFERED" if safe_on(key, info) else "withheld"
+        lines.append(f"  {plan.name:9} ${plan.monthly_usd:>4}/mo  with offer {float(worst):+8.2f}"
+                     f"   full price {float(full):+8.2f}   -> {verdict}")
+    return "\n".join(lines)
+
+
+def applies(account_id: int, interval: str, plan_key: Optional[str] = None, *,
+            dsn: Optional[str] = None) -> bool:
+    """Whether THIS checkout carries the welcome coupon: eligible, a monthly
+    plan, and (when the plan is named) one the margin guard allows."""
+    if (interval or "month") != "month" or not eligible(account_id, dsn=dsn):
+        return False
+    return plan_key is None or safe_on(plan_key, describe())
 
 
 def for_account(account_id: int, *, dsn: Optional[str] = None) -> Optional[dict]:
     """What the studio shows this workspace (the balance's `welcome_offer`):
-    the coupon's description when the workspace is eligible and the coupon
-    reads, else None."""
+    the coupon's description and the plans it is offered on, when the
+    workspace is eligible, the coupon reads and the guard allows at least
+    one plan; else None."""
     if not eligible(account_id, dsn=dsn):
         return None
-    return describe()
+    info = describe()
+    if not info:
+        return None
+    plans = safe_plans(info)
+    return {**info, "plans": plans} if plans else None
+
+
+if __name__ == "__main__":
+    print(report())

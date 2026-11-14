@@ -51,3 +51,13 @@ test('a card prices yearly from the catalog and never puts the welcome offer on 
   assert.equal(howMany(3500, 162), 21);
   assert.equal(howMany(100, 0), 0);
 });
+
+test('a plan the server withheld the offer on shows its plain price', async () => {
+  const { cardPrice, offerFor } = await import('../src/lib/upgrade.ts');
+  const offer = { ...OFFER30, plans: ['studio'] };
+  assert.equal(offerFor('creator', offer), null);
+  assert.equal(offerFor('studio', offer), offer);
+  assert.equal(offerFor('creator', OFFER30), OFFER30); // an older server: no list, every plan
+  const pro = { monthly_usd: 35, yearly_usd: 336, yearly_monthly_usd: 28 };
+  assert.equal(cardPrice(pro, 'month', offerFor('creator', offer)).cents, 3500);
+});

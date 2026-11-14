@@ -23,6 +23,7 @@ import { startCheckout } from "@/lib/site-billing";
 import {
   UPGRADE_EVENT,
   cardPrice,
+  offerFor,
   dollars,
   howMany,
   shouldOpen,
@@ -30,6 +31,9 @@ import {
   type WelcomeOffer,
 } from "@/lib/upgrade";
 import "@/components/studio/upgrade-modal.css";
+
+// the popup sells the solo plans; Agency (ten seats) is sold from /pricing
+const SOLO = PLANS.filter((p) => (p.seats ?? 1) <= 1);
 
 // the card colour by plan: the popular plan is the signal, the top plan pink
 const TIER: Record<string, "base" | "pro" | "max"> = { starter: "base", creator: "pro", studio: "max" };
@@ -101,6 +105,12 @@ export function UpgradeModal() {
 
   const onPlan = !!balance?.plan;
   const offer: WelcomeOffer | null = onPlan ? null : (balance?.welcome_offer ?? null);
+  // the banner names the plans when the guard offered it on only some
+  const offerOn = offer?.plans ? SOLO.filter((p) => offer.plans?.includes(p.key)) : SOLO;
+  const onWhich =
+    offerOn.length && offerOn.length < SOLO.length
+      ? ` on ${offerOn.map((p) => p.name).join(" and ")}`
+      : "";
 
   return (
     <Dialog.Root
@@ -129,6 +139,7 @@ export function UpgradeModal() {
                 <>
                   <em>Your free credits are used up</em>
                   Keep making with {offer.label}
+                  {onWhich}
                 </>
               ) : (
                 <>
@@ -183,8 +194,8 @@ export function UpgradeModal() {
               </div>
 
               <div className="upg-grid">
-                {PLANS.map((plan) => {
-                  const price = cardPrice(plan, interval, offer);
+                {SOLO.map((plan) => {
+                  const price = cardPrice(plan, interval, offerFor(plan.key, offer));
                   const tier = TIER[plan.key] ?? (plan.popular ? "pro" : "base");
                   return (
                     <section key={plan.key} className="upg-card" data-tier={tier} aria-label={plan.name}>

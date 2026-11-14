@@ -32,7 +32,17 @@ export type WelcomeOffer = {
   duration: string;
   months: number | null;
   label: string;
+  /** the plan keys the server's margin guard offers it on
+   *  (src/welcome_offer.py safe_plans); never empty when sent */
+  plans?: string[];
 };
+
+/** The offer as it applies to one plan: null where the server's margin
+    guard withheld it, so the card shows the plain price. */
+export function offerFor(planKey: string, offer: WelcomeOffer | null | undefined): WelcomeOffer | null {
+  if (!offer) return null;
+  return !offer.plans || offer.plans.includes(planKey) ? offer : null;
+}
 
 /** A refusal opens the popup by itself at most once in this window: a
     person who closed it and tries again gets the link, not the popup in

@@ -64,6 +64,8 @@ def fake_stripe(monkeypatch, coupon=COUPON_30, *, coupon_fails=False):
     monkeypatch.setenv("STRIPE_PRICE_STARTER_YEAR", "price_starter_year")
     monkeypatch.setenv("STRIPE_PRICE_TOPUP", "price_topup")
     monkeypatch.setenv(welcome_offer.COUPON_ENV, "welcome30")
+    # these tests are about WHO gets it; the margin guard has its own below
+    monkeypatch.setenv(welcome_offer.ALLOW_LOSS_ENV, "1000")
     monkeypatch.setattr(billing, "_stripe", lambda: FakeStripe)
     return sessions, reads
 
@@ -153,14 +155,55 @@ def test_an_unreadable_coupon_is_a_full_price_checkout_not_a_refused_one(world, 
     assert "discounts" not in sessions[-1]
 
 
-def test_the_welcome_coupon_wins_over_the_affiliate_one(world, monkeypatch):
+def test_a_referred_buyer_keeps_the_affiliate_discount_and_never_both(world, monkeypatch):
     sessions, _ = fake_stripe(monkeypatch)
     monkeypatch.setenv(affiliates.COUPON_ENV, "coupon_aff10")
     monkeypatch.setattr(affiliates, "buyer_discount_applies", lambda *a, **k: True)
     acct = make_account(world, "w-both")
     billing.checkout_url(acct, "starter", dsn=world)
-    assert sessions[-1]["discounts"] == [{"coupon": "welcome30"}]
-    # once the welcome offer is spent (they paid), the affiliate one is still there
-    monkeypatch.setattr(welcome_offer, "applies", lambda *a, **k: False)
-    billing.checkout_url(acct, "starter", dsn=world)
     assert sessions[-1]["discounts"] == [{"coupon": "coupon_aff10"}]
+
+
+# --- the margin guard -----------------------------------------------------------
+
+def test_a_discount_that_could_lose_money_is_withheld(world, monkeypatch):
+    sessions, _ = fake_stripe(monkeypatch)
+    monkeypatch.delenv(welcome_offer.ALLOW_LOSS_ENV)
+    acct = make_account(world, "w-guard")
+    # 30% off with Veo 3.1 at 1.15x: every solo plan's worst first month loses
+    assert welcome_offer.safe_plans(welcome_offer.describe()) == []
+    assert welcome_offer.for_account(acct, dsn=world) is None
+    billing.checkout_url(acct, "starter", dsn=world)
+    assert "discounts" not in sessions[-1]
+
+
+def test_the_guard_prices_the_worst_customer():
+    from fractions import Fraction
+
+    from src import pricing
+    plan = pricing.PLANS["creator"]
+    worst = welcome_offer.worst_first_month_usd("creator", {"percent_off": 30})
+    paid = Fraction(plan.monthly_usd) * Fraction(7, 10)
+    expected = (paid - paid * Fraction(pricing.STRIPE_PCT) - Fraction(pricing.STRIPE_FIXED_USD)
+                - pricing.BRAIN_USD["creator"]
+                - Fraction(plan.credits, 100) / welcome_offer.thinnest_markup())
+    assert worst == expected and worst < 0
+    assert welcome_offer.worst_first_month_usd("creator", None) > 0     # full price still pays
+
+
+def test_a_small_enough_discount_is_offered_and_agency_never(world, monkeypatch):
+    fake_stripe(monkeypatch, coupon={**COUPON_30, "percent_off": 3.0})
+    monkeypatch.delenv(welcome_offer.ALLOW_LOSS_ENV)
+    plans = welcome_offer.safe_plans(welcome_offer.describe())
+    assert "creator" in plans and "studio" in plans
+    assert "starter" not in plans          # 3% already loses on the $15 plan
+    assert "agency" not in plans           # ten seats: sold by hand, never discounted here
+
+
+def test_an_accepted_loss_lets_the_offer_through(world, monkeypatch):
+    fake_stripe(monkeypatch)
+    monkeypatch.setenv(welcome_offer.ALLOW_LOSS_ENV, "10")
+    plans = welcome_offer.safe_plans(welcome_offer.describe())
+    assert plans == ["starter", "creator"]   # Max's worst case is about -$22, over the $10 accepted
+    acct = make_account(world, "w-risk")
+    assert welcome_offer.for_account(acct, dsn=world)["plans"] == ["starter", "creator"]

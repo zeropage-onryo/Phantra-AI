@@ -250,9 +250,18 @@ Mike: "get people to sign up after using credits with like a popup ... maybe lik
   A workspace with no plan, not exempt, that has never paid (no `subscription` / `purchase` lot)
   gets it on a MONTHLY plan checkout (`billing.checkout_url`), and the balance carries
   `welcome_offer` (its label, read off the coupon: "30% off your first month") so the popup can
-  strike through the first month. It wins over the affiliate coupon (Checkout takes one discount);
-  the partner's commission is booked off what the invoice charged either way. An unreadable or
-  invalid coupon is a full-price checkout, never a refused one; every read fails closed (no offer).
+  strike through the first month. An unreadable or invalid coupon is a full-price checkout, never a
+  refused one; every read fails closed (no offer).
+- **The margin guard** (2026-11-14, Mike: "make sure im not losing money on this"): the offer is
+  shown and applied only on a solo plan whose WORST first month still nets ≥ 0: the discounted price,
+  less Stripe (2.9% + $0.30), less `pricing.BRAIN_USD`, less every credit spent at the thinnest
+  markup in the studio (Veo 3.1, 1.15x). At today's markups that allows ~1.5% on Standard, ~3.6% on
+  Pro, ~5.7% on Max, so a 30% coupon is withheld everywhere. `PHANTRA_WELCOME_ALLOW_LOSS_USD` names
+  an accepted worst-case loss per new customer; `python -m src.welcome_offer` prints the table.
+  Agency (multi-seat) is never discounted here and not shown in the popup.
+- **Referred buyers keep the affiliate discount** and never get the welcome offer as well (the
+  commission on top of a discounted first month loses money). This reverses the first cut of this
+  feature, where the welcome coupon won.
 
 ## Still open
 
