@@ -410,12 +410,12 @@
   margin: 0 6px;
   background: var(--zc-line);
 }
-/* the settings read as one line: 16:9 · 5s · [MODEL] ⌄ */
+/* the settings: a row of chips (below) */
 .zc .zc-opts {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  margin-left: 4px;
+  gap: 6px;
+  margin-left: 6px;
   /* the options wrap inside their own group, so Send keeps its place at
      the right of the first row however many a project and a kit add (QA
      2026-11-02 T13: it dropped to a row of its own, on the left) */
@@ -423,72 +423,76 @@
   min-width: 0;
   flex-wrap: wrap;
 }
+/* the settings as Higgsfield's chips (2026-11-11): one filled pill per
+   setting -- glyph, word, chevron when it opens a list -- no "·" between */
 .zc .zc-opt {
   height: 32px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--zc-ink-2);
+  padding: 0 10px 0 9px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.06);
+  color: var(--zc-ink);
   font-family: var(--body);
-  font-size: 13.5px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   white-space: nowrap;
   transition:
     background var(--t),
+    border-color var(--t),
     color var(--t);
 }
-.zc .zc-opt:hover,
-.zc .zc-opt[aria-expanded="true"] {
-  color: var(--zc-ink);
-  background: rgb(255 255 255 / 0.06);
+.zc .zc-opt:hover {
+  background: rgb(255 255 255 / 0.1);
 }
-.zc .zc-opt svg {
+.zc .zc-opt[aria-expanded="true"] {
+  background: rgb(255 255 255 / 0.1);
+  border-color: rgb(255 255 255 / 0.14);
+}
+.zc .zc-opt > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--zc-ink-2);
+}
+.zc .zc-opt .zc-opt-label {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.zc .zc-opt > svg.zc-opt-chev {
   width: 13px;
   height: 13px;
+  margin-left: -2px;
   color: var(--zc-ink-3);
+  transition: transform var(--t);
 }
-.zc .zc-dot {
-  color: var(--zc-ink-3);
-  font-size: 11px;
-  padding: 0 2px;
-  user-select: none;
+.zc .zc-opt[aria-expanded="true"] > svg.zc-opt-chev {
+  transform: rotate(180deg);
 }
-/* the project's brand kit (2026-10-21): yellow only while it is on */
-.zc .zc-kit {
-  padding: 0 3px;
-}
-.zc .zc-kit .zc-kit-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1.5px solid var(--zc-ink-3);
-}
-.zc .zc-kit.is-on .zc-kit-dot,
-.zc .zc-kit[aria-pressed="true"] .zc-kit-dot {
-  border-color: var(--signal);
-  background: var(--signal);
-}
+/* the brand kit: reads "Brand" until one is picked; a yellow glyph and a
+   yellow edge only while a kit is on */
 .zc .zc-kit .zc-kit-name {
-  max-width: 96px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.zc .zc-kit[aria-pressed="false"] {
-  color: var(--zc-ink-3);
+.zc .zc-kit.is-on,
+.zc .zc-kit[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--signal) 10%, transparent);
+  border-color: color-mix(in srgb, var(--signal) 32%, transparent);
 }
-.zc .zc-kit[aria-pressed="false"] .zc-kit-name {
-  text-decoration: line-through;
+.zc .zc-kit.is-on > svg:first-child,
+.zc .zc-kit[aria-pressed="true"] > svg:first-child {
+  color: var(--signal);
 }
 .zc .zc-kit:disabled {
   cursor: default;
-}
-.zc .zc-kit:disabled:hover {
-  background: transparent;
 }
 /* the Ad Studio's brief on this conversation (2026-10-26, lib/ad-studio.ts):
    a link back to the studio and an × that stops following it */
