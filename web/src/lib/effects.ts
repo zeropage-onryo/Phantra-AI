@@ -16,6 +16,10 @@
 export const EFFECT_TOOL = "apply_effect";
 
 export type OptionValue = string | number | boolean;
+/** What an effect acts on. MIXED (motion control, 2026-11-14) is a still of
+ *  the character AND the clip whose movement it copies, in that order. */
+export const MIXED = "image+video";
+export type Takes = "image" | "video" | typeof MIXED;
 export type EffectOption = { values: OptionValue[]; default: OptionValue | null; required: boolean };
 export type Effect = {
   id: string;
@@ -23,7 +27,8 @@ export type Effect = {
   category: string;
   /** one line for a person: what it does */
   blurb: string;
-  takes: "image" | "video";
+  /** "image+video" is motion control: a still, then the clip it copies */
+  takes: Takes;
   output: "image" | "video";
   sources: { min: number; max: number };
   prompt: "required" | "optional" | "none";
@@ -61,7 +66,7 @@ export type EffectState = {
   id: string;
   effect: string;
   label: string;
-  takes: "image" | "video";
+  takes: Takes;
   output: "image" | "video";
   sources: Candidate[];
   options: Record<string, OptionValue>;
@@ -79,8 +84,11 @@ export type ResultLike = { image?: string | null; clip?: string | null; asset?: 
 /** What is there to act on, most deliberate first: every image attached
     to the box, then the thread's results from the newest back. A result
     is named by its render id when it has one. */
-export function candidates(attached: string[], results: ResultLike[]): Candidate[] {
+export function candidates(attached: string[], results: ResultLike[], boxClips: { ref: string; name?: string }[] = []): Candidate[] {
   const out: Candidate[] = attached.filter(Boolean).map((ref) => ({ ref, kind: "image", thumb: ref, from: "attached" }));
+  // a clip attached to the box (2026-11-14): uploaded as an asset:<id>, so it
+  // is named by id like any clip, and it is the most deliberate clip there is
+  for (const c of boxClips) if (c.ref) out.push({ ref: c.ref, kind: "clip", from: "attached" });
   let stills = 0;
   let clips = 0;
   for (const r of [...results].reverse()) {
@@ -106,9 +114,41 @@ export function candidateOf(r: ResultLike, from: string): Candidate | null {
 
 const wants = (e: Pick<Effect, "takes">) => (e.takes === "video" ? "clip" : "image");
 
+/** Motion control's sources: the still (attached first, else the newest),
+    the clip (attached first, else the newest), then the FACE LOCK -- the
+    other attached images, up to MOTION_FACES -- in that order, or as much
+    of it as there is. */
+export const MOTION_FACES = 4;
+function pairFor(all: Candidate[]): Candidate[] {
+  const still = all.find((c) => c.kind === "image");
+  const clip = all.find((c) => c.kind === "clip");
+  const faces = all.filter((c) => c.kind === "image" && c.from === "attached" && c !== still).slice(0, MOTION_FACES);
+  return [still, clip, ...faces].filter((c): c is Candidate => !!c);
+}
+
+/** One more source on a motion card: a clip takes the clip's place, an
+    image becomes the still if there is none yet, else a face photo. What
+    is already on the card is read by position ([still, clip, ...faces]). */
+export function addToPair(current: Candidate[], add: Candidate[]): Candidate[] {
+  let still = current.find((c) => c.kind === "image");
+  let clip = current.find((c) => c.kind === "clip");
+  const faces = current.filter((c) => c.kind === "image" && c !== still);
+  for (const a of add) {
+    if (a.kind === "clip") clip = a;
+    else if (!still) still = a;
+    else if (a.ref !== still.ref && !faces.some((f) => f.ref === a.ref)) faces.push(a);
+  }
+  return [still, clip, ...faces.slice(0, MOTION_FACES)].filter((c): c is Candidate => !!c);
+}
+
+/** The face photos on a motion card (after the still and the clip). */
+export const facesOf = (state: Pick<EffectState, "takes" | "sources">) =>
+  state.takes === MIXED ? state.sources.filter((c, i) => i > 0 && c.kind === "image") : [];
+
 /** The sources an effect is bound to: everything attached that fits, up to
     what it takes; with nothing attached, the newest result that fits. */
 export function sourcesFor(effect: Pick<Effect, "takes" | "sources">, all: Candidate[]): Candidate[] {
+  if (effect.takes === MIXED) return pairFor(all);
   const fits = all.filter((c) => c.kind === wants(effect));
   const attached = fits.filter((c) => c.from === "attached");
   if (attached.length) return attached.slice(0, effect.sources.max);
@@ -117,7 +157,13 @@ export function sourcesFor(effect: Pick<Effect, "takes" | "sources">, all: Candi
 
 /** Can this effect start at all, given what is there? "" or the reason. */
 export function unavailable(effect: Pick<Effect, "takes" | "sources">, all: Candidate[]): string {
-  const have = sourcesFor(effect, all).length;
+  const bound = sourcesFor(effect, all);
+  if (effect.takes === MIXED) {
+    const kinds = new Set(bound.map((c) => c.kind));
+    if (kinds.has("image") && kinds.has("clip")) return "";
+    return kinds.has("image") ? "Needs a clip to copy the movement from" : "Needs a still of the character and a clip to copy";
+  }
+  const have = bound.length;
   if (have >= effect.sources.min) return "";
   if (effect.takes === "video") return "Needs a clip: animate a still first, then finish the clip it makes";
   return effect.sources.min > 1 ? `Needs ${effect.sources.min} images attached` : "Needs an image: attach one, or make a still first";
@@ -146,6 +192,8 @@ export function settle(effect: Pick<Effect, "options">, given: Record<string, un
 }
 
 const OPTION_LABELS: Record<string, string> = {
+  character_orientation: "Framing from",
+  keep_original_sound: "Keep the clip's sound",
   effect_scene: "Template",
   effect: "Template",
   camera_movement: "Camera move",
@@ -186,13 +234,21 @@ export function valueLabel(name: string, value: OptionValue): string {
   if (name === "upscale_factor") return value === 1 || value === "1" ? "Keep the size" : `${value}x`;
   if (name === "target_fps") return `${value} fps`;
   if (name === "resolution" || name === "aspect_ratio") return String(value);
+  if (name === "character_orientation") return value === "video" ? "The clip (up to 30s)" : "The still (up to 10s)";
   return sentence(String(value));
 }
 
 /** What still stops this effect from being approved: "" when nothing does.
     The server checks all of it again; this is only said sooner. */
 export function missing(effect: Pick<Effect, "sources" | "prompt" | "options" | "takes">, state: Pick<EffectState, "sources" | "options" | "prompt">): string {
-  if (state.sources.length < effect.sources.min) {
+  if (effect.takes === MIXED) {
+    const [still, clip] = state.sources;
+    if (still?.kind !== "image") return "Needs a still of the character";
+    if (clip?.kind !== "clip") return "Needs a clip to copy the movement from";
+    if (state.sources.length > 2 && state.options.character_orientation !== "video") {
+      return "Face lock needs Framing from: the clip";
+    }
+  } else if (state.sources.length < effect.sources.min) {
     return effect.takes === "video" ? "Needs a clip to work on" : "Needs an image to work on";
   }
   for (const [name, o] of Object.entries(effect.options)) {
@@ -208,6 +264,7 @@ export function missing(effect: Pick<Effect, "sources" | "prompt" | "options" | 
 
 /** "A still in, a clip out" */
 export function takesLine(effect: Pick<Effect, "takes" | "output" | "sources">): string {
+  if (effect.takes === MIXED) return "A still and a clip in, the still doing the clip's moves out";
   const input = effect.takes === "video" ? "A clip" : effect.sources.max > 1 ? `Up to ${effect.sources.max} images` : "A still";
   return `${input} in, ${effect.output === "video" ? "a clip" : "an image"} out`;
 }
@@ -243,15 +300,22 @@ export function begin(
     hookFor?: number | null;
   } = {},
 ): EffectState {
-  const fits = (given.on ?? []).filter((c) => c.kind === wants(effect)).slice(0, effect.sources.max);
+  // motion control: the result acted on fills its own place in the pair
+  const on = given.on ?? [];
+  const fits =
+    effect.takes === MIXED ? addToPair(pairFor(all), on) : on.filter((c) => c.kind === wants(effect)).slice(0, effect.sources.max);
+  const sources = effect.takes === MIXED || fits.length >= effect.sources.min ? fits : sourcesFor(effect, all);
+  const options = settle(effect, given.options);
+  // face photos on the card: Kling binds them only when the clip sets the framing
+  if (effect.takes === MIXED && sources.length > 2 && !given.options?.character_orientation) options.character_orientation = "video";
   return {
     id,
     effect: effect.id,
     label: effect.label,
     takes: effect.takes,
     output: effect.output,
-    sources: fits.length >= effect.sources.min ? fits : sourcesFor(effect, all),
-    options: settle(effect, given.options),
+    sources,
+    options,
     prompt: effect.prompt === "none" ? "" : (given.prompt ?? "").trim(),
     ...(given.hookFor ? { hookFor: given.hookFor } : {}),
   };

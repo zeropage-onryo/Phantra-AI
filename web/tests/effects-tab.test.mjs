@@ -184,3 +184,10 @@ test('the manifest on disk names every agreed key: real media, or pending with a
   }
   assert.ok(fs.existsSync(new URL('../public/showcase/placeholder/still.svg', import.meta.url)));
 });
+
+test('motion control takes either half of its pair from a drop', () => {
+  const motion = { takes: 'image+video' };
+  assert.equal(fits(motion, { kind: 'image' }), true);
+  assert.equal(fits(motion, { kind: 'clip' }), true);
+  assert.equal(fits(motion, null), false);
+});

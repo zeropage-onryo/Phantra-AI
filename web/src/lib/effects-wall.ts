@@ -243,6 +243,7 @@ export function openOptions(tile: Tile): [string, Effect["options"][string]][] {
 /** What the source slot is called for this effect. */
 export function slotLabel(effect: Pick<Effect, "takes" | "category">, presetName?: string | null): string {
   if (effect.takes === "video") return "Clip";
+  if (effect.takes === "image+video") return "Photo of the character";
   if (presetName === "camera_movement" || effect.category === "image_edit") return "Image";
   return "Photo";
 }

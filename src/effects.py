@@ -66,7 +66,7 @@ LOG_TOOL = fal.IMAGE_LOG_TOOL          # "fal": effects count with the stills
 # "look" (2026-10-22): the free, non-generative looks (src/free_looks.py) --
 # ffmpeg on this server, no provider, no hold, listed only when
 # PHANTRA_FREE_LOOKS=1 (looks.enabled)
-CATEGORIES = ("image_edit", "video_effect", "camera", "finish", "look")
+CATEGORIES = ("image_edit", "video_effect", "camera", "motion", "finish", "look")
 
 
 # --- the enums, copied off the schemas on CHECKED --------------------------
@@ -410,6 +410,52 @@ def _bria_combo(opts: dict) -> None:
                          "mov_proresks, or pick a background colour")
 
 
+# --- motion transfer (2026-11-14, docs/tasks/task-motion-control.md) -------
+# Kling's motion control: a STILL of the character and a CLIP whose movement
+# it copies, the one row in the table that takes two kinds of source. Its
+# `takes` is MIXED ("image+video") and its sources are ordered: the still
+# first, the driving clip second. Read 2026-11-14 off each endpoint's model
+# page and llms.txt (fal.ai/models/fal-ai/kling-video/v3/<tier>/motion-control):
+# image_url + video_url + character_orientation (required, image | video)
+# + prompt (optional) + keep_original_sound (default true). The driving clip
+# may be up to 10s when the character keeps the STILL's orientation, 30s when
+# it follows the CLIP's. Billed per second of the output, which is the
+# driving clip's length: $0.126/s standard, $0.168/s pro.
+#
+# FACE LOCK (same day): Kling's `elements` -- ONE element, a frontal photo
+# plus 1-3 more angles, named in the prompt as @Element1, bound only when
+# character_orientation is "video" (the model page). Here it is OPTIONAL
+# sources after the clip: [still, clip, face, *more angles]. With one face
+# photo the still itself is the second angle -- it is a picture of the same
+# character -- so one headshot is enough to turn it on.
+CHECKED_MOTION = "2026-11-14"
+MIXED = "image+video"
+MOTION_ORIENTATIONS = ("image", "video")
+MOTION_MAX_SECONDS = {"image": 10.5, "video": 30.5}   # half a second of slack, as reframe
+MOTION_FACES = 4                  # the frontal photo + Kling's 3 more angles
+FACE_TAG = "@Element1"
+
+
+def _motion_seconds(opts: dict) -> float:
+    return MOTION_MAX_SECONDS[opts.get("character_orientation") or "image"]
+
+
+def is_mixed(row: dict) -> bool:
+    """A row that takes a still AND a clip, in that order."""
+    return row.get("takes") == MIXED
+
+
+def split_mixed(named: list[str]) -> tuple[list[str], list[str], list[str]]:
+    """A mixed row's sources -> ([the still], [the driving clip], [face photos])."""
+    return list(named[:1]), list(named[1:2]), list(named[2:2 + MOTION_FACES])
+
+
+def _face_element(still_url: str, faces: list[str]) -> dict:
+    """Kling's one element: the first face photo is the frontal view, the
+    rest the other angles -- or the still, when there is only one."""
+    return {"frontal_image_url": faces[0],
+            "reference_image_urls": list(faces[1:]) or [still_url]}
+
 EFFECTS: dict[str, dict] = {
     # -- image edits: an image in, an image out --------------------------
     "nano-banana-edit": {
@@ -600,6 +646,42 @@ EFFECTS: dict[str, dict] = {
         "source": "https://fal.ai/models/bria/video/background-removal",
         "checked": CHECKED_2B,
     },
+    # -- motion transfer: a still and a clip in, the still's character doing
+    # the clip's movement out (2026-11-14) ------------------------------
+    "motion-control": {
+        "label": "Motion control (Kling 3)", "category": "motion",
+        "note": ("the character in a still performs the movement of a driving clip; "
+                 "sources are [the still, the clip], in that order; "
+                 "character_orientation image keeps the still's framing (clip up to 10s), "
+                 "video follows the clip's (up to 30s); prompt optional; FACE LOCK: up "
+                 "to 4 more photos of the face after the clip (frontal first) hold the "
+                 "likeness, and need character_orientation video"),
+        "endpoint": "fal-ai/kling-video/v3/standard/motion-control", "takes": MIXED,
+        "field": "", "as_list": False, "sources": (2, 2 + MOTION_FACES),
+        "prompt": "optional", "output": "video",
+        "options": {"character_orientation": {"values": MOTION_ORIENTATIONS,
+                                              "default": "image"},
+                    "keep_original_sound": {"values": (True, False), "default": False}},
+        "fixed": {},
+        "price": _per_second(0.126), "probe": True, "max_seconds_for": _motion_seconds,
+        "source": "https://fal.ai/models/fal-ai/kling-video/v3/standard/motion-control",
+        "checked": CHECKED_MOTION,
+    },
+    "motion-control-pro": {
+        "label": "Motion control Pro (Kling 3)", "category": "motion",
+        "note": ("as motion-control, at Kling's pro tier: better faces and hands on "
+                 "complex choreography"),
+        "endpoint": "fal-ai/kling-video/v3/pro/motion-control", "takes": MIXED,
+        "field": "", "as_list": False, "sources": (2, 2 + MOTION_FACES),
+        "prompt": "optional", "output": "video",
+        "options": {"character_orientation": {"values": MOTION_ORIENTATIONS,
+                                              "default": "image"},
+                    "keep_original_sound": {"values": (True, False), "default": False}},
+        "fixed": {},
+        "price": _per_second(0.168), "probe": True, "max_seconds_for": _motion_seconds,
+        "source": "https://fal.ai/models/fal-ai/kling-video/v3/pro/motion-control",
+        "checked": CHECKED_MOTION,
+    },
 }
 
 
@@ -705,6 +787,8 @@ def _pricing_note(name: str) -> str:
         "remove-video-background": ("per started 30 frames of the clip: $0.0225 with "
                                     "refine_foreground_edges, $0.015 without"),
         "remove-video-background-pro": "$0.14 per second of the clip",
+        "motion-control": "$0.126 per second of the driving clip",
+        "motion-control-pro": "$0.168 per second of the driving clip",
     }
     if name in notes:
         return notes[name]
@@ -751,6 +835,16 @@ def check_sources(effect: str, n: int, options: dict) -> None:
     if effect == "kling-effect":
         need = 2 if options.get("effect_scene") == "heart_gesture" else 1
         lo = hi = need
+    if is_mixed(row):
+        if not lo <= n <= hi:
+            raise ValueError(f"{row['label']} takes, in order: the still of the character, "
+                             f"then the clip whose movement it copies, then up to "
+                             f"{hi - 2} face photos to lock the likeness -- got {n} sources")
+        if n > 2 and options.get("character_orientation") != "video":
+            raise ValueError(f"{row['label']}'s face lock works only when the framing "
+                             "follows the clip: set character_orientation to video, or "
+                             "leave the face photos out")
+        return
     if not lo <= n <= hi:
         want = f"exactly {lo}" if lo == hi else f"{lo} to {hi}"
         raise ValueError(f"{row['label']} takes {want} {row['takes']} source"
@@ -799,6 +893,16 @@ def quote_usd(effect: str, options: dict, probe: Optional[dict] = None) -> float
     if probe and row.get("max_seconds") and probe["seconds"] > row["max_seconds"]:
         raise ValueError(f"{row['label']} takes clips up to {row['max_seconds']}s, "
                          f"this one is {probe['seconds']}s")
+    if probe and row.get("max_seconds_for"):
+        cap = row["max_seconds_for"](options)
+        if probe["seconds"] > cap:
+            raise ValueError(
+                f"{row['label']} takes a driving clip up to {int(cap)}s with "
+                f"character_orientation={options.get('character_orientation')}, this one "
+                f"is {probe['seconds']}s" + (" -- trim it, or follow the clip's "
+                                             "orientation (video, up to 30s)"
+                                             if options.get("character_orientation") == "image"
+                                             else " -- trim it"))
     return round(float(row["price"](options, probe or {})), 4)
 
 
@@ -824,7 +928,17 @@ def build_body(effect: str, urls: list[str], prompt: str, options: dict,
                probe: Optional[dict] = None) -> tuple[str, dict]:
     row = spec(effect)
     body: dict = {**row["fixed"], **options}
-    body[row["field"]] = list(urls) if row["as_list"] else urls[0]
+    if is_mixed(row):
+        # [the still, the driving clip, *face photos], as check_sources held them
+        body["image_url"], body["video_url"] = urls[0], urls[1]
+        faces = list(urls[2:2 + MOTION_FACES])
+        if faces:
+            body["elements"] = [_face_element(urls[0], faces)]
+            # the element only binds where the prompt names it
+            prompt = prompt if FACE_TAG in (prompt or "") else " ".join(
+                x for x in (FACE_TAG, prompt) if x)
+    else:
+        body[row["field"]] = list(urls) if row["as_list"] else urls[0]
     if row.get("costume"):
         # the costume is ours to word (src/costumes.py): it is not a field
         # the model takes, so it leaves the body as the prompt

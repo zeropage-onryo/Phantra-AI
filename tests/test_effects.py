@@ -43,7 +43,8 @@ def local_publish():
 def test_every_row_is_dated_and_complete():
     for name, row in effects.EFFECTS.items():
         assert row["category"] in effects.CATEGORIES, name
-        assert row["takes"] in ("image", "video") and row["output"] in ("image", "video")
+        assert row["takes"] in ("image", "video", effects.MIXED), name
+        assert row["output"] in ("image", "video"), name
         assert row["prompt"] in ("required", "optional", "none")
         if row.get("provider") == "local":       # a free look (src/free_looks.py): no fal page
             assert row["free"] is True and row["category"] == "look", name
@@ -52,7 +53,8 @@ def test_every_row_is_dated_and_complete():
             assert row["source"].startswith("https://fal.ai/models/"), name
         lo, hi = row["sources"]
         assert 1 <= lo <= hi
-        assert row.get("probe", False) == (row["takes"] == "video"), name
+        # priced off a measured clip exactly when it takes one
+        assert row.get("probe", False) == (row["takes"] in ("video", effects.MIXED)), name
 
 
 def test_the_enums_are_the_schemas_not_a_summary():

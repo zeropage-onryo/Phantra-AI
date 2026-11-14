@@ -4280,7 +4280,18 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
     if listed:
         _own_ids_only(named)
     probe = None
-    if row["takes"] == "video":
+    if effects.is_mixed(row):
+        # motion control (2026-11-14): [the still, the driving clip], each read
+        # by its own door -- the still as any reference, the clip by id only
+        # (and any face photos after the clip, read as the still is)
+        still, clip, faces = effects.split_mixed(named)
+        stills = resolve_references(still + faces, limit=1 + len(faces), who=row["label"],
+                                    dsn=dsn, account_id=account_id, listed=listed)
+        if len(stills) != 1 + len(faces):
+            raise ValueError(f"{row['label']}: one of the photos could not be read")
+        clip_urls, probe = _video_sources(clip, dsn, account_id, listed)
+        urls = stills[:1] + clip_urls + stills[1:]
+    elif row["takes"] == "video":
         urls, probe = _video_sources(named, dsn, account_id, listed,
                                      fetch=row.get("provider") != "local")
     else:
@@ -5713,7 +5724,8 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
             effect: Annotated[str, _arg("The effect's id, from `effects`.")],
             sources: Annotated[Optional[list[str]], _arg(
                 "What the effect is applied to, by id, never URLs: images for an image "
-                "effect, one clip for a clip effect.")] = None,
+                "effect, one clip for a clip effect, and for motion control the still "
+                "first, then the clip whose movement it copies.")] = None,
             prompt: Annotated[str, _arg(
                 "The instruction the effect takes; required, optional or refused per "
                 "effect, as `effects` says.")] = "",

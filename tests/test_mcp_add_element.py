@@ -1158,13 +1158,17 @@ def test_each_effect_tool_stands_for_one_effect_call():
     assert call("reframe_clip", {"source": "gen:2", "aspect": "9:16",
                                  "quality": "high"})["effect"] == "reframe-hq"
     assert call("reframe_clip", {"source": "gen:2", "aspect": "9:16"})["effect"] == "reframe"
-    # every table effect has a tool on the listing
+    # every table effect has a tool on the listing -- except motion control
+    # (2026-11-14, docs/tasks/task-motion-control.md): it is on the studio
+    # surface's apply_effect, and a tool for it would change the ChatGPT
+    # app's submitted tool list, which is Mike's call, not a side effect
     from src import effects
     made = {"nano-banana-edit", "flux-kontext-pro", "seedream-edit", "remove-background",
             "remove-video-background", "remove-video-background-pro", "kling-effect",
             "pixverse-effect", "camera-move", "upscale", "add-sound", "reframe", "reframe-hq",
             "costume-preview"}
-    assert made == {row["id"] for row in effects.catalogue()}
+    studio_only = {"motion-control", "motion-control-pro"}
+    assert made | studio_only == {row["id"] for row in effects.catalogue()}
     # a Halloween costume is edit_image with a costume picked, never words
     assert call("edit_image", {"sources": ["gen:1"], "costume": "witch"}) == {
         "effect": "costume-preview", "sources": ["gen:1"], "prompt": "",

@@ -1424,6 +1424,9 @@ def effect_line(args: dict) -> str:
 
 def _takes(row: dict) -> str:
     lo, hi = row["sources"]["min"], row["sources"]["max"]
+    if row["takes"] == "image+video":
+        return ("a still of the character, then the clip whose movement it copies, then "
+                "optionally up to 4 face photos that lock the likeness")
     what = "clip" if row["takes"] == "video" else "still"
     return f"one {what}" if hi == 1 else f"{lo} to {hi} {what}s"
 
