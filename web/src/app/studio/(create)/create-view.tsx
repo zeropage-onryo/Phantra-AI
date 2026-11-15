@@ -140,6 +140,7 @@ import {
   type Job,
   type Preset,
   type Project,
+  cutUploadMedia,
 } from "@/lib/studio-api";
 import { useMentions } from "@/components/studio/mentions";
 import { useShell } from "@/components/studio/shell";
@@ -442,6 +443,12 @@ function resumeLine(thread: Turn[]): string {
 
 const imageFiles = (list: FileList | File[] | null | undefined) =>
   Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
+/* A clip on the box (2026-11-14, docs/tasks/task-motion-control.md): uploaded
+   to the editor's media bin as an asset:<id>, so an effect names it by id
+   like any clip -- motion control's driving clip, or a clip to upscale. */
+const clipFiles = (list: FileList | File[] | null | undefined) =>
+  Array.from(list ?? []).filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
+type BoxClip = { ref: string; name: string };
 
 function Composer() {
   const { toast, balance, signedOut, me } = useShell();
@@ -546,6 +553,8 @@ function Composer() {
   const [adding, setAdding] = useState(false);
   const [open, setOpen] = useState<Asset | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
+  const [boxClips, setBoxClips] = useState<BoxClip[]>([]);
+  const [clipsUploading, setClipsUploading] = useState(0);
   const [busy, setBusy] = useState(false);
   // the Guide's progress line while it answers (null = not answering)
   const [guideWorking, setGuideWorking] = useState<string | null>(null);
@@ -1124,7 +1133,7 @@ function Composer() {
   // an upload still on its way to the bin would be left out of the run
   // (exploring, an empty box never makes from the brief: a send needs words)
   const canSend = !busy && !pending.length && !!(idea.trim() || (!explore && brief.trim()));
-  const referenceCount = picked.length + uploads.length + pending.length;
+  const referenceCount = picked.length + uploads.length + pending.length + boxClips.length + clipsUploading;
 
   /* WELCOME BACK (2026-10-20, the Vesper review): reopening a project, Vesper
      opens with one line on where it stands -- read off its scenes by the
@@ -1399,6 +1408,7 @@ function Composer() {
       setFilledBy(null);
       setPreset(null);
       setSkill(null);
+      setBoxClips([]);
       plans.current.clear();
       planLive.current.clear();
       setTimeout(() => textarea.current?.focus(), 50);
@@ -2139,8 +2149,9 @@ function Composer() {
         thread
           .filter((t) => t.made && madeStatus(t.made) === "done")
           .map((t) => ({ image: t.made?.clip ? null : t.made?.image, clip: t.made?.clip, asset: t.made?.asset })),
+        boxClips,
       ),
-    [uploads, picked, thread],
+    [uploads, picked, thread, boxClips],
   );
   /* A card opened before anything was attached (the costume card off the
      landing page) takes the first photo that is: a waiting card with no
@@ -3378,7 +3389,21 @@ function Composer() {
      to R2). The draft then remembers a URL that resolves on every machine,
      which is what lets the box survive leaving the page; a File object
      never could. The chip draws from the object URL until the server answers. */
+  const attachClips = (clips: File[]) => {
+    setClipsUploading((n) => n + clips.length);
+    for (const f of clips) {
+      cutUploadMedia(f)
+        .then((up) => {
+          setBoxClips((was) => (was.some((c) => c.ref === up.handle) ? was : [...was, { ref: up.handle, name: f.name }]));
+          toast(`${f.name} attached as a clip · use it with /effects`);
+        })
+        .catch((e) => toast(e instanceof Error ? e.message : "The clip did not upload.", "err"))
+        .finally(() => setClipsUploading((n) => Math.max(0, n - 1)));
+    }
+  };
   const attach = (files: FileList | File[] | null | undefined) => {
+    const clips = clipFiles(files);
+    if (clips.length) attachClips(clips);
     const images = imageFiles(files);
     if (!images.length) return;
     const rows: Pending[] = images.map((f) => ({ id: crypto.randomUUID(), name: f.name, url: URL.createObjectURL(f) }));
@@ -3876,6 +3901,25 @@ function Composer() {
                     </button>
                   </span>
                 ))}
+                {boxClips.map((c) => (
+                  <span key={c.ref} className="zc-chip" title={`${c.name} · a clip for effects`}>
+                    <span className="zc-chip-thumb">CLIP</span>
+                    <span className="zc-chip-name">{c.name}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${c.name}`}
+                      onClick={() => setBoxClips((was) => was.filter((x) => x.ref !== c.ref))}
+                    >
+                      <X strokeWidth={2} />
+                    </button>
+                  </span>
+                ))}
+                {clipsUploading ? (
+                  <span className="zc-chip pending" title="clip uploading…" aria-busy="true">
+                    <span className="zc-chip-thumb">CLIP</span>
+                    <span className="zc-chip-name">Uploading…</span>
+                  </span>
+                ) : null}
                 {pending.map((a) => (
                   <span key={a.id} className="zc-chip pending" title={`${a.name} · uploading…`} aria-busy="true">
                     <span className="zc-chip-thumb" style={{ backgroundImage: `url(${a.url})` }} />
@@ -3911,7 +3955,14 @@ function Composer() {
                   );
                 })}
                 {referenceCount > 1 ? (
-                  <button type="button" className="cclear" onClick={() => setDraft({ picked: [], uploads: [] })}>
+                  <button
+                    type="button"
+                    className="cclear"
+                    onClick={() => {
+                      setDraft({ picked: [], uploads: [] });
+                      setBoxClips([]);
+                    }}
+                  >
                     Clear {referenceCount}
                   </button>
                 ) : null}
@@ -3920,7 +3971,7 @@ function Composer() {
             <input
               ref={fileInput}
               type="file"
-              accept="image/*"
+              accept="image/*,video/mp4,video/quicktime,video/webm"
               multiple
               hidden
               onChange={(e) => {
@@ -4009,7 +4060,7 @@ function Composer() {
                     .filter((it) => it.kind === "file")
                     .map((it) => it.getAsFile())
                     .filter((f): f is File => !!f);
-                  if (imageFiles(files).length) {
+                  if (imageFiles(files).length || clipFiles(files).length) {
                     e.preventDefault();
                     attach(files);
                   }

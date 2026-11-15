@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   candidates, sourcesFor, unavailable, defaults, settle, optionLabel, valueLabel, missing, takesLine,
-  fromPrice, requestOf, begin, candidateOf,
+  fromPrice, requestOf, begin, candidateOf, addToPair, facesOf,
 } from '../src/lib/effects.ts';
 
 const KLING = {
@@ -131,4 +131,71 @@ test('a hook card carries its scene, and the scene never reaches the run', () =>
   assert.equal(card.hookFor, 42);
   assert.equal('hookFor' in requestOf(card), false);
   assert.equal('hookFor' in begin(KLING, candidates(['/refs/a.jpg'], []), 'h2'), false);
+});
+
+// motion control (2026-11-14): a still of the character AND a clip, in that order
+const MOTION = {
+  id: 'motion-control', label: 'Motion control (Kling 3)', category: 'motion', blurb: 'moves',
+  takes: 'image+video', output: 'video', sources: { min: 2, max: 2 }, prompt: 'optional', credits: null,
+  options: {
+    character_orientation: { values: ['image', 'video'], default: 'image', required: false },
+    keep_original_sound: { values: [true, false], default: false, required: false },
+  },
+};
+
+test('motion control binds a still then a clip, and says which half is missing', () => {
+  const all = candidates(['/refs/jensen.jpg'], [
+    { clip: 'https://r2/strut.mp4', asset: 'asset:12' },
+    { image: 'https://r2/later.png', asset: 'gen:3' },
+  ]);
+  assert.deepEqual(sourcesFor(MOTION, all).map((c) => c.ref), ['/refs/jensen.jpg', 'asset:12']);
+  assert.equal(unavailable(MOTION, all), '');
+  const stillOnly = candidates(['/refs/jensen.jpg'], []);
+  assert.equal(unavailable(MOTION, stillOnly), 'Needs a clip to copy the movement from');
+  assert.equal(unavailable(MOTION, []), 'Needs a still of the character and a clip to copy');
+  const half = begin(MOTION, stillOnly, 'fx1');
+  assert.equal(missing(MOTION, half), 'Needs a clip to copy the movement from');
+  // a clip acted on fills ITS half, the still stays
+  const clip = { ref: 'asset:12', kind: 'clip', from: 'dropped · strut.mp4' };
+  const both = begin(MOTION, half.sources, 'fx1', { on: [clip] });
+  assert.deepEqual(requestOf(both).sources, ['/refs/jensen.jpg', 'asset:12']);
+  assert.equal(missing(MOTION, both), '');
+  assert.deepEqual(both.options, { character_orientation: 'image', keep_original_sound: false });
+});
+
+test('motion control reads as words', () => {
+  assert.equal(takesLine(MOTION), "A still and a clip in, the still doing the clip's moves out");
+  assert.equal(optionLabel('character_orientation'), 'Framing from');
+  assert.equal(valueLabel('character_orientation', 'video'), 'The clip (up to 30s)');
+  assert.equal(valueLabel('keep_original_sound', false), 'No');
+});
+
+test('a clip attached to the box is a clip source, ahead of the thread\'s clips', () => {
+  const all = candidates(['/refs/jensen.jpg'], [{ clip: 'https://r2/made.mp4', asset: 'gen:4' }],
+    [{ ref: 'asset:12', name: 'strut.mp4' }]);
+  assert.deepEqual(all.map((c) => `${c.kind}:${c.ref}:${c.from}`),
+    ['image:/refs/jensen.jpg:attached', 'clip:asset:12:attached', 'clip:gen:4:the last clip']);
+  assert.deepEqual(sourcesFor(MOTION, all).map((c) => c.ref), ['/refs/jensen.jpg', 'asset:12']);
+  assert.deepEqual(sourcesFor(SOUND, all).map((c) => c.ref), ['asset:12']);
+});
+
+test('motion control: attached photos after the first lock the face, and need the clip\'s framing', () => {
+  const all = candidates(['/refs/stage.jpg', '/refs/headshot.jpg'], [], [{ ref: 'asset:12' }]);
+  const fx = begin(MOTION, all, 'fx2');
+  assert.deepEqual(requestOf(fx).sources, ['/refs/stage.jpg', 'asset:12', '/refs/headshot.jpg']);
+  assert.deepEqual(facesOf(fx).map((c) => c.ref), ['/refs/headshot.jpg']);
+  assert.equal(fx.options.character_orientation, 'video');        // turned on with the face lock
+  assert.equal(missing(MOTION, fx), '');
+  assert.equal(missing(MOTION, { ...fx, options: { ...fx.options, character_orientation: 'image' } }),
+    'Face lock needs Framing from: the clip');
+  // dropped in any order: a clip takes the clip's place, images fill still then faces
+  const img = (ref) => ({ ref, kind: 'image', from: 'dropped' });
+  const clip = { ref: 'asset:7', kind: 'clip', from: 'dropped' };
+  let cur = addToPair([], [img('/a.jpg')]);
+  cur = addToPair(cur, [img('/face1.jpg')]);
+  cur = addToPair(cur, [clip]);
+  cur = addToPair(cur, [img('/face1.jpg')]);                        // the same photo once
+  assert.deepEqual(cur.map((c) => c.ref), ['/a.jpg', 'asset:7', '/face1.jpg']);
+  for (const n of [2, 3, 4, 5]) cur = addToPair(cur, [img(`/f${n}.jpg`)]);
+  assert.equal(cur.length, 6);                                      // still + clip + 4 faces at most
 });

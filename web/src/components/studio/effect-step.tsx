@@ -135,9 +135,21 @@ export function EffectStep({
             ),
           )
         ) : (
-          <span className="fx-none">{fx.takes === "video" ? "No clip to work on yet" : "No image yet: attach a photo to the box below"}</span>
+          <span className="fx-none">
+            {fx.takes === "image+video"
+              ? "Needs a still and a clip"
+              : fx.takes === "video"
+                ? "No clip to work on yet"
+                : "No image yet: attach a photo to the box below"}
+          </span>
         )}
-        {fx.sources.length ? <small>On {fx.sources[0].from}{fx.sources.length > 1 ? ` + ${fx.sources.length - 1} more` : ""}</small> : null}
+        {fx.sources.length ? (
+          <small>
+            {fx.takes === "image+video"
+              ? `${fx.sources[0].from} doing the moves from ${fx.sources[1]?.from ?? "a clip"}`
+              : `On ${fx.sources[0].from}${fx.sources.length > 1 ? ` + ${fx.sources.length - 1} more` : ""}`}
+          </small>
+        ) : null}
       </div>
 
       {effect && open
@@ -214,7 +226,9 @@ export function EffectStep({
           rows={2}
           maxLength={2000}
           placeholder={
-            effect.takes === "video"
+            effect.takes === "image+video"
+              ? "Optional: the scene, e.g. a man in a leather jacket on a stage…"
+              : effect.takes === "video"
               ? effect.prompt === "required"
                 ? "What it should sound like…"
                 : "Optional: what belongs in the new area…"

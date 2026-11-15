@@ -38,7 +38,7 @@ export type PublicEffect = {
   description: string;
   group: EffectGroup;
   media: ShowcaseItem;
-  takes: "image" | "video";
+  takes: "image" | "video" | "image+video";
   output: "image" | "video";
   free: boolean;
   /** credits at its defaults; null when the clip's length decides */
@@ -137,6 +137,7 @@ export function costLine(e: PublicEffect): string {
 
 /** What it needs from the person. */
 export function needsLine(e: PublicEffect): string {
+  if (e.takes === "image+video") return "One photo and one clip";
   return e.takes === "video" ? "One clip" : "One photo";
 }
 

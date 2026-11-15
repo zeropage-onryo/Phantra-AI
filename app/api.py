@@ -6181,14 +6181,16 @@ EFFECT_BLURBS = {
     "reframe-hq": "A new shape for a clip, at higher quality and a higher price.",
     "remove-video-background": "Cut a clip's subject out on a transparent background.",
     "remove-video-background-pro": "Remove or replace a clip's background, sound kept.",
+    "motion-control": "Make the person in a still do the moves from a clip.",
+    "motion-control-pro": "Make the person in a still do the moves from a clip, at Kling's top tier.",
     # the free looks (src/free_looks.py, 2026-10-22): their own words, from the table
     **{name: look["blurb"] for name, look in looks.LOOKS.items()},
     # the recipe effects (src/effect_recipes.py, 2026-10-26): their own words
     **{name: r["blurb"] for name, r in effect_recipes.RECIPES.items()},
 }
 EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
-                          "camera": "Camera moves", "finish": "Finish a clip",
-                          "look": "Free looks"}
+                          "camera": "Camera moves", "motion": "Copy a movement",
+                          "finish": "Finish a clip", "look": "Free looks"}
 # What each effect is FOR, as the Effects tab filters it (2026-10-22,
 # docs/tasks/task-effects-tab.md): cinematic / social / product. A row in
 # src/effects.py may carry its own `tags` (the free looks do); this is the
@@ -6208,6 +6210,8 @@ EFFECT_TAGS = {
     "reframe-hq": ("social", "cinematic"),
     "remove-video-background": ("product",),
     "remove-video-background-pro": ("product",),
+    "motion-control": ("social", "cinematic"),
+    "motion-control-pro": ("social", "cinematic"),
 }
 EFFECT_SOURCES_MAX = 4
 
@@ -6320,9 +6324,12 @@ def _effect_request(account_id: int, body: EffectBody) -> dict:
         raise ValueError(f"at most {EFFECT_SOURCES_MAX} sources")
     effects.check_sources(name, len(named), opts)
     probe = None
-    if row["takes"] == "video":
-        # a clip is named by id, and priced off its measured length and size
-        clip = mcp_server._clip_row(named[0], None, account_id)
+    if row["takes"] == "video" or effects.is_mixed(row):
+        # a clip is named by id, and priced off its measured length and size;
+        # a motion transfer's clip is its SECOND source, after the still
+        # (and before any face photos)
+        clip = mcp_server._clip_row(named[1] if effects.is_mixed(row) else named[0],
+                                    None, account_id)
         local = clip.get("output_path") or ""
         probe = effects.probe_video(local if local and Path(local).is_file() else clip["media_url"])
     usd = effects.quote_usd(name, opts, probe)
@@ -6345,15 +6352,17 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
     run time only: an image the composer holds has to be uploaded first.
     Raises ValueError when a source cannot be read or made fetchable -- an
     effect must not be paid for against a picture it never saw."""
-    from src import fal, mcp_server
+    from src import effects, fal, mcp_server
     row = req["row"]
     if row.get("provider") == "local":
         return []           # a free look reads its clip from this disk by id (src/free_looks.py)
     if row["takes"] == "video":
         urls, _ = mcp_server._video_sources(req["sources"], None, account_id)
         return urls
+    still, clip, faces = (effects.split_mixed(req["sources"]) if effects.is_mixed(row)
+                          else (req["sources"], [], []))
     urls = []
-    for ref in req["sources"]:
+    for ref in still + faces:
         kind, _, rest = ref.partition(":")
         if kind in ("gen", "asset") and rest.isdigit():
             urls += mcp_server.resolve_references([ref], limit=1, who=row["label"],
@@ -6367,6 +6376,9 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
         if not url:
             raise ValueError("one of the images could not be read or made fetchable")
         urls.append(url)
+    if clip:
+        # motion control's driving clip goes after its still, before any face photos
+        urls[1:1] = mcp_server._video_sources(clip, None, account_id)[0]
     return urls
 
 

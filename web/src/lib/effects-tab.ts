@@ -60,7 +60,10 @@ export function makeItPro<E extends Pick<Effect, "id">>(items: E[]): E | null {
 
 /** Does the dropped thing fit what this effect takes? */
 export const fits = (effect: Pick<Effect, "takes">, source: Pick<Candidate, "kind"> | null) =>
-  !!source && (effect.takes === "video" ? source.kind === "clip" : source.kind === "image");
+  !!source &&
+  // motion control takes a still AND a clip: either is half of its pair, and
+  // begin() puts the panel's two slots in order (lib/effects.ts addToPair)
+  (effect.takes === "image+video" || (effect.takes === "video" ? source.kind === "clip" : source.kind === "image"));
 
 /** A dropped file, by what the page can make of it. */
 export function acceptsFile(file: { type?: string | null; name?: string | null }): "clip" | "image" | null {

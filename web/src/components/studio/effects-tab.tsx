@@ -355,6 +355,9 @@ export function EffectsTab() {
 
   const wants = effect ? slotLabel(effect, chosen?.preset?.name) : "Photo or clip";
   const takesTwo = !!effect && effect.sources.max > 1;
+  // motion control (2026-11-14): the first slot is the still, the second the
+  // clip it copies -- dropped either way round, begin() puts them in order
+  const mixed = effect?.takes === "image+video";
   const mismatch = effect && source && !fits(effect, source) ? (effect.takes === "video" ? "This effect works on a clip" : "This effect works on a photo") : "";
   const buttonLine = !chosen
     ? "Pick an effect"
@@ -375,7 +378,7 @@ export function EffectsTab() {
 
   const slot = (which: "first" | "second") => {
     const held = which === "first" ? source : second;
-    const label = which === "first" ? wants : `Second ${wants.toLowerCase()}`;
+    const label = mixed ? (which === "first" ? "Photo of the character" : "Clip to copy the moves from") : which === "first" ? wants : `Second ${wants.toLowerCase()}`;
     return (
       <div
         key={which}
@@ -402,7 +405,7 @@ export function EffectsTab() {
         )}
         <span className="fxp-slot-words">
           <b>{label}</b>
-          <span>{loading === which ? "Loading…" : held ? held.from : which === "second" ? "Optional · for effects with two people" : "Drop it here, choose a file or use your Library"}</span>
+          <span>{loading === which ? "Loading…" : held ? held.from : which === "second" ? (mixed ? "A dance, a walk: the clip whose movement it copies" : "Optional · for effects with two people") : "Drop it here, choose a file or use your Library"}</span>
         </span>
         <span className="fxp-slot-acts">
           {held ? (
@@ -487,7 +490,7 @@ export function EffectsTab() {
         <LibraryDrawer
           open={!!picker}
           onClose={() => setPicker(null)}
-          accept={effect ? (effect.takes === "video" ? "video" : "image") : "any"}
+          accept={effect ? (mixed ? (picker === "second" ? "video" : "image") : effect.takes === "video" ? "video" : "image") : "any"}
           max={1}
           onPick={pick}
           onFiles={(files) => picker && files[0] && void takeFile(files[0], picker)}

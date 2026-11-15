@@ -813,6 +813,86 @@
    "made_with": ""
   },
   {
+   "id": "motion-control",
+   "label": "Motion control (Kling 3)",
+   "category": "motion",
+   "blurb": "Make the person in a still do the moves from a clip.",
+   "takes": "image+video",
+   "output": "video",
+   "sources": {
+    "min": 2,
+    "max": 6
+   },
+   "prompt": "optional",
+   "options": {
+    "character_orientation": {
+     "values": [
+      "image",
+      "video"
+     ],
+     "default": "image",
+     "required": false
+    },
+    "keep_original_sound": {
+     "values": [
+      true,
+      false
+     ],
+     "default": false,
+     "required": false
+    }
+   },
+   "credits": null,
+   "free": false,
+   "tags": [
+    "social",
+    "cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
+   "id": "motion-control-pro",
+   "label": "Motion control Pro (Kling 3)",
+   "category": "motion",
+   "blurb": "Make the person in a still do the moves from a clip, at Kling's top tier.",
+   "takes": "image+video",
+   "output": "video",
+   "sources": {
+    "min": 2,
+    "max": 6
+   },
+   "prompt": "optional",
+   "options": {
+    "character_orientation": {
+     "values": [
+      "image",
+      "video"
+     ],
+     "default": "image",
+     "required": false
+    },
+    "keep_original_sound": {
+     "values": [
+      true,
+      false
+     ],
+     "default": false,
+     "required": false
+    }
+   },
+   "credits": null,
+   "free": false,
+   "tags": [
+    "social",
+    "cinematic"
+   ],
+   "recipe": false,
+   "hint": "",
+   "made_with": ""
+  },
+  {
    "id": "film_grade",
    "label": "Film Grade",
    "category": "look",
