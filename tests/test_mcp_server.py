@@ -861,7 +861,7 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert tuple(listed_names) == mcp_server.LISTED_TOOLS          # and in this order
     assert mcp_server.LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "upload_link", "image_models", "video_models",
+        "elements", "add_element", "add_attached_photo", "upload_link", "image_models", "video_models",
         "generate_image", "edit_image", "remove_background", "animate_still",
         "camera_move", "upscale_clip", "add_sound", "reframe_clip",
         "write_scene", "scene", "quote", "approve", "job",
