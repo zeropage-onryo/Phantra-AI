@@ -140,8 +140,12 @@ def _counted(request: Request, account_id: int) -> Optional[dict]:
 def billing_balance(request: Request, account_id: int = Depends(auth.current_account_id)):
     if account_id is None:
         return _no_account()
+    from src import welcome_offer
     return {**billing.balance(account_id), "prices": action_prices(),
-            "account": _counted(request, account_id)}
+            "account": _counted(request, account_id),
+            # the first-plan discount the out-of-credits popup offers
+            # (src/welcome_offer.py); None for anyone it does not apply to
+            "welcome_offer": welcome_offer.for_account(account_id)}
 
 
 def billing_history(request: Request, before: Optional[int] = None,
